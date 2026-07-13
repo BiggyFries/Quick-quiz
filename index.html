@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quick Quiz</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #07111f; }
+    canvas { width: min(92vw, 900px); height: auto; aspect-ratio: 16 / 10; border: 2px solid #28415f; border-radius: 18px; box-shadow: 0 20px 70px #0008; background: #0d1d31; }
+  </style>
+</head>
+<body>
+<canvas id="game" width="900" height="560" aria-label="Quick Quiz game"></canvas>
+<script>
+(() => {
+  const canvas = document.querySelector('#game');
+  const ctx = canvas.getContext('2d');
+  const questions = [
+    { q: 'Which planet is known as the Red Planet?', choices: ['Venus', 'Mars', 'Jupiter', 'Mercury'], answer: 1 },
+    { q: 'How many sides does a hexagon have?', choices: ['Five', 'Six', 'Seven', 'Eight'], answer: 1 },
+    { q: 'What is the largest ocean on Earth?', choices: ['Atlantic', 'Indian', 'Pacific', 'Arctic'], answer: 2 },
+    { q: 'Which animal is famous for changing its colors?', choices: ['Chameleon', 'Penguin', 'Elephant', 'Dolphin'], answer: 0 },
+    { q: 'What do bees collect from flowers?', choices: ['Pebbles', 'Nectar', 'Sand', 'Dew'], answer: 1 }
+  ];
+  const state = { mode: 'start', round: 0, score: 0, selected: -1, message: '', nextAt: 0 };
+  const W = canvas.width, H = canvas.height;
+
+  function reset() { state.mode = 'playing'; state.round = 0; state.score = 0; state.selected = -1; state.message = ''; state.nextAt = 0; }
+  function wrap(text, maxWidth) {
+    const words = text.split(' '), lines = []; let line = '';
+    for (const word of words) { const test = line ? line + ' ' + word : word; if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = word; } else line = test; }
+    if (line) lines.push(line); return lines;
+  }
+  function roundRect(x, y, w, h, r, fill, stroke) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.stroke(); } }
+  function drawBackground() {
+    const gradient = ctx.createLinearGradient(0, 0, W, H); gradient.addColorStop(0, '#102b4b'); gradient.addColorStop(1, '#07111f'); ctx.fillStyle = gradient; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#4ed1b4'; ctx.globalAlpha = 0.09; ctx.beginPath(); ctx.arc(90, 80, 120, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(840, 500, 180, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+  }
+  function text(value, x, y, size, color, align = 'left', weight = 500) { ctx.font = `${weight} ${size}px Inter, system-ui, sans-serif`; ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(value, x, y); }
+  function render() {
+    drawBackground();
+    if (state.mode === 'start') return drawStart();
+    if (state.mode === 'done') return drawDone();
+    drawQuiz();
+  }
+  function drawStart() {
+    text('QUICK QUIZ', W / 2, 170, 54, '#f5fbff', 'center', 800); text('A tiny five-round trivia challenge', W / 2, 215, 20, '#a9c4dc', 'center');
+    roundRect(290, 285, 320, 76, 18, '#4ed1b4'); text('START GAME', W / 2, 333, 24, '#06201e', 'center', 800); text('Click the button or press Enter', W / 2, 415, 17, '#9db4cb', 'center');
+  }
+  function drawQuiz() {
+    const current = questions[state.round];
+    text(`ROUND ${state.round + 1} / ${questions.length}`, 70, 70, 17, '#4ed1b4', 'left', 800); text(`SCORE  ${state.score}`, 830, 70, 17, '#dcecff', 'right', 700);
+    ctx.fillStyle = '#203b58'; ctx.fillRect(70, 92, 760, 8); ctx.fillStyle = '#4ed1b4'; ctx.fillRect(70, 92, 760 * (state.round / questions.length), 8);
+    const lines = wrap(current.q, 730); lines.forEach((line, i) => text(line, W / 2, 175 + i * 38, 31, '#f5fbff', 'center', 750));
+    current.choices.forEach((choice, i) => { const y = 270 + i * 58; const picked = state.selected === i; const fill = picked ? (i === current.answer ? '#2d967f' : '#a4565d') : '#142c46'; roundRect(145, y, 610, 44, 12, fill, picked ? '#f5fbff' : '#2a4865'); text(`${String.fromCharCode(65 + i)}.  ${choice}`, 175, y + 29, 18, '#f5fbff'); });
+    if (state.message) text(state.message, W / 2, 520, 18, state.message.startsWith('Correct') ? '#6de2c4' : '#ffb4b4', 'center', 700);
+  }
+  function drawDone() { text('QUIZ COMPLETE', W / 2, 175, 48, '#f5fbff', 'center', 800); text(`You scored ${state.score} out of ${questions.length}`, W / 2, 240, 28, '#4ed1b4', 'center', 700); roundRect(290, 315, 320, 70, 18, '#4ed1b4'); text('PLAY AGAIN', W / 2, 360, 23, '#06201e', 'center', 800); text('Press Enter or click to restart', W / 2, 445, 17, '#9db4cb', 'center'); }
+  function choose(index) { if (state.mode !== 'playing' || state.selected !== -1) return; state.selected = index; if (index === questions[state.round].answer) { state.score++; state.message = 'Correct!'; } else state.message = `Not quite — the answer was ${questions[state.round].choices[questions[state.round].answer]}.`; state.nextAt = performance.now() + 900; render(); }
+  canvas.addEventListener('click', (event) => { const rect = canvas.getBoundingClientRect(); const x = (event.clientX - rect.left) * W / rect.width, y = (event.clientY - rect.top) * H / rect.height; if (state.mode === 'start' || state.mode === 'done') { reset(); render(); return; } if (y >= 270 && y < 502) choose(Math.floor((y - 270) / 58)); });
+  window.addEventListener('keydown', (event) => { if (event.key === 'Enter' && state.mode !== 'playing') { reset(); render(); } if (state.mode === 'playing' && ['1','2','3','4'].includes(event.key)) choose(Number(event.key) - 1); if (event.key.toLowerCase() === 'f') document.fullscreenElement ? document.exitFullscreen() : canvas.requestFullscreen(); });
+  function update() { if (state.mode === 'playing' && state.selected !== -1 && performance.now() >= state.nextAt) { state.round++; state.selected = -1; state.message = ''; if (state.round >= questions.length) state.mode = 'done'; render(); } }
+  window.advanceTime = (ms) => { const end = performance.now() + ms; while (performance.now() < end) update(); update(); render(); };
+  window.render_game_to_text = () => JSON.stringify({ mode: state.mode, round: state.round + 1, totalRounds: questions.length, score: state.score, selected: state.selected, message: state.message, controls: 'Click an answer or press 1-4; Enter starts/restarts; F toggles fullscreen' });
+  setInterval(update, 50); render();
+})();
+</script>
+</body>
+</html>
