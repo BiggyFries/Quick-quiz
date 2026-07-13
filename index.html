@@ -18,11 +18,16 @@
   const canvas = document.querySelector('#game');
   const ctx = canvas.getContext('2d');
   const questions = [
-    { q: 'Which planet is known as the Red Planet?', choices: ['Venus', 'Mars', 'Jupiter', 'Mercury'], answer: 1 },
-    { q: 'How many sides does a hexagon have?', choices: ['Five', 'Six', 'Seven', 'Eight'], answer: 1 },
-    { q: 'What is the largest ocean on Earth?', choices: ['Atlantic', 'Indian', 'Pacific', 'Arctic'], answer: 2 },
-    { q: 'Which animal is famous for changing its colors?', choices: ['Chameleon', 'Penguin', 'Elephant', 'Dolphin'], answer: 0 },
-    { q: 'What do bees collect from flowers?', choices: ['Pebbles', 'Nectar', 'Sand', 'Dew'], answer: 1 }
+    { q: 'Which ancient civilization built Machu Picchu?', choices: ['Maya', 'Inca', 'Roman', 'Phoenician'], answer: 1 },
+    { q: 'What is the chemical symbol for tungsten?', choices: ['T', 'Tu', 'W', 'Tg'], answer: 2 },
+    { q: 'Which novel begins with the line “Call me Ishmael”?', choices: ['Moby-Dick', 'The Odyssey', 'Ulysses', 'The Great Gatsby'], answer: 0 },
+    { q: 'What is the smallest prime number greater than 50?', choices: ['51', '53', '57', '59'], answer: 1 },
+    { q: 'Which composer wrote “The Four Seasons”?', choices: ['Mozart', 'Bach', 'Vivaldi', 'Beethoven'], answer: 2 },
+    { q: 'What is the capital city of Mongolia?', choices: ['Astana', 'Bishkek', 'Ulaanbaatar', 'Tashkent'], answer: 2 },
+    { q: 'In computing, what does CPU stand for?', choices: ['Central Processing Unit', 'Computer Power Utility', 'Core Program Upload', 'Central Program User'], answer: 0 },
+    { q: 'Which layer of Earth is liquid and surrounds the inner core?', choices: ['Crust', 'Mantle', 'Outer core', 'Lithosphere'], answer: 2 },
+    { q: 'What is the main language spoken in Brazil?', choices: ['Spanish', 'Portuguese', 'French', 'Italian'], answer: 1 },
+    { q: 'Which mathematician is associated with the theorem a² + b² = c²?', choices: ['Euclid', 'Pythagoras', 'Archimedes', 'Fermat'], answer: 1 }
   ];
   const state = { mode: 'start', round: 0, score: 0, selected: -1, message: '', nextAt: 0 };
   const W = canvas.width, H = canvas.height;
@@ -46,7 +51,7 @@
     drawQuiz();
   }
   function drawStart() {
-    text('QUICK QUIZ', W / 2, 170, 54, '#f5fbff', 'center', 800); text('A tiny five-round trivia challenge', W / 2, 215, 20, '#a9c4dc', 'center');
+    text('QUICK QUIZ', W / 2, 170, 54, '#f5fbff', 'center', 800); text('A ten-round challenge for curious minds', W / 2, 215, 20, '#a9c4dc', 'center');
     roundRect(290, 285, 320, 76, 18, '#4ed1b4'); text('START GAME', W / 2, 333, 24, '#06201e', 'center', 800); text('Click the button or press Enter', W / 2, 415, 17, '#9db4cb', 'center');
   }
   function drawQuiz() {
@@ -63,7 +68,7 @@
   window.addEventListener('keydown', (event) => { if (event.key === 'Enter' && state.mode !== 'playing') { reset(); render(); } if (state.mode === 'playing' && ['1','2','3','4'].includes(event.key)) choose(Number(event.key) - 1); if (event.key.toLowerCase() === 'f') document.fullscreenElement ? document.exitFullscreen() : canvas.requestFullscreen(); });
   function update() { if (state.mode === 'playing' && state.selected !== -1 && performance.now() >= state.nextAt) { state.round++; state.selected = -1; state.message = ''; if (state.round >= questions.length) state.mode = 'done'; render(); } }
   window.advanceTime = (ms) => { const end = performance.now() + ms; while (performance.now() < end) update(); update(); render(); };
-  window.render_game_to_text = () => JSON.stringify({ mode: state.mode, round: state.round + 1, totalRounds: questions.length, score: state.score, selected: state.selected, message: state.message, controls: 'Click an answer or press 1-4; Enter starts/restarts; F toggles fullscreen' });
+  window.render_game_to_text = () => JSON.stringify({ mode: state.mode, round: Math.min(state.round + 1, questions.length), totalRounds: questions.length, score: state.score, selected: state.selected, message: state.message, controls: 'Click an answer or press 1-4; Enter starts/restarts; F toggles fullscreen' });
   setInterval(update, 50); render();
 })();
 </script>
