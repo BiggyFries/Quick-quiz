@@ -3,73 +3,115 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Quick Quiz</title>
+  <title>Five Rooms</title>
   <style>
     :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #07111f; }
-    canvas { width: min(92vw, 900px); height: auto; aspect-ratio: 16 / 10; border: 2px solid #28415f; border-radius: 18px; box-shadow: 0 20px 70px #0008; background: #0d1d31; }
+    canvas { width: min(94vw, 980px); height: auto; aspect-ratio: 16 / 10; border: 2px solid #28415f; border-radius: 18px; box-shadow: 0 24px 80px #0009; background: #0d1d31; touch-action: manipulation; }
   </style>
 </head>
 <body>
-<canvas id="game" width="900" height="560" aria-label="Quick Quiz game"></canvas>
+<canvas id="game" width="980" height="612" aria-label="Five Rooms daily puzzle game"></canvas>
 <script>
 (() => {
   const canvas = document.querySelector('#game');
   const ctx = canvas.getContext('2d');
-  const questions = [
-    { q: 'Which ancient civilization built Machu Picchu?', choices: ['Maya', 'Inca', 'Roman', 'Phoenician'], answer: 1 },
-    { q: 'What is the chemical symbol for tungsten?', choices: ['T', 'Tu', 'W', 'Tg'], answer: 2 },
-    { q: 'Which novel begins with the line “Call me Ishmael”?', choices: ['Moby-Dick', 'The Odyssey', 'Ulysses', 'The Great Gatsby'], answer: 0 },
-    { q: 'What is the smallest prime number greater than 50?', choices: ['51', '53', '57', '59'], answer: 1 },
-    { q: 'Which composer wrote “The Four Seasons”?', choices: ['Mozart', 'Bach', 'Vivaldi', 'Beethoven'], answer: 2 },
-    { q: 'What is the capital city of Mongolia?', choices: ['Astana', 'Bishkek', 'Ulaanbaatar', 'Tashkent'], answer: 2 },
-    { q: 'In computing, what does CPU stand for?', choices: ['Central Processing Unit', 'Computer Power Utility', 'Core Program Upload', 'Central Program User'], answer: 0 },
-    { q: 'Which layer of Earth is liquid and surrounds the inner core?', choices: ['Crust', 'Mantle', 'Outer core', 'Lithosphere'], answer: 2 },
-    { q: 'What is the main language spoken in Brazil?', choices: ['Spanish', 'Portuguese', 'French', 'Italian'], answer: 1 },
-    { q: 'Which mathematician is associated with the theorem a² + b² = c²?', choices: ['Euclid', 'Pythagoras', 'Archimedes', 'Fermat'], answer: 1 }
-  ];
-  const state = { mode: 'start', round: 0, score: 0, selected: -1, message: '', nextAt: 0 };
   const W = canvas.width, H = canvas.height;
+  const TIMEZONE = 'America/Los_Angeles';
+  const ROOM_NAMES = ['TRIVIA', 'LOGIC', 'MEMORY', 'REACTION', 'FINALE'];
+  const ROOM_ICONS = ['?', '◆', '✦', '!', '★'];
+  const ROOM_COLORS = ['#4ed1b4', '#8bb5ff', '#d7a2ff', '#ffbe63', '#ff7f9c'];
+  const THEMES = ['Donut Day', 'Deep Sea', 'Retro Arcade', 'Night Garden', 'Space Station', 'Ancient Maps', 'Cozy Kitchen', 'Rainy City', 'Tiny Giants', 'Movie Magic', 'Wild Weather', 'Hidden History', 'Ocean Myths', 'Bright Futures'];
+  const triviaPool = [
+    ['Which ancient civilization built Machu Picchu?', ['Maya', 'Inca', 'Roman', 'Phoenician'], 1],
+    ['What is the chemical symbol for tungsten?', ['T', 'Tu', 'W', 'Tg'], 2],
+    ['Which novel begins with “Call me Ishmael”?', ['Moby-Dick', 'The Odyssey', 'Ulysses', 'The Great Gatsby'], 0],
+    ['What is the smallest prime number greater than 50?', ['51', '53', '57', '59'], 1],
+    ['Which composer wrote “The Four Seasons”?', ['Mozart', 'Bach', 'Vivaldi', 'Beethoven'], 2],
+    ['What is the capital city of Mongolia?', ['Astana', 'Bishkek', 'Ulaanbaatar', 'Tashkent'], 2],
+    ['In computing, what does CPU stand for?', ['Central Processing Unit', 'Computer Power Utility', 'Core Program Upload', 'Central Program User'], 0],
+    ['Which layer surrounds Earth’s inner core?', ['Crust', 'Mantle', 'Outer core', 'Lithosphere'], 2],
+    ['What is the main language spoken in Brazil?', ['Spanish', 'Portuguese', 'French', 'Italian'], 1],
+    ['Which mathematician is associated with a² + b² = c²?', ['Euclid', 'Pythagoras', 'Archimedes', 'Fermat'], 1],
+    ['Which gas makes up most of Earth’s atmosphere?', ['Oxygen', 'Nitrogen', 'Argon', 'Carbon dioxide'], 1],
+    ['What is the hardest natural mineral?', ['Quartz', 'Topaz', 'Diamond', 'Graphite'], 2],
+    ['Which instrument measures atmospheric pressure?', ['Barometer', 'Altimeter', 'Hygrometer', 'Anemometer'], 0],
+    ['How many bones are in the adult human body, approximately?', ['106', '206', '306', '406'], 1]
+  ];
+  const state = {
+    mode: 'start', room: 0, score: 0, official: true, attempt: 1, startedAt: 0, roomStartedAt: 0,
+    selected: -1, roomResult: [], feedback: '', clock: 0, transitionUntil: 0, sequence: [], sequenceIndex: 0,
+    reactionReadyAt: 0, reactionStarted: false, reactionStart: 0, level: null, stats: null, prefersReducedMotion: false
+  };
 
-  function reset() { state.mode = 'playing'; state.round = 0; state.score = 0; state.selected = -1; state.message = ''; state.nextAt = 0; }
-  function wrap(text, maxWidth) {
-    const words = text.split(' '), lines = []; let line = '';
-    for (const word of words) { const test = line ? line + ' ' + word : word; if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = word; } else line = test; }
-    if (line) lines.push(line); return lines;
+  const levelQueue = THEMES.map((theme, i) => ({
+    id: `2026-demo-${String(i + 1).padStart(2, '0')}`,
+    theme, approved: true, difficultyTarget: 'challenging',
+    finalPrompt: [`Arrange these bakery clues from smallest to largest: crumb, bite, pastry, feast`, `Which creature is most at home in this theme?`, `Which sequence completes the arcade pattern?`, `Which clue belongs in a night garden?`, `Which object would you pack for orbit?`, `Which map clue points furthest east?`, `Which ingredient changes the recipe most?`, `Which city clue belongs in the rain?`, `Which animal is tiny but mighty?`, `Which film clue is the odd one out?`, `Which weather clue signals a storm?`, `Which historical clue is oldest?`, `Which sea legend is the outlier?`, `Which invention best represents the future?`][i],
+    finalChoices: [
+      ['crumb → bite → pastry → feast', 'feast → pastry → bite → crumb', 'bite → crumb → feast → pastry', 'pastry → feast → crumb → bite'],
+      ['Jellyfish', 'Camel', 'Mole', 'Yak'], ['A-B-C-D', 'A-C-B-D', 'D-C-B-A', 'B-A-D-C'], ['Moonflower', 'Cactus', 'Pine tree', 'Wheat'], ['A telescope', 'A surfboard', 'A snow shovel', 'A canoe'], ['The sunrise', 'The sunset', 'The compass', 'The anchor'], ['Salt', 'A wooden spoon', 'A plate', 'A napkin'], ['Umbrella', 'Sunglasses', 'Sandals', 'Fan'], ['Tardigrade', 'Giraffe', 'Blue whale', 'Eagle'], ['A director', 'A camera', 'A screenplay', 'A toaster'], ['Pressure drop', 'Clear skies', 'Warm blanket', 'Dry pavement'], ['A smartphone', 'A clay tablet', 'A steam engine', 'A radio'], ['Mermaid', 'Kelp forest', 'Coral reef', 'Mountain goat'], ['Solar panel', 'Telegraph', 'Abacus', 'Candle']
+    ],
+    finalAnswer: [0, 0, 1, 0, 0, 2, 0, 0, 0, 3, 0, 1, 3, 0][i]
+  }));
+  let level;
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function dateKeyInTimezone(date = new Date()) {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date).reduce((o, p) => (o[p.type] = p.value, o), {});
+    return `${parts.year}-${parts.month}-${parts.day}`;
   }
-  function roundRect(x, y, w, h, r, fill, stroke) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.stroke(); } }
-  function drawBackground() {
-    const gradient = ctx.createLinearGradient(0, 0, W, H); gradient.addColorStop(0, '#102b4b'); gradient.addColorStop(1, '#07111f'); ctx.fillStyle = gradient; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#4ed1b4'; ctx.globalAlpha = 0.09; ctx.beginPath(); ctx.arc(90, 80, 120, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(840, 500, 180, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+  function dayNumber(key) { return Math.floor(Date.UTC(...key.split('-').map(Number).map((v, i) => i === 1 ? v - 1 : v)) / 86400000); }
+  function levelForDate(key) { const exact = levelQueue.find((item) => item.date === key); const source = exact || levelQueue[((dayNumber(key) % levelQueue.length) + levelQueue.length) % levelQueue.length]; return { ...source, id: `five-rooms-${key}-v1`, dateKey: key }; }
+  function formatDate(key) { return new Intl.DateTimeFormat('en-US', { timeZone: TIMEZONE, month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(`${key}T12:00:00Z`)); }
+  function loadStats() { try { return JSON.parse(localStorage.getItem('fiveRoomsStats') || '{}'); } catch { return {}; } }
+  function saveStats(result) {
+    const stats = loadStats(); const key = state.level.dateKey; const previous = stats.days?.[key];
+    const days = stats.days || {}; days[key] = { ...result, bestScore: Math.max(result.score, previous?.bestScore || 0), attempts: (previous?.attempts || 0) + 1 };
+    const keys = Object.keys(days).sort(); const last = keys[keys.length - 2];
+    const currentStreak = previous ? (stats.currentStreak || 1) : (last && dayNumber(key) - dayNumber(last) === 1 ? (days[last]?.completed ? (stats.currentStreak || 0) + 1 : 1) : 1);
+    const next = { days, streak: Math.max(stats.streak || 0, currentStreak), currentStreak };
+    localStorage.setItem('fiveRoomsStats', JSON.stringify(next)); state.stats = next; return next;
   }
+  function resetRun(isRetry = false) {
+    state.mode = 'playing'; state.room = 0; state.score = 0; state.official = !isRetry; state.attempt = isRetry ? state.attempt + 1 : 1; state.startedAt = state.clock; state.roomStartedAt = state.clock; state.selected = -1; state.roomResult = []; state.feedback = ''; state.transitionUntil = 0; state.sequence = []; state.sequenceIndex = 0; state.reactionReadyAt = 0; state.reactionStarted = false; state.reactionStart = 0;
+  }
+  function startGame() { resetRun(false); render(); }
+  function retryGame() { resetRun(true); render(); }
+  function setLevel() { const key = dateKeyInTimezone(); level = levelForDate(key); level.dateKey = key; state.level = level; state.stats = loadStats(); state.prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches; }
   function text(value, x, y, size, color, align = 'left', weight = 500) { ctx.font = `${weight} ${size}px Inter, system-ui, sans-serif`; ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(value, x, y); }
-  function render() {
-    drawBackground();
-    if (state.mode === 'start') return drawStart();
-    if (state.mode === 'done') return drawDone();
-    drawQuiz();
-  }
-  function drawStart() {
-    text('QUICK QUIZ', W / 2, 170, 54, '#f5fbff', 'center', 800); text('A ten-round challenge for curious minds', W / 2, 215, 20, '#a9c4dc', 'center');
-    roundRect(290, 285, 320, 76, 18, '#4ed1b4'); text('START GAME', W / 2, 333, 24, '#06201e', 'center', 800); text('Click the button or press Enter', W / 2, 415, 17, '#9db4cb', 'center');
-  }
-  function drawQuiz() {
-    const current = questions[state.round];
-    text(`ROUND ${state.round + 1} / ${questions.length}`, 70, 70, 17, '#4ed1b4', 'left', 800); text(`SCORE  ${state.score}`, 830, 70, 17, '#dcecff', 'right', 700);
-    ctx.fillStyle = '#203b58'; ctx.fillRect(70, 92, 760, 8); ctx.fillStyle = '#4ed1b4'; ctx.fillRect(70, 92, 760 * (state.round / questions.length), 8);
-    const lines = wrap(current.q, 730); lines.forEach((line, i) => text(line, W / 2, 175 + i * 38, 31, '#f5fbff', 'center', 750));
-    current.choices.forEach((choice, i) => { const y = 270 + i * 58; const picked = state.selected === i; const fill = picked ? (i === current.answer ? '#2d967f' : '#a4565d') : '#142c46'; roundRect(145, y, 610, 44, 12, fill, picked ? '#f5fbff' : '#2a4865'); text(`${String.fromCharCode(65 + i)}.  ${choice}`, 175, y + 29, 18, '#f5fbff'); });
-    if (state.message) text(state.message, W / 2, 520, 18, state.message.startsWith('Correct') ? '#6de2c4' : '#ffb4b4', 'center', 700);
-  }
-  function drawDone() { text('QUIZ COMPLETE', W / 2, 175, 48, '#f5fbff', 'center', 800); text(`You scored ${state.score} out of ${questions.length}`, W / 2, 240, 28, '#4ed1b4', 'center', 700); roundRect(290, 315, 320, 70, 18, '#4ed1b4'); text('PLAY AGAIN', W / 2, 360, 23, '#06201e', 'center', 800); text('Press Enter or click to restart', W / 2, 445, 17, '#9db4cb', 'center'); }
-  function choose(index) { if (state.mode !== 'playing' || state.selected !== -1) return; state.selected = index; if (index === questions[state.round].answer) { state.score++; state.message = 'Correct!'; } else state.message = `Not quite — the answer was ${questions[state.round].choices[questions[state.round].answer]}.`; state.nextAt = performance.now() + 900; render(); }
-  canvas.addEventListener('click', (event) => { const rect = canvas.getBoundingClientRect(); const x = (event.clientX - rect.left) * W / rect.width, y = (event.clientY - rect.top) * H / rect.height; if (state.mode === 'start' || state.mode === 'done') { reset(); render(); return; } if (y >= 270 && y < 502) choose(Math.floor((y - 270) / 58)); });
-  window.addEventListener('keydown', (event) => { if (event.key === 'Enter' && state.mode !== 'playing') { reset(); render(); } if (state.mode === 'playing' && ['1','2','3','4'].includes(event.key)) choose(Number(event.key) - 1); if (event.key.toLowerCase() === 'f') document.fullscreenElement ? document.exitFullscreen() : canvas.requestFullscreen(); });
-  function update() { if (state.mode === 'playing' && state.selected !== -1 && performance.now() >= state.nextAt) { state.round++; state.selected = -1; state.message = ''; if (state.round >= questions.length) state.mode = 'done'; render(); } }
-  window.advanceTime = (ms) => { const end = performance.now() + ms; while (performance.now() < end) update(); update(); render(); };
-  window.render_game_to_text = () => JSON.stringify({ mode: state.mode, round: Math.min(state.round + 1, questions.length), totalRounds: questions.length, score: state.score, selected: state.selected, message: state.message, controls: 'Click an answer or press 1-4; Enter starts/restarts; F toggles fullscreen' });
-  setInterval(update, 50); render();
+  function roundRect(x, y, w, h, r, fill, stroke = null) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 2; ctx.stroke(); } }
+  function wrap(value, maxWidth) { const lines = []; let line = ''; for (const word of value.split(' ')) { const test = line ? `${line} ${word}` : word; if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = word; } else line = test; } if (line) lines.push(line); return lines; }
+  function drawBackground() { const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, '#102b4b'); g.addColorStop(1, '#07111f'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.fillStyle = ROOM_COLORS[state.room % ROOM_COLORS.length]; ctx.globalAlpha = .10; ctx.beginPath(); ctx.arc(95, 95, 150, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(875, 540, 210, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; }
+  function drawCharacter(x, y) { ctx.fillStyle = '#f5fbff'; ctx.beginPath(); ctx.arc(x, y - 26, 18, 0, Math.PI * 2); ctx.fill(); roundRect(x - 22, y - 8, 44, 48, 16, ROOM_COLORS[state.room % ROOM_COLORS.length]); ctx.fillStyle = '#061827'; ctx.beginPath(); ctx.arc(x - 6, y - 28, 3, 0, Math.PI * 2); ctx.arc(x + 6, y - 28, 3, 0, Math.PI * 2); ctx.fill(); }
+  function drawRoomPath() { const x0 = 105, gap = 158; for (let i = 0; i < 5; i++) { const x = x0 + i * gap; if (i < 4) { ctx.strokeStyle = i < state.room ? '#4ed1b4' : '#29455f'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x + 24, 108); ctx.lineTo(x + gap - 24, 108); ctx.stroke(); } ctx.fillStyle = i < state.room ? '#4ed1b4' : i === state.room ? ROOM_COLORS[i] : '#203b58'; ctx.beginPath(); ctx.arc(x, 108, 24, 0, Math.PI * 2); ctx.fill(); text(i < state.room ? '✓' : ROOM_ICONS[i], x, 116, 21, '#07111f', 'center', 800); text(ROOM_NAMES[i], x, 152, 12, i <= state.room ? '#dcecff' : '#7190ad', 'center', 800); } }
+  function header(instruction = '') { drawRoomPath(); text(level.theme.toUpperCase(), 55, 55, 16, '#4ed1b4', 'left', 800); text(`${formatDate(level.dateKey)} · ${state.official ? 'OFFICIAL RUN' : 'RETRY'}`, W - 55, 55, 15, '#b7cce0', 'right', 600); if (instruction) text(instruction, W / 2, 205, 18, '#a9c4dc', 'center'); }
+  function drawStart() { text('FIVE ROOMS', W / 2, 175, 62, '#f5fbff', 'center', 850); text('A shared daily puzzle run', W / 2, 217, 22, '#a9c4dc', 'center'); roundRect(170, 260, 640, 110, 22, '#102b47', '#315473'); text(`TODAY: ${level.theme.toUpperCase()}`, W / 2, 303, 25, '#4ed1b4', 'center', 800); text('Five rooms · about 5 minutes · same challenge for everyone', W / 2, 340, 17, '#dcecff', 'center'); roundRect(330, 405, 320, 72, 18, '#4ed1b4'); text('ENTER THE ROOMS', W / 2, 450, 22, '#06201e', 'center', 800); const stats = state.stats || {}; text(`CURRENT STREAK  ${stats.currentStreak || 0}    BEST SCORE  ${stats.days?.[level.dateKey]?.bestScore || '—'}`, W / 2, 535, 16, '#a9c4dc', 'center', 700); text('Click or press Enter · F toggles fullscreen · no account required', W / 2, 570, 14, '#7997b3', 'center'); }
+  function drawTimer(limit) { const elapsed = Math.max(0, (state.clock - state.roomStartedAt) / 1000); const remaining = Math.max(0, limit - elapsed); text(`${Math.ceil(remaining)}s`, W - 60, 194, 18, remaining < 10 ? '#ff8c8c' : '#dcecff', 'right', 800); ctx.fillStyle = '#203b58'; ctx.fillRect(120, 220, 740, 7); ctx.fillStyle = remaining < 10 ? '#ff7f9c' : '#4ed1b4'; ctx.fillRect(120, 220, 740 * (remaining / limit), 7); return remaining; }
+  function choiceButton(label, x, y, w, h, active = false) { roundRect(x, y, w, h, 13, active ? '#4ed1b4' : '#142c46', active ? '#eafff9' : '#2a4865'); text(label, x + 22, y + h / 2 + 7, 18, active ? '#06201e' : '#f5fbff', 'left', 700); }
+  function drawTrivia() { header('Warm up with the day’s question'); const item = triviaPool[dayNumber(level.dateKey) % triviaPool.length]; const lines = wrap(item[0], 720); lines.forEach((line, i) => text(line, W / 2, 275 + i * 35, 28, '#f5fbff', 'center', 800)); item[1].forEach((choice, i) => choiceButton(`${String.fromCharCode(65 + i)}  ${choice}`, 175, 345 + i * 53, 630, 42, state.selected === i)); }
+  function drawLogic() { header('Put the clues in the correct order'); text('Which sequence is logically ordered from smallest to largest?', W / 2, 272, 27, '#f5fbff', 'center', 800); const choices = [['Seed → sprout → tree → forest', 0], ['Forest → tree → sprout → seed', 1], ['Sprout → seed → forest → tree', 2], ['Tree → forest → seed → sprout', 3]]; choices.forEach((item, i) => choiceButton(`${String.fromCharCode(65 + i)}  ${item[0]}`, 175, 330 + i * 53, 630, 42, state.selected === i)); }
+  function ensureSequence() { if (!state.sequence.length) { const seed = dayNumber(level.dateKey) % 4; state.sequence = [0, 1, 2, 3].map((_, i) => (i + seed) % 4); state.sequenceIndex = -1; } }
+  function drawMemory() { ensureSequence(); header('Watch the pattern, then repeat it'); const showing = state.sequenceIndex === -1; text(showing ? 'Memorize this four-symbol sequence' : `Repeat the sequence · ${state.sequenceIndex + 1} / 4`, W / 2, 255, 24, '#f5fbff', 'center', 750); const symbols = ['◆', '●', '▲', '■']; state.sequence.forEach((v, i) => { const x = 300 + i * 125; const lit = showing ? true : i < state.sequenceIndex; roundRect(x, 300, 85, 75, 16, lit ? ROOM_COLORS[v] : '#142c46'); text(symbols[v], x + 42, 350, 32, '#07111f', 'center', 800); }); if (showing) { text('The pattern will be ready in a moment…', W / 2, 430, 17, '#a9c4dc', 'center'); } else { symbols.forEach((s, i) => choiceButton(`${s}  SYMBOL ${i + 1}`, 145 + (i % 2) * 360, 445 + Math.floor(i / 2) * 53, 330, 42, false)); } }
+  function drawReaction() { header('Wait for the signal, then react'); const remaining = drawTimer(8); if (!state.reactionStarted) { text('When the circle turns green, click it.', W / 2, 275, 26, '#f5fbff', 'center', 800); roundRect(370, 325, 240, 120, 60, '#a4565d'); text('WAIT', W / 2, 398, 30, '#fff4f4', 'center', 850); } else { text('GO!', W / 2, 275, 34, '#4ed1b4', 'center', 850); ctx.fillStyle = '#4ed1b4'; ctx.beginPath(); ctx.arc(W / 2, 385, 78, 0, Math.PI * 2); ctx.fill(); text('CLICK', W / 2, 397, 26, '#06201e', 'center', 850); } if (remaining <= 0) failRoom('Too slow — the signal passed.'); }
+  function drawFinale() { header('One last themed deduction'); const lines = wrap(level.finalPrompt, 720); lines.forEach((line, i) => text(line, W / 2, 260 + i * 35, 26, '#f5fbff', 'center', 800)); level.finalChoices.forEach((choice, i) => choiceButton(`${String.fromCharCode(65 + i)}  ${choice}`, 175, 340 + i * 53, 630, 42, state.selected === i)); }
+  function drawPlay() { if (state.room === 0) drawTrivia(); else if (state.room === 1) drawLogic(); else if (state.room === 2) drawMemory(); else if (state.room === 3) drawReaction(); else drawFinale(); drawCharacter(70 + state.room * 10, 575); if (state.feedback) text(state.feedback, W / 2, 575, 17, state.feedback.startsWith('Correct') ? '#6de2c4' : '#ffb4b4', 'center', 750); }
+  function resultText(completed) { const symbols = Array.from({ length: 5 }, (_, i) => state.roomResult[i] == null ? '⬜' : (state.roomResult[i] ? '🟩' : '🟥')).join(''); return `FIVE ROOMS · ${level.dateKey}\n${level.theme}\n${symbols} ${completed ? '5/5 COMPLETE' : `${state.room}/5 REACHED`}\nScore ${state.score}/5 · ${state.official ? 'Official run' : 'Retry'}`; }
+  function drawResults() { const completed = state.mode === 'complete'; text(completed ? 'YOU CLEARED THE ROOMS' : 'THE ROOMS GOT YOU', W / 2, 175, 42, '#f5fbff', 'center', 850); text(`${level.theme} · ${formatDate(level.dateKey)}`, W / 2, 218, 19, '#4ed1b4', 'center', 700); roundRect(185, 260, 610, 132, 20, '#102b47', '#315473'); text(state.roomResult.map((r) => r ? '🟩' : '🟥').join('  '), W / 2, 315, 30, '#f5fbff', 'center'); text(completed ? 'A perfect route through all five rooms.' : `You reached room ${Math.min(state.room + 1, 5)}. Retry to improve your route.`, W / 2, 360, 17, '#c7d9e9', 'center'); text(`SCORE  ${state.score}/5     ATTEMPT  ${state.attempt}`, W / 2, 430, 18, '#dcecff', 'center', 750); roundRect(210, 475, 260, 58, 14, '#4ed1b4'); text('RETRY TODAY', 340, 512, 18, '#06201e', 'center', 800); roundRect(510, 475, 260, 58, 14, '#142c46', '#3a5d7b'); text('COPY RESULT', 640, 512, 18, '#f5fbff', 'center', 800); text('Your share card never reveals the answers.', W / 2, 570, 14, '#7997b3', 'center'); }
+  function render() { drawBackground(); if (state.mode === 'start') drawStart(); else if (state.mode === 'playing') drawPlay(); else drawResults(); }
+  function beginRoom() { state.roomStartedAt = state.clock; state.selected = -1; state.feedback = ''; state.sequence = []; state.sequenceIndex = 0; state.reactionStarted = false; state.reactionReadyAt = state.clock + (state.prefersReducedMotion ? 700 : 1400); }
+  function correctRoom() { state.score++; state.roomResult[state.room] = true; state.feedback = 'Correct!'; state.transitionUntil = state.clock + (state.prefersReducedMotion ? 150 : 650); }
+  function failRoom(reason) { if (state.mode !== 'playing') return; state.roomResult[state.room] = false; state.feedback = reason; state.mode = 'failed'; saveStats({ completed: false, score: state.score, room: state.room, official: state.official }); render(); }
+  function answer(index) { if (state.mode !== 'playing' || state.selected !== -1 || state.transitionUntil) return; state.selected = index; let correct = false; if (state.room === 0) correct = index === triviaPool[dayNumber(level.dateKey) % triviaPool.length][2]; if (state.room === 1) correct = index === 0; if (state.room === 4) correct = index === level.finalAnswer; if (correct) correctRoom(); else failRoom('That answer closed the door.'); render(); }
+  function clickMemory(index) { if (state.transitionUntil) return; ensureSequence(); if (state.sequenceIndex === -1) return; if (index !== state.sequence[state.sequenceIndex]) return failRoom('The pattern broke.'); state.sequenceIndex++; if (state.sequenceIndex >= state.sequence.length) correctRoom(); render(); }
+  function clickReaction() { if (!state.reactionStarted || state.transitionUntil) return; const elapsed = (state.clock - state.reactionStart) / 1000; if (elapsed < .15) return failRoom('Too early — wait for the green signal.'); correctRoom(); render(); }
+  function handleClick(event) { const rect = canvas.getBoundingClientRect(); const x = (event.clientX - rect.left) * W / rect.width, y = (event.clientY - rect.top) * H / rect.height; if (state.mode === 'start') return startGame(); if (state.mode === 'failed' || state.mode === 'complete') { if (y > 455 && y < 550 && x < 490) return retryGame(); if (y > 455 && y < 550 && x >= 490) return navigator.clipboard?.writeText(resultText(state.mode === 'complete')).then(() => { state.feedback = 'Result copied!'; render(); }); return; } if (state.mode !== 'playing') return; if (state.room === 3) return clickReaction(); if (state.room === 2 && state.sequenceIndex >= 0 && y > 435) return clickMemory(Math.floor((x - 145) / 360) + (y > 488 ? 2 : 0)); if (y >= 330 && y < 560) answer(Math.floor((y - 330) / 53)); }
+  function handleKey(event) { if (event.key === 'Enter' && state.mode === 'start') startGame(); else if ((event.key === 'r' || event.key === 'Enter') && (state.mode === 'failed' || state.mode === 'complete')) retryGame(); else if (event.key.toLowerCase() === 'f') document.fullscreenElement ? document.exitFullscreen() : canvas.requestFullscreen(); else if (state.mode === 'playing' && state.room !== 2 && state.room !== 3 && ['1','2','3','4'].includes(event.key)) answer(Number(event.key) - 1); else if (state.mode === 'playing' && state.room === 2 && ['1','2','3','4'].includes(event.key)) clickMemory(Number(event.key) - 1); else if (state.mode === 'playing' && state.room === 3 && event.key === ' ') clickReaction(); }
+  function update(ms) { state.clock += ms; if (state.mode === 'playing') { if (state.room === 2 && state.sequenceIndex === -1 && state.clock - state.roomStartedAt > 1800) { state.sequenceIndex = 0; render(); } if (state.room === 3 && !state.reactionStarted && state.clock >= state.reactionReadyAt) { state.reactionStarted = true; state.reactionStart = state.clock; render(); } const limit = [60, 60, 45, 8, 75][state.room] * 1000; if (state.clock - state.roomStartedAt > limit) failRoom('Time ran out.'); if (state.transitionUntil && state.clock >= state.transitionUntil) { state.transitionUntil = 0; state.room++; if (state.room >= 5) { state.mode = 'complete'; state.roomResult = [true, true, true, true, true]; saveStats({ completed: true, score: state.score, room: 5, official: state.official }); } else beginRoom(); render(); } } }
+  window.advanceTime = (ms) => { const steps = Math.max(1, Math.round(ms / 50)); for (let i = 0; i < steps; i++) update(ms / steps); render(); };
+  window.render_game_to_text = () => JSON.stringify({ mode: state.mode, date: level.dateKey, theme: level.theme, room: Math.min(state.room + 1, 5), totalRooms: 5, score: state.score, attempt: state.attempt, official: state.official, roomTypes: ROOM_NAMES, roomResult: state.roomResult, controls: 'Click or press 1-4; Space reacts; R or Enter retries; F fullscreen' });
+  canvas.addEventListener('click', handleClick); window.addEventListener('keydown', handleKey); setInterval(() => update(50), 50); setLevel(); render();
 })();
 </script>
 </body>
