@@ -7,16 +7,21 @@
   <style>
     :root { color-scheme: dark; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; overflow: hidden; background: #09070f; }
-    canvas { width: min(96vw, 960px); height: auto; aspect-ratio: 16 / 10; border: 4px solid #4d315f; border-radius: 4px; background: #160f23; box-shadow: 0 20px 80px #000c; image-rendering: pixelated; touch-action: manipulation; }
+    body { margin: 0; min-height: 100dvh; display: grid; place-items: center; overflow: hidden; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); background: #09070f; }
+    canvas { width: min(96vw, 960px, calc(96dvh * 1.6)); height: auto; max-height: 96dvh; aspect-ratio: 16 / 10; border: 4px solid #4d315f; border-radius: 4px; background: #160f23; box-shadow: 0 20px 80px #000c; image-rendering: pixelated; touch-action: none; }
+    #landscapeBtn { display: none; position: fixed; z-index: 5; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); min-height: 44px; padding: 10px 14px; border: 3px solid #1b1020; background: #f4c95d; color: #241526; font: 800 13px ui-monospace, monospace; box-shadow: 4px 4px 0 #0008; }
+    @media (pointer: coarse), (max-width: 900px) { #landscapeBtn { display: block; } }
+    @media (orientation: landscape) and (max-height: 600px) { canvas { width: min(100vw, calc(100dvh * 1.6)); max-height: 100dvh; border-width: 0; } #landscapeBtn { opacity: .82; } }
   </style>
 </head>
 <body>
 <canvas id="game" width="960" height="600" aria-label="Five Rooms: Temple of the Sun"></canvas>
+<button id="landscapeBtn" type="button" aria-label="Enter fullscreen landscape mode">LANDSCAPE ↻</button>
 <script>
 (() => {
   'use strict';
   const canvas = document.querySelector('#game');
+  const landscapeBtn = document.querySelector('#landscapeBtn');
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
   const W = canvas.width, H = canvas.height;
@@ -41,7 +46,7 @@
     roomResults: [], modeStarted: 0, roomStarted: 0, message: '', detail: '',
     character: { x: 110, y: 488, anim: 'idle', animStarted: 0, facing: 1 },
     logic: { selected: [] },
-    memory: { round: 0, phase: 'show', input: [], phaseStarted: 0, lit: -1 },
+    memory: { round: 0, phase: 'show', input: [], phaseStarted: 0, lit: -1, replayUsed: false },
     trivia: { selected: -1 },
     reaction: { gate: 0, phase: 'waiting', readyAt: 0, activeAt: 0 },
     finale: { phase: 'question', selected: [], input: [], readyAt: 0, activeAt: 0 },
@@ -206,9 +211,10 @@
     drawPanel(160, 150, 640, 135, '#111127e8', '#6960a8');
     text(showing ? 'WATCH THE WALL' : `REPEAT THE ECHO · ${state.memory.input.length}/${seq.length}`, W / 2, 184, 16, '#c1b3ff', 'center');
     const lit = showing ? memoryLitIndex() : -1;
-    for (let i = 0; i < seq.length; i++) { const x = W/2 - (seq.length * 54)/2 + i * 54; outline(x, 208, 44, 48, lit === seq[i] ? '#fff0a0' : '#2b2754', '#0e0d1b', 3); text(showing && i <= Math.floor(elapsedSince(state.memory.phaseStarted)/650) ? GLYPHS[seq[i]] : '·', x + 22, 241, 22, lit === seq[i] ? '#4b3260' : '#8c83b8', 'center'); }
+    for (let i = 0; i < seq.length; i++) { const x = W/2 - (seq.length * 54)/2 + i * 54; const entered = !showing && i < state.memory.input.length; const visibleGlyph = showing ? (i <= Math.floor(elapsedSince(state.memory.phaseStarted)/650) ? GLYPHS[seq[i]] : '·') : (entered ? GLYPHS[seq[i]] : '·'); outline(x, 208, 44, 48, lit === seq[i] ? '#fff0a0' : entered ? '#5d52a0' : '#2b2754', '#0e0d1b', 3); text(visibleGlyph, x + 22, 241, 22, lit === seq[i] ? '#4b3260' : entered ? '#fff5d7' : '#8c83b8', 'center'); }
     for (let i = 0; i < 4; i++) drawButton(`${GLYPHS[i]} ${SYMBOLS[i]}`, 120 + i * 185, 335, 170, 62, false, '#39306a');
-    text(showing ? 'The glyphs pulse without sound.' : 'Choose the glyphs in the exact order shown.', W / 2, 435, 13, '#d1c5dd', 'center');
+    text(showing ? 'The glyphs pulse without sound.' : 'Correct choices lock into the echo slots above.', W / 2, 435, 14, '#d1c5dd', 'center');
+    if (!showing) drawButton(state.memory.replayUsed ? 'REPLAY USED' : 'REPLAY ONCE', 380, 452, 200, 42, false, state.memory.replayUsed ? '#2a2943' : '#4b427c');
     drawExplorer(105, 515);
   }
   function drawTrivia() {
@@ -276,7 +282,7 @@
 
   function currentType() { return DAY.order[Math.min(state.roomIndex, DAY.order.length - 1)]; }
   function resetPuzzles() {
-    state.logic.selected = []; state.memory = { round:0, phase:'show', input:[], phaseStarted:state.clock, lit:-1 }; state.trivia.selected = -1;
+    state.logic.selected = []; state.memory = { round:0, phase:'show', input:[], phaseStarted:state.clock, lit:-1, replayUsed:false }; state.trivia.selected = -1;
     state.reaction = { gate:0, phase:'waiting', readyAt:0, activeAt:0 }; state.finale = { phase:'question', selected:[], input:[], readyAt:0, activeAt:0 };
   }
   function startRun(retry = false) {
@@ -286,7 +292,7 @@
   }
   function enterRoom() {
     state.mode = 'room'; state.modeStarted = state.clock; state.roomStarted = state.clock; state.character.x = 105; state.character.y = 515; setAnim('idle');
-    const type = currentType(); if (type === 'memory') { state.memory.phase = 'show'; state.memory.phaseStarted = state.clock; state.memory.input = []; } if (type === 'reaction') beginReactionGate(); render();
+    const type = currentType(); if (type === 'memory') { state.memory.phase = 'show'; state.memory.phaseStarted = state.clock; state.memory.input = []; state.memory.replayUsed = false; } if (type === 'reaction') beginReactionGate(); render();
   }
   function beginReactionGate() { state.reaction.phase = 'waiting'; state.reaction.readyAt = state.clock + reactionWaits[state.reaction.gate]; state.reaction.activeAt = 0; setAnim('run'); }
   function roomSuccess(message) { if (state.mode !== 'room') return; state.roomResults[state.roomIndex] = true; state.score++; state.message = message; state.mode = 'success'; state.modeStarted = state.clock; setAnim('celebrate'); render(); }
@@ -301,8 +307,9 @@
   function chooseMemory(index) {
     if (state.memory.phase !== 'input') return; const seq = memoryRounds[state.memory.round]; const pos = state.memory.input.length; setAnim('interact');
     if (index !== seq[pos]) return roomFailure('shadow', 'A wrong echo wakes the shadows in the wall.');
-    state.memory.input.push(index); if (state.memory.input.length === seq.length) { if (state.memory.round === 0) { state.memory.round = 1; state.memory.phase = 'pause'; state.memory.phaseStarted = state.clock; state.memory.input = []; } else roomSuccess('Both echoes return. The violet seal glows.'); } render();
+    state.memory.input.push(index); if (state.memory.input.length === seq.length) { if (state.memory.round === 0) { state.memory.round = 1; state.memory.phase = 'pause'; state.memory.phaseStarted = state.clock; state.memory.input = []; state.memory.replayUsed = false; } else roomSuccess('Both echoes return. The violet seal glows.'); } render();
   }
+  function replayMemory() { if (state.memory.phase !== 'input' || state.memory.replayUsed) return; state.memory.phase = 'show'; state.memory.phaseStarted = state.clock; state.memory.input = []; state.memory.replayUsed = true; setAnim('idle'); render(); }
   function chooseTrivia(index) { if (state.trivia.selected !== -1) return; state.trivia.selected = index; setAnim('interact'); if (index === 1) roomSuccess('The Papyrus Tablet reveals the hidden path.'); else roomFailure('fall', 'The false tablet opens a trap beneath the explorer!'); }
   function react() {
     if (currentType() === 'reaction') {
@@ -327,7 +334,7 @@
   function handleRoomClick(x, y) {
     const type = currentType();
     if (type === 'logic') { if (y >= 360 && y <= 430) return chooseLogic(Math.max(0, Math.min(3, Math.floor((x - 130) / 180)))); if (y >= 435 && y <= 510) return x < 460 ? resetLogic() : confirmLogic(); }
-    if (type === 'memory' && y >= 320 && y <= 415) return chooseMemory(Math.max(0, Math.min(3, Math.floor((x - 120) / 185))));
+    if (type === 'memory') { if (y >= 320 && y <= 415) return chooseMemory(Math.max(0, Math.min(3, Math.floor((x - 120) / 185)))); if (y >= 440 && y <= 510) return replayMemory(); }
     if (type === 'trivia' && y >= 285 && y <= 450) { const col = x < 480 ? 0 : 1, row = y < 378 ? 0 : 1; return chooseTrivia(row * 2 + col); }
     if (type === 'reaction' && y >= 315 && y <= 435) return react();
     if (type === 'finale') { if (state.finale.phase === 'question' && y >= 420 && y <= 510) return chooseFinale(Math.max(0, Math.min(3, Math.floor((x - 145) / 170)))); if (state.finale.phase === 'runes') { if (y >= 415 && y <= 485) return chooseFinale(Math.max(0, Math.min(3, Math.floor((x - 145) / 170)))); if (y >= 480 && x >= 540) return confirmFinaleRunes(); } if (state.finale.phase === 'memory' && y >= 420 && y <= 510) return chooseFinale(Math.max(0, Math.min(3, Math.floor((x - 145) / 170)))); if (state.finale.phase.startsWith('reaction') && y >= 420 && y <= 520) return react(); }
@@ -374,10 +381,11 @@
     coordinateSystem:'canvas origin top-left; x right; y down; 960x600', day:DAY.id, title:DAY.title, mode:state.mode,
     room:state.roomIndex + 1, roomType:currentType(), roomOrder:DAY.order, score:state.score, attempt:state.attempt, official:state.official,
     results:state.roomResults, character:{x:Math.round(state.character.x), y:Math.round(state.character.y), animation:state.character.anim},
-    puzzle: currentType() === 'logic' ? {selected:state.logic.selected, options:SYMBOLS} : currentType() === 'memory' ? {round:state.memory.round + 1, phase:state.memory.phase, inputLength:state.memory.input.length} : currentType() === 'trivia' ? {question:'Which material did ancient Egyptians famously use as writing paper?', options:['Marble','Papyrus','Silk','Bamboo']} : currentType() === 'reaction' ? {gate:state.reaction.gate + 1, phase:state.reaction.phase} : {phase:state.finale.phase, selected:state.finale.selected, inputLength:state.finale.input.length},
+    puzzle: currentType() === 'logic' ? {selected:state.logic.selected, options:SYMBOLS} : currentType() === 'memory' ? {round:state.memory.round + 1, phase:state.memory.phase, inputLength:state.memory.input.length, replayAvailable:!state.memory.replayUsed} : currentType() === 'trivia' ? {question:'Which material did ancient Egyptians famously use as writing paper?', options:['Marble','Papyrus','Silk','Bamboo']} : currentType() === 'reaction' ? {gate:state.reaction.gate + 1, phase:state.reaction.phase} : {phase:state.finale.phase, selected:state.finale.selected, inputLength:state.finale.input.length},
     controls:'Mouse/touch; 1-4 choose; Enter confirms; Space reacts; Backspace resets logic; R retries; F fullscreen'
   });
-  canvas.addEventListener('click', handleClick); window.addEventListener('keydown', handleKey); setInterval(() => { if (!manualTime) { update(50); render(); } }, 50); state.stats = loadStats(); render();
+  async function requestLandscape() { try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen(); } catch {} try { await screen.orientation?.lock?.('landscape'); landscapeBtn.textContent = 'LANDSCAPE ✓'; } catch { landscapeBtn.textContent = 'ROTATE PHONE ↻'; } }
+  canvas.addEventListener('pointerup', handleClick); landscapeBtn.addEventListener('click', requestLandscape); window.addEventListener('keydown', handleKey); setInterval(() => { if (!manualTime) { update(50); render(); } }, 50); state.stats = loadStats(); render();
 })();
 </script>
 </body>

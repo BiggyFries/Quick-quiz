@@ -12,3 +12,6 @@ Original prompt: Create a very simple low effort 5 round browser-based trivia ga
 - Full Chromium playthrough now passes an official 5/5 victory with no console errors. Visually inspected the start screen, all five room backgrounds, memory input, active boulder gate, multi-stage finale, victory card, and burning-explorer failure frame.
 - Fixed the trivia question overflowing its tablet by wrapping it across two centered lines. Added a reusable Playwright success-route fixture.
 - Day 1 Ancient Temple rebuild is verified and ready for GitHub Pages. Future work: author and queue additional self-contained themed days.
+- Mobile update in progress: fit the canvas to both viewport width and height, add fullscreen landscape orientation, move gameplay to pointer input, and make accepted memory choices visibly lock into their slots with one replay per sequence.
+- Mobile Chromium verification passed at 844×390: the full 960×600 canvas fits inside the viewport, the landscape control is visible, fullscreen orientation mode activates without errors, and a touch tap on the correct first memory glyph increments input progress to 1/4.
+- Full pointer-driven browser route still completes 5/5 with no console errors. Deterministic tests now also cover one allowed memory replay, rejection of a second replay, and visible accepted-input progress.

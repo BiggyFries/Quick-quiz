@@ -20,12 +20,13 @@ function boot() {
     getBoundingClientRect() { return { left: 0, top: 0, width: 960, height: 600 }; },
     requestFullscreen() {}
   };
+  const landscapeButton = { textContent: '', addEventListener() {} };
   const storage = new Map();
-  const document = { querySelector() { return canvas; }, fullscreenElement: null, exitFullscreen() {} };
+  const document = { querySelector(selector) { return selector === '#game' ? canvas : landscapeButton; }, documentElement: { requestFullscreen() { return Promise.resolve(); } }, fullscreenElement: null, exitFullscreen() {} };
   const sandbox = {
     console, document, navigator: { clipboard: { writeText() { return Promise.resolve(); } } },
     localStorage: { getItem(key) { return storage.get(key) ?? null; }, setItem(key, value) { storage.set(key, value); } },
-    matchMedia() { return { matches: false }; }, setInterval() {}, Intl, Math, Date, JSON
+    matchMedia() { return { matches: false }; }, screen: { orientation: { lock() { return Promise.resolve(); } } }, setInterval() {}, Intl, Math, Date, JSON
   };
   sandbox.window = sandbox;
   sandbox.addEventListener = (type, fn) => { handlers[type] = fn; };
@@ -34,7 +35,7 @@ function boot() {
   const key = (value) => handlers.keydown({ key: value, preventDefault() {} });
   const advance = (ms) => sandbox.advanceTime(ms);
   const state = () => JSON.parse(sandbox.render_game_to_text());
-  return { key, advance, state, storage, click: (x, y) => canvasHandlers.click({ clientX: x, clientY: y }) };
+  return { key, advance, state, storage, click: (x, y) => canvasHandlers.pointerup({ clientX: x, clientY: y }) };
 }
 
 function startToLogic(game) {
@@ -104,6 +105,16 @@ assert.equal(failure.state().official, false);
 const memoryFailure = boot();
 startToLogic(memoryFailure); passLogic(memoryFailure); memoryFailure.advance(3100); memoryFailure.key('2');
 assert.equal(memoryFailure.state().character.animation, 'shadow');
+
+const memoryReplay = boot();
+startToLogic(memoryReplay); passLogic(memoryReplay); memoryReplay.advance(3100);
+memoryReplay.click(480, 470);
+assert.equal(memoryReplay.state().puzzle.phase, 'show');
+assert.equal(memoryReplay.state().puzzle.replayAvailable, false);
+memoryReplay.advance(3100); memoryReplay.click(480, 470);
+assert.equal(memoryReplay.state().puzzle.phase, 'input');
+memoryReplay.click(205, 365);
+assert.equal(memoryReplay.state().puzzle.inputLength, 1);
 
 const triviaFailure = boot();
 startToLogic(triviaFailure); passLogic(triviaFailure); passMemory(triviaFailure); triviaFailure.key('1');
