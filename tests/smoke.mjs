@@ -11,13 +11,13 @@ function boot() {
   const canvasHandlers = {};
   const context2d = new Proxy({
     measureText(value) { return { width: String(value).length * 9 }; },
-    fillRect() {}, clearRect() {}, beginPath() {}, arc() {}, fill() {}, stroke() {}, moveTo() {}, lineTo() {}, fillText() {}
+    fillRect() {}, clearRect() {}, beginPath() {}, roundRect() {}, arc() {}, ellipse() {}, fill() {}, stroke() {}, moveTo() {}, lineTo() {}, fillText() {}, save() {}, restore() {}, clip() {}
   }, { set(target, property, value) { target[property] = value; return true; } });
   const canvas = {
-    width: 960, height: 600,
+    width: 600, height: 900,
     getContext() { return context2d; },
     addEventListener(type, fn) { canvasHandlers[type] = fn; },
-    getBoundingClientRect() { return { left: 0, top: 0, width: 960, height: 600 }; },
+    getBoundingClientRect() { return { left: 0, top: 0, width: 600, height: 900 }; },
     requestFullscreen() {}
   };
   const landscapeButton = { textContent: '', addEventListener() {} };
@@ -40,37 +40,54 @@ function boot() {
 
 function startToLogic(game) {
   game.key('Enter');
-  game.advance(1400);
+  game.advance(900);
+  assert.equal(game.state().mode, 'ready');
   assert.equal(game.state().roomType, 'logic');
+  game.key('Enter');
+  assert.equal(game.state().mode, 'room');
 }
 
 function passLogic(game) {
   ['1', '2', '3', '4', 'Enter'].forEach(game.key);
-  game.advance(1200); game.advance(1400);
+  game.advance(1000); game.advance(900);
+  assert.equal(game.state().mode, 'ready');
   assert.equal(game.state().roomType, 'memory');
+  game.key('Enter');
 }
 
 function passMemory(game) {
   game.advance(3100);
   ['1', '3', '2', '4'].forEach(game.key);
-  game.advance(950); game.advance(4400);
+  game.advance(900); game.advance(4400);
   ['1', '3', '2', '4', '3', '1'].forEach(game.key);
-  game.advance(1200); game.advance(1400);
+  game.advance(1000); game.advance(900);
+  assert.equal(game.state().mode, 'ready');
   assert.equal(game.state().roomType, 'trivia');
+  game.key('Enter');
 }
 
 function passTrivia(game) {
-  game.key('2');
-  game.advance(1200); game.advance(1400);
-  assert.equal(game.state().roomType, 'reaction');
+  ['2', '1', '3', '4'].forEach(game.key);
+  game.advance(1000); game.advance(900);
+  assert.equal(game.state().mode, 'ready');
+  assert.equal(game.state().roomType, 'platformer');
+  game.key('Enter');
 }
 
-function passReaction(game) {
-  game.advance(1150); game.key(' ');
-  game.advance(550); game.advance(1500); game.key(' ');
-  game.advance(550); game.advance(950); game.key(' ');
-  game.advance(1200); game.advance(1400);
+function passPlatformer(game) {
+  game.advance(3100);
+  for (const time of [2500,5500,8500,11500,14500,17500,20500,23500,26500]) {
+    const current = game.state().puzzle.elapsedMs;
+    game.advance(Math.max(0, time - current - 400));
+    game.key(' ');
+    game.advance(450);
+  }
+  const remaining = 30000 - game.state().puzzle.elapsedMs + 50;
+  game.advance(Math.max(0, remaining));
+  game.advance(1000); game.advance(900);
+  assert.equal(game.state().mode, 'ready');
   assert.equal(game.state().roomType, 'finale');
+  game.key('Enter');
 }
 
 function passFinale(game) {
@@ -82,7 +99,7 @@ function passFinale(game) {
 }
 
 function passDayOne(game) {
-  startToLogic(game); passLogic(game); passMemory(game); passTrivia(game); passReaction(game); passFinale(game);
+  startToLogic(game); passLogic(game); passMemory(game); passTrivia(game); passPlatformer(game); passFinale(game);
 }
 
 const success = boot();
@@ -108,24 +125,24 @@ assert.equal(memoryFailure.state().character.animation, 'shadow');
 
 const memoryReplay = boot();
 startToLogic(memoryReplay); passLogic(memoryReplay); memoryReplay.advance(3100);
-memoryReplay.click(480, 470);
+memoryReplay.click(300, 750);
 assert.equal(memoryReplay.state().puzzle.phase, 'show');
 assert.equal(memoryReplay.state().puzzle.replayAvailable, false);
-memoryReplay.advance(3100); memoryReplay.click(480, 470);
+memoryReplay.advance(3100); memoryReplay.click(300, 750);
 assert.equal(memoryReplay.state().puzzle.phase, 'input');
-memoryReplay.click(205, 365);
+memoryReplay.click(150, 480);
 assert.equal(memoryReplay.state().puzzle.inputLength, 1);
 
 const triviaFailure = boot();
 startToLogic(triviaFailure); passLogic(triviaFailure); passMemory(triviaFailure); triviaFailure.key('1');
 assert.equal(triviaFailure.state().character.animation, 'fall');
 
-const reactionFailure = boot();
-startToLogic(reactionFailure); passLogic(reactionFailure); passMemory(reactionFailure); passTrivia(reactionFailure); reactionFailure.key(' ');
-assert.equal(reactionFailure.state().character.animation, 'crushed');
+const platformerFailure = boot();
+startToLogic(platformerFailure); passLogic(platformerFailure); passMemory(platformerFailure); passTrivia(platformerFailure); platformerFailure.advance(3100); platformerFailure.advance(2500);
+assert.equal(platformerFailure.state().character.animation, 'crushed');
 
 const finaleFailure = boot();
-startToLogic(finaleFailure); passLogic(finaleFailure); passMemory(finaleFailure); passTrivia(finaleFailure); passReaction(finaleFailure); finaleFailure.key('1');
+startToLogic(finaleFailure); passLogic(finaleFailure); passMemory(finaleFailure); passTrivia(finaleFailure); passPlatformer(finaleFailure); finaleFailure.key('1');
 assert.equal(finaleFailure.state().character.animation, 'blast');
 
-console.log('Smoke test: full victory, all room failure animations, and retry state passed.');
+console.log('Smoke test: portrait flow, all Ready gates, four trivia questions, 30-second platformer, victory, failures, and retry passed.');
