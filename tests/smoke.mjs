@@ -80,9 +80,9 @@ function passPlatformer(game) {
   game.advance(3100);
   for (const time of [2500,5500,8500,11500,14500,17500,20500,23500,26500]) {
     const current = game.state().puzzle.elapsedMs;
-    game.advance(Math.max(0, time - current - 400));
+    game.advance(Math.max(0, time - current - 600));
     game.key(' ');
-    game.advance(450);
+    game.advance(650);
   }
   const remaining = 30000 - game.state().puzzle.elapsedMs + 50;
   game.advance(Math.max(0, remaining));
@@ -97,7 +97,10 @@ function passFinale(game) {
   ['1', '2', '3', 'Enter'].forEach(game.key);
   ['1', '3', '2'].forEach(game.key);
   game.advance(1350); game.key(' ');
-  game.advance(2700);
+  assert.equal(game.state().puzzle.phase, 'reactionLeap');
+  game.advance(600);
+  assert.equal(game.state().puzzle.phase, 'reactionLeap');
+  game.advance(3200);
 }
 
 function passDayOne(game) {
@@ -146,6 +149,14 @@ assert.equal(memoryReplay.state().puzzle.phase, 'input');
 memoryReplay.click(150, 480);
 assert.equal(memoryReplay.state().puzzle.inputLength, 1);
 
+const memoryHighlight = boot();
+startToLogic(memoryHighlight); passLogic(memoryHighlight); memoryHighlight.advance(3100);
+['1', '3', '2', '4'].forEach(memoryHighlight.key);
+memoryHighlight.advance(900); memoryHighlight.advance(1500);
+assert.equal(memoryHighlight.state().puzzle.round, 2);
+assert.equal(memoryHighlight.state().puzzle.highlightedCount, 1);
+assert.equal(memoryHighlight.state().puzzle.highlightedPosition, 3);
+
 const triviaFailure = boot();
 startToLogic(triviaFailure); passLogic(triviaFailure); passMemory(triviaFailure); triviaFailure.key('1');
 assert.equal(triviaFailure.state().character.animation, 'fall');
@@ -153,6 +164,11 @@ assert.equal(triviaFailure.state().character.animation, 'fall');
 const platformerFailure = boot();
 startToLogic(platformerFailure); passLogic(platformerFailure); passMemory(platformerFailure); passTrivia(platformerFailure); platformerFailure.advance(3100); platformerFailure.advance(2500);
 assert.equal(platformerFailure.state().character.animation, 'crushed');
+
+const visibleCollision = boot();
+visibleCollision.click(410, 680); visibleCollision.advance(1500); visibleCollision.key('Enter'); visibleCollision.advance(3100); visibleCollision.advance(2300); visibleCollision.key(' '); visibleCollision.advance(200);
+assert.equal(visibleCollision.state().mode, 'fail');
+assert.equal(visibleCollision.state().character.animation, 'crushed');
 
 const finaleFailure = boot();
 startToLogic(finaleFailure); passLogic(finaleFailure); passMemory(finaleFailure); passTrivia(finaleFailure); passPlatformer(finaleFailure); finaleFailure.key('1');
@@ -171,4 +187,4 @@ assert.equal(roomTesting.state().puzzle.elapsedMs, beforeInfo);
 roomTesting.click(300, 670);
 assert.equal(roomTesting.state().infoOpen, false);
 
-console.log('Smoke test: idols, collection flow, room selector, paused clues, portrait rooms, platformer, victory, failures, and retry passed.');
+console.log('Smoke test: carried idols, single memory highlight, visible collision, final leap, coins, victory, failures, and retry passed.');

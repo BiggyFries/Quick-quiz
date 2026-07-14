@@ -20,10 +20,10 @@
   const canvas = document.querySelector('#game');
   const ctx = canvas.getContext('2d');
   const W = 600, H = 900;
-  const COLORS = { ink:'#17202a', cream:'#f7f3eb', paper:'#fffdfa', sand:'#e8c67a', gold:'#efb643', coral:'#eb6b57', teal:'#2f9c8f', blue:'#5479c7', plum:'#7561a8', pale:'#e8e1d7', green:'#5dbb87', red:'#d84b4b' };
+  const COLORS = { ink:'#17202a', cream:'#f7f3eb', paper:'#fffdfae8', sand:'#e8c67a', gold:'#efb643', coral:'#eb6b57', teal:'#2f9c8f', blue:'#5479c7', plum:'#7561a8', pale:'#e8e1d7', green:'#5dbb87', red:'#d84b4b' };
   const DAY = { id:'day-001-ancient-temple-v2', title:'TEMPLE OF THE SUN', subtitle:'The Eclipse Trial', order:['logic','memory','trivia','platformer','finale'] };
   const META = {
-    logic:{name:'Bridge of Idols',kicker:'Logic seal',color:COLORS.coral,brief:'Use the three clues to place four temple idols in the correct order.'},
+    logic:{name:'Bridge of Idols',kicker:'Logic seal',color:COLORS.coral,brief:'Use four connected clues to place the temple idols in the only possible order.'},
     memory:{name:'Chamber of Echoes',kicker:'Memory seal',color:COLORS.plum,brief:'Watch two rune sequences, then repeat each one. You may replay each sequence once.'},
     trivia:{name:'Archive of Glyphs',kicker:'Trivia seal',color:COLORS.teal,brief:'Answer four approachable questions about the ancient world. One wrong answer ends the run.'},
     platformer:{name:'Boulder Passage',kicker:'Agility seal',color:COLORS.coral,brief:'Your explorer runs automatically for 30 seconds. Use one button to jump over every obstacle.'},
@@ -49,12 +49,12 @@
     {q:'Which object helped scholars decode Egyptian hieroglyphs?',a:['Dead Sea Scrolls','Antikythera Mechanism','Terracotta Army','Rosetta Stone'],correct:3}
   ];
   const obstacleTimes = [2500,5500,8500,11500,14500,17500,20500,23500,26500];
-  const COURSE_SPEED = .26, JUMP_DURATION = 1200;
+  const COURSE_SPEED = .26, JUMP_DURATION = 1600, JUMP_HEIGHT = 185;
   const state = {
     mode:'start', clock:0, modeStarted:0, roomIndex:0, score:0, attempt:1, official:true, results:[], message:'', detail:'',
     character:{anim:'idle',animStarted:0}, logic:{selected:[]}, memory:{round:0,phase:'show',phaseStarted:0,input:[],replayUsed:false},
     trivia:{index:0,selected:-1}, platformer:{phase:'countdown',countdownStarted:0,runStarted:0,jumpStarted:-1,checked:[],distance:0},
-    finale:{phase:'question',selected:[],input:[],readyAt:0,activeAt:0}, infoOpen:false, testing:false, stats:{}, reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches
+    finale:{phase:'question',selected:[],input:[],readyAt:0,activeAt:0,leapStarted:0}, infoOpen:false, testing:false, stats:{}, reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches
   };
   let manualTime = false;
 
@@ -64,10 +64,11 @@
   function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
   function rounded(x,y,w,h,r,fill,stroke=null,line=2){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=line;ctx.stroke()}}
   function line(x1,y1,x2,y2,color,width=2){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke()}
-  function text(v,x,y,size,color=COLORS.ink,align='left',weight=700){ctx.font=`${weight} ${size}px Inter, ui-sans-serif, system-ui, sans-serif`;ctx.textAlign=align;ctx.fillStyle=color;ctx.fillText(v,x,y)}
+  function poly(points,fill){ctx.beginPath();ctx.moveTo(points[0][0],points[0][1]);points.slice(1).forEach(p=>ctx.lineTo(p[0],p[1]));ctx.closePath();ctx.fillStyle=fill;ctx.fill()}
+  function text(v,x,y,size,color=COLORS.ink,align='left',weight=700){const alpha=ctx.globalAlpha;ctx.globalAlpha=alpha*.96;ctx.font=`${weight} ${size}px Inter, ui-sans-serif, system-ui, sans-serif`;ctx.textAlign=align;ctx.fillStyle=color;ctx.fillText(v,x,y);ctx.globalAlpha=alpha}
   function wrap(v,max){const words=v.split(' '),out=[];let row='';for(const word of words){const t=row?`${row} ${word}`:word;if(ctx.measureText(t).width>max&&row){out.push(row);row=word}else row=t}if(row)out.push(row);return out}
   function drawWrapped(v,x,y,max,size,color=COLORS.ink,gap=size+6,weight=700){ctx.font=`${weight} ${size}px Inter, ui-sans-serif, system-ui, sans-serif`;wrap(v,max).forEach((row,i)=>text(row,x,y+i*gap,size,color,'center',weight))}
-  function button(label,x,y,w,h,fill=COLORS.ink,color='#fff',active=false){rounded(x,y,w,h,18,active?COLORS.gold:fill);text(label,x+w/2,y+h/2+7,18,active?COLORS.ink:color,'center',800)}
+  function button(label,x,y,w,h,fill=COLORS.ink,color='#fff',active=false){const alpha=ctx.globalAlpha;ctx.globalAlpha=alpha*.94;rounded(x,y,w,h,18,active?COLORS.gold:fill);text(label,x+w/2,y+h/2+7,18,active?COLORS.ink:color,'center',800);ctx.globalAlpha=alpha}
   function drawIdol(type,x,y,s=1,gray=false){
     const c=gray?'#b9b1a8':IDOLS[type].color,dark=gray?'#8f8881':COLORS.ink;ctx.save();ctx.translate(x,y);ctx.scale(s,s);
     ctx.fillStyle=gray?'#e0dbd5':'#fff7df';ctx.beginPath();ctx.arc(0,0,28,0,Math.PI*2);ctx.fill();ctx.strokeStyle=c;ctx.lineWidth=5;ctx.stroke();
@@ -83,27 +84,49 @@
   function currentType(){return DAY.order[Math.min(state.roomIndex,4)]}
 
   function drawBackdrop(type){
-    ctx.fillStyle=COLORS.cream;ctx.fillRect(0,0,W,H);
-    const c=META[type]?.color||COLORS.gold;
-    ctx.fillStyle=c;ctx.globalAlpha=.12;ctx.beginPath();ctx.arc(500,165,170,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
-    // Minimal temple skyline.
-    ctx.fillStyle='#d8cdbf';ctx.fillRect(0,540,W,360);
-    ctx.fillStyle='#c7b7a6';ctx.beginPath();ctx.moveTo(0,540);ctx.lineTo(180,330);ctx.lineTo(300,540);ctx.fill();ctx.beginPath();ctx.moveTo(250,540);ctx.lineTo(430,270);ctx.lineTo(600,540);ctx.fill();
-    ctx.fillStyle='#b7a18c';ctx.fillRect(36,260,56,300);ctx.fillRect(508,260,56,300);ctx.fillRect(22,245,84,24);ctx.fillRect(494,245,84,24);
-    if(type==='memory'){for(let r=45;r<170;r+=38){ctx.beginPath();ctx.arc(300,350,r,Math.PI,Math.PI*2);ctx.strokeStyle=COLORS.plum;ctx.lineWidth=8;ctx.globalAlpha=.18;ctx.stroke()}ctx.globalAlpha=1}
-    if(type==='trivia'){for(let i=0;i<4;i++){rounded(110+i*100,295,70,90,8,'#fff7df');line(125+i*100,325,165+i*100,325,COLORS.teal,5)}}
-    if(type==='platformer'){ctx.fillStyle='#91c9c3';ctx.beginPath();ctx.moveTo(0,460);ctx.lineTo(130,350);ctx.lineTo(250,460);ctx.lineTo(400,310);ctx.lineTo(600,460);ctx.fill()}
-    if(type==='finale'){ctx.fillStyle=COLORS.gold;ctx.beginPath();ctx.arc(300,340,92,0,Math.PI*2);ctx.fill();for(let i=0;i<12;i++){const a=i*Math.PI/6;line(300+Math.cos(a)*110,340+Math.sin(a)*110,300+Math.cos(a)*145,340+Math.sin(a)*145,COLORS.gold,10)}}
+    if(type==='logic'){
+      ctx.fillStyle='#f6dfbd';ctx.fillRect(0,0,W,H);ctx.fillStyle='#efb64355';ctx.beginPath();ctx.arc(488,178,92,0,Math.PI*2);ctx.fill();
+      poly([[0,530],[130,340],[245,520],[355,300],[600,530]],'#d49b71');poly([[0,600],[170,430],[300,600],[455,390],[600,590]],'#b8755f');
+      rounded(55,250,62,315,8,'#9b624d');rounded(483,250,62,315,8,'#9b624d');rounded(40,235,92,28,8,'#7f4f42');rounded(468,235,92,28,8,'#7f4f42');
+      ctx.fillStyle='#4e3532';ctx.fillRect(0,560,W,340);poly([[0,900],[0,730],[85,680],[150,760],[205,700],[260,900]],'#704d43');poly([[600,900],[600,700],[530,660],[470,755],[415,695],[350,900]],'#704d43');
+      for(let i=0;i<7;i++)rounded(22+i*92,790+(i%2)*24,58,38,10,'#a36f55');
+    }else if(type==='memory'){
+      ctx.fillStyle='#ddd8ee';ctx.fillRect(0,0,W,H);poly([[0,0],[180,0],[135,185],[205,315],[105,500],[155,900],[0,900]],'#756a91');poly([[600,0],[430,0],[465,180],[395,320],[500,510],[450,900],[600,900]],'#675d84');
+      poly([[0,900],[0,650],[100,605],[178,710],[235,900]],'#4e4869');poly([[600,900],[600,635],[505,590],[430,720],[375,900]],'#4e4869');
+      for(let r=58;r<220;r+=42){ctx.beginPath();ctx.arc(300,350,r,Math.PI,Math.PI*2);ctx.strokeStyle='#a58ed9';ctx.lineWidth=11;ctx.globalAlpha=.35;ctx.stroke()}ctx.globalAlpha=1;
+      [[66,610],[128,700],[475,660],[535,575]].forEach(([x,y],i)=>poly([[x,y],[x+18,y-85-i%2*25],[x+36,y]],i%2?'#c9b7ff':'#8fe3da'));
+    }else if(type==='trivia'){
+      ctx.fillStyle='#dcefe8';ctx.fillRect(0,0,W,H);ctx.fillStyle='#8cc5b5';ctx.fillRect(0,185,W,410);for(let y=225;y<555;y+=110){ctx.fillStyle='#496f68';ctx.fillRect(34,y,532,15);for(let i=0;i<7;i++){rounded(48+i*76,y-72,55,70,6,i%2?'#f1d598':'#d48c67');line(60+i*76,y-45,91+i*76,y-45,'#775e4e',4)}}
+      rounded(32,570,536,330,0,'#b6a07e');poly([[0,900],[0,665],[90,620],[145,900]],'#477f69');poly([[600,900],[600,650],[510,610],[455,900]],'#477f69');
+      for(let i=0;i<6;i++){line(20+i*112,600,58+i*105,760,'#315f4d',8);ctx.fillStyle='#74b88d';ctx.beginPath();ctx.ellipse(50+i*100,665,18,9,-.5,0,Math.PI*2);ctx.fill()}
+    }else if(type==='platformer'){
+      ctx.fillStyle='#d8eee9';ctx.fillRect(0,0,W,H);ctx.fillStyle='#f5d8b6';ctx.beginPath();ctx.arc(500,170,100,0,Math.PI*2);ctx.fill();poly([[0,560],[105,335],[230,555],[385,285],[600,560]],'#86bbb4');poly([[0,650],[155,430],[295,650],[455,400],[600,630]],'#5e948f');ctx.fillStyle='#d1b17a';ctx.fillRect(0,610,W,290);
+      poly([[0,900],[0,685],[80,620],[125,900]],'#70594d');poly([[600,900],[600,660],[525,610],[470,900]],'#70594d');for(let y=690;y<900;y+=62)line(0,y,110,y-40,'#9d7a5b',8);
+    }else{
+      ctx.fillStyle='#f7e7c8';ctx.fillRect(0,0,W,H);ctx.fillStyle='#a56d5f';ctx.fillRect(0,205,W,480);for(let i=0;i<5;i++){rounded(45+i*124,250,75,300,12,i%2?'#b77f67':'#926154');line(82+i*124,280,82+i*124,520,'#e3b56f',7)}
+      ctx.fillStyle='#f2bd49';ctx.beginPath();ctx.arc(300,360,100,0,Math.PI*2);ctx.fill();for(let i=0;i<12;i++){const a=i*Math.PI/6;line(300+Math.cos(a)*118,360+Math.sin(a)*118,300+Math.cos(a)*156,360+Math.sin(a)*156,'#f2bd49',10)}
+      ctx.fillStyle='#6e493f';ctx.fillRect(0,650,W,250);poly([[0,900],[0,690],[105,625],[155,900]],'#4f3734');poly([[600,900],[600,690],[495,625],[445,900]],'#4f3734');
+      [78,522].forEach(x=>{rounded(x-22,590,44,105,10,'#71483d');ctx.fillStyle='#f3aa3e';ctx.beginPath();ctx.moveTo(x-20,590);ctx.lineTo(x,540);ctx.lineTo(x+20,590);ctx.fill()});
+    }
   }
-  function drawCharacter(x=90,y=570){
-    const t=elapsed(state.character.animStarted),a=state.character.anim;let dy=0,dx=0;
-    if(a==='walk'||a==='run')dy=Math.sin(t/90)*5;if(a==='jump'||a==='celebrate')dy=-Math.abs(Math.sin(Math.min(1,t/700)*Math.PI))*42;
+  function drawCharacter(x=90,y=570,pose=null){
+    const t=elapsed(state.character.animStarted),a=pose||state.character.anim;let dy=0,dx=0;
+    if(a==='walk'||a==='run')dy=Math.sin(t/90)*5;if(a==='jump')dy=-Math.abs(Math.sin(Math.min(1,t/700)*Math.PI))*42;if(a==='celebrate')dy=-Math.abs(Math.sin(t/320))*46;
     if(a==='fall')dy=Math.min(180,t*.12);if(a==='blast')dx=Math.min(220,t*.15);if(a==='crushed')dy=Math.min(30,t*.04);
-    ctx.fillStyle='#263548';ctx.beginPath();ctx.ellipse(x,y+35,34,10,0,0,Math.PI*2);ctx.fill();
-    rounded(x-24+dx,y-32+dy,48,65,20,'#de8b4e');rounded(x-19+dx,y-70+dy,38,40,18,'#bd7145');
-    const carried=DAY.order.filter((_,i)=>state.results[i]&&!(state.mode==='success'&&i===state.roomIndex&&elapsed(state.modeStarted)<1450));if(carried.length){rounded(x+dx-(carried.length-1)*9-10,y+dy+8,(carried.length-1)*18+20,22,10,'#704b3b');carried.forEach((type,i)=>drawIdol(type,x+dx-(carried.length-1)*9+i*18,y+dy+19,.27,false))}
-    rounded(x-30+dx,y-80+dy,60,13,7,'#8a553d');rounded(x-17+dx,y-95+dy,34,20,8,'#9b6244');
-    ctx.fillStyle=COLORS.ink;ctx.beginPath();ctx.arc(x-7+dx,y-54+dy,3,0,Math.PI*2);ctx.arc(x+8+dx,y-54+dy,3,0,Math.PI*2);ctx.fill();
+    const xx=x+dx,yy=y+dy,swing=(a==='walk'||a==='run')?Math.sin(t/85)*8:0;
+    ctx.fillStyle='#26354888';ctx.beginPath();ctx.ellipse(x,y+47,35,9,0,0,Math.PI*2);ctx.fill();
+    // Boots, legs, neck, and a layered expedition jacket.
+    rounded(xx-20,yy+20,16,27,7,'#263548');rounded(xx+4,yy+20,16,27,7,'#263548');rounded(xx-7,yy-40,14,14,5,'#bd7145');
+    const carried=DAY.order.filter((_,i)=>state.results[i]&&!(state.mode==='success'&&i===state.roomIndex&&elapsed(state.modeStarted)<1450));
+    let lh={x:xx-31,y:yy+12+swing},rh={x:xx+31,y:yy+12-swing};
+    if(a==='celebrate'){lh={x:xx-35,y:yy-53};rh={x:xx+35,y:yy-53}}else if(a==='interact'){rh={x:xx+43,y:yy-24}}else if(carried.length){lh={x:xx-38,y:yy+8};rh={x:xx+38,y:yy+8}}
+    ctx.save();ctx.lineCap='round';line(xx-19,yy-18,(xx-19+lh.x)/2,(yy-18+lh.y)/2,'#c87845',13);line((xx-19+lh.x)/2,(yy-18+lh.y)/2,lh.x,lh.y,'#bd7145',9);line(xx+19,yy-18,(xx+19+rh.x)/2,(yy-18+rh.y)/2,'#c87845',13);line((xx+19+rh.x)/2,(yy-18+rh.y)/2,rh.x,rh.y,'#bd7145',9);ctx.restore();
+    ctx.fillStyle='#bd7145';ctx.beginPath();ctx.arc(lh.x,lh.y,6,0,Math.PI*2);ctx.arc(rh.x,rh.y,6,0,Math.PI*2);ctx.fill();
+    rounded(xx-24,yy-32,48,65,18,'#de8b4e');rounded(xx-17,yy-27,34,55,12,'#e8a25d');line(xx,yy-24,xx,yy+20,'#8f573e',3);rounded(xx+12,yy-5,14,24,5,'#704b3b');
+    rounded(xx-19,yy-70,38,40,18,'#bd7145');ctx.fillStyle='#a75f3d';ctx.beginPath();ctx.arc(xx+18,yy-52,5,0,Math.PI*2);ctx.fill();
+    rounded(xx-30,yy-80,60,13,7,'#8a553d');rounded(xx-17,yy-95,34,20,8,'#9b6244');
+    ctx.fillStyle=COLORS.ink;ctx.beginPath();ctx.arc(xx-7,yy-54,3,0,Math.PI*2);ctx.arc(xx+8,yy-54,3,0,Math.PI*2);ctx.fill();line(xx-3,yy-43,xx+5,yy-43,'#75432f',2);
+    if(carried.length){rounded(xx-43,yy+2,86,13,6,'#704b3b');carried.forEach((type,i)=>drawIdol(type,xx-(carried.length-1)*9+i*18,yy-3,.27,false))}
     if(a==='burn'){ctx.fillStyle=COLORS.coral;ctx.beginPath();ctx.moveTo(x-15,y-95);ctx.lineTo(x,y-135);ctx.lineTo(x+12,y-95);ctx.fill()}
     if(a==='shadow'){ctx.globalAlpha=.55;rounded(x-35,y-120,70,170,35,COLORS.plum);ctx.globalAlpha=1}
   }
@@ -139,12 +162,12 @@
     for(let i=0;i<4;i++){const col=i%2,row=Math.floor(i/2);button(`${ICONS[i]}  ${NAMES[i]}`,30+col*285,472+row*88,255,70,state.logic.selected.includes(i)?'#d9cbbf':COLORS.coral,'#fff',state.logic.selected.includes(i))}
     button('RESET',30,678,180,66,'#ded4c9',COLORS.ink);button('CONFIRM ORDER',230,678,340,66,COLORS.ink,'#fff',state.logic.selected.length===4);drawCharacter(92,845)
   }
-  function memoryLit(){const seq=memoryRounds[state.memory.round],i=Math.floor(elapsed(state.memory.phaseStarted)/650);return i<seq.length?seq[i]:-1}
+  function memoryLit(){const seq=memoryRounds[state.memory.round],i=Math.floor(elapsed(state.memory.phaseStarted)/650);return i<seq.length?i:-1}
   function drawMemory(){
     drawBackdrop('memory');drawTitle('memory',`Sequence ${state.memory.round+1} of 2`);const seq=memoryRounds[state.memory.round],show=state.memory.phase==='show',lit=show?memoryLit():-1;
     rounded(24,190,552,190,28,COLORS.paper);text(show?'WATCH THE RUNES':`REPEAT THE ECHO · ${state.memory.input.length}/${seq.length}`,300,230,16,COLORS.plum,'center');
     const slotW=seq.length===4?88:70,start=(W-(seq.length*slotW+(seq.length-1)*10))/2;
-    seq.forEach((v,i)=>{const entered=!show&&i<state.memory.input.length;rounded(start+i*(slotW+10),266,slotW,82,20,lit===v?'#ffdf83':entered?'#c8baf2':'#eee8f8');const visible=show?(i<=Math.floor(elapsed(state.memory.phaseStarted)/650)?ICONS[v]:'•'):(entered?ICONS[v]:'•');text(visible,start+i*(slotW+10)+slotW/2,320,34,lit===v?COLORS.ink:COLORS.plum,'center')});
+    seq.forEach((v,i)=>{const entered=!show&&i<state.memory.input.length,active=i===lit;rounded(start+i*(slotW+10),266,slotW,82,20,active?'#ffdf83':entered?'#c8baf2':'#eee8f8');const visible=show?(i<=Math.floor(elapsed(state.memory.phaseStarted)/650)?ICONS[v]:'•'):(entered?ICONS[v]:'•');text(visible,start+i*(slotW+10)+slotW/2,320,34,active?COLORS.ink:COLORS.plum,'center')});
     for(let i=0;i<4;i++){const col=i%2,row=Math.floor(i/2),x=30+col*285,y=430+row*124;rounded(x,y,255,104,20,COLORS.plum);text(ICONS[i],x+127.5,y+47,34,'#fff','center',800);text(NAMES[i],x+127.5,y+78,14,'#fff','center',800)}
     text(show?'Watch carefully…':'Correct choices stay visible above.',300,690,15,'#6f6682','center');button(state.memory.replayUsed?'REPLAY USED':'REPLAY ONCE',135,722,330,60,state.memory.replayUsed?'#d8d0df':COLORS.ink);drawCharacter(86,852)
   }
@@ -154,7 +177,7 @@
     q.a.forEach((v,i)=>button(`${i+1}. ${v}`,32,400+i*82,536,66,state.trivia.selected===i?COLORS.gold:'#ffffff',state.trivia.selected===i?COLORS.ink:COLORS.ink));
     rounded(32,750,536,18,9,'#dfd7cd');rounded(32,750,536*((state.trivia.index)/4),18,9,COLORS.teal);text('All four answers must be correct.',300,812,14,'#607179','center');drawCharacter(80,855)
   }
-  function jumpHeight(){if(state.platformer.jumpStarted<0)return 0;const p=elapsed(state.platformer.jumpStarted)/JUMP_DURATION;if(p>=1)return 0;return Math.sin(p*Math.PI)*130}
+  function jumpHeight(){if(state.platformer.jumpStarted<0)return 0;const p=elapsed(state.platformer.jumpStarted)/JUMP_DURATION;if(p>=1)return 0;return Math.sin(p*Math.PI)*JUMP_HEIGHT}
   function platformElapsed(){return state.platformer.phase==='running'?elapsed(state.platformer.runStarted):0}
   function drawPlatformer(){
     drawBackdrop('platformer');drawTitle('platformer','Auto-run for 30 seconds · tap only to jump');const p=state.platformer,e=platformElapsed(),left=Math.max(0,30000-e);
@@ -173,19 +196,27 @@
   }
   function drawFinale(){
     drawBackdrop('finale');drawTitle('finale','Combine every lesson to awaken the Sunstone.');const f=state.finale;rounded(24,450,552,360,30,COLORS.paper);
-    if(f.phase==='question'){drawWrapped('Where does the sun rise?',300,500,500,24,COLORS.ink,30,800);['NORTH','EAST','SOUTH','WEST'].forEach((v,i)=>button(`${i+1}. ${v}`,40+(i%2)*270,570+Math.floor(i/2)*88,250,70,COLORS.gold,COLORS.ink))}
-    else if(f.phase==='runes'){text('ORDER: DAWN → ZENITH → DUSK',300,500,18,COLORS.ink,'center');['DAWN','ZENITH','DUSK','ECLIPSE'].forEach((v,i)=>button(`${ICONS[i]} ${v}`,40+(i%2)*270,545+Math.floor(i/2)*82,250,64,f.selected.includes(i)?COLORS.gold:'#eee5d8',COLORS.ink));button('CONFIRM',140,720,320,60,COLORS.ink)}
+    if(f.phase==='question'){drawWrapped('At dawn I stretch long. At noon I nearly vanish. At dusk I grow again. What am I?',300,490,500,20,COLORS.ink,26,800);['A RIVER','A SHADOW','THE MOON','A FLAME'].forEach((v,i)=>button(`${i+1}. ${v}`,40+(i%2)*270,585+Math.floor(i/2)*82,250,64,COLORS.gold,COLORS.ink))}
+    else if(f.phase==='runes'){drawWrapped('Trace one full day: birth of light → highest light → fading light.',300,490,500,17,COLORS.ink,23,750);['DAWN','ZENITH','DUSK','ECLIPSE'].forEach((v,i)=>button(`${ICONS[i]} ${v}`,40+(i%2)*270,565+Math.floor(i/2)*76,250,60,f.selected.includes(i)?COLORS.gold:'#eee5d8',COLORS.ink));button('CONFIRM',140,720,320,60,COLORS.ink)}
     else if(f.phase==='memory'){text('REPEAT THE FIRST 3 ECHOES',300,500,18,COLORS.ink,'center');ICONS.forEach((v,i)=>button(`${v} ${NAMES[i]}`,40+(i%2)*270,550+Math.floor(i/2)*82,250,64,COLORS.plum));text(`${f.input.length}/3 restored`,300,735,15,'#6b617c','center')}
-    else {text(f.phase==='reactionActive'?'TAP NOW!':'WAIT FOR THE SUNBEAM',300,540,24,f.phase==='reactionActive'?COLORS.coral:COLORS.ink,'center');button(f.phase==='reactionActive'?'AWAKEN':'WAIT…',90,620,420,100,f.phase==='reactionActive'?COLORS.gold:'#d8cec1',COLORS.ink)}
-    drawCharacter(82,850)
+    else {const leap=f.phase==='reactionLeap',p=leap?clamp(elapsed(f.leapStarted)/1100,0,1):0;drawIdol('finale',500,560,.88,false);line(62,700,538,700,'#8d674d',9);rounded(282,616,48,84,9,'#784f42');poly([[270,700],[294,655],[318,700]],'#d86d50');drawCharacter(leap?112+p*360:112,690-(leap?Math.sin(p*Math.PI)*135:0));text(leap?'LEAPING FOR THE SUNSTONE':f.phase==='reactionActive'?'JUMP NOW!':'WAIT FOR THE SUNBEAM',300,500,21,f.phase==='reactionActive'?COLORS.coral:COLORS.ink,'center');if(!leap)button(f.phase==='reactionActive'?'JUMP THE ALTAR':'WAIT…',90,730,420,62,f.phase==='reactionActive'?COLORS.gold:'#d8cec1',COLORS.ink)}
+    if(!f.phase.startsWith('reaction'))drawCharacter(82,850)
   }
   function drawRoom(){const t=currentType();if(t==='logic')drawLogic();else if(t==='memory')drawMemory();else if(t==='trivia')drawTrivia();else if(t==='platformer')drawPlatformer();else drawFinale()}
-  function drawSuccess(){const type=currentType(),e=elapsed(state.modeStarted);drawBackdrop(type);drawHUD();text('IDOL RECOVERED',300,158,15,META[type].color,'center');text(IDOLS[type].name,300,198,30,COLORS.ink,'center');rounded(28,238,544,470,30,'#ffffffd9');line(54,610,546,610,'#c9b59e',8);let x=90;if(e<850)x=90+210*clamp(e/850,0,1);else if(e>1450)x=300+280*clamp((e-1450)/1150,0,1);drawCharacter(x,585);if(e<1450){const grab=clamp((e-850)/600,0,1),s=1.55*(1-grab*.68);drawIdol(type,350-45*grab,480-45*grab,s,false)}else drawIdol(type,x,515,.48,false);text(e<850?'THE IDOL APPEARS':e<1450?'COLLECTING…':state.roomIndex===4?'THE SUNSTONE AWAKENS':'ONWARD TO THE NEXT ROOM',300,666,14,META[type].color,'center');text(state.message,300,760,14,'#64727a','center')}
-  function drawFail(){drawBackdrop(currentType());drawHUD();ctx.fillStyle='#c9404033';ctx.fillRect(0,0,W,H);drawCharacter(300,570);drawWrapped(state.detail,300,210,500,22,COLORS.red,30,800)}
-  function drawEnd(victory){drawBackdrop(victory?'finale':currentType());ctx.fillStyle='#ffffffdd';ctx.fillRect(0,0,W,H);rounded(26,50,548,800,34,COLORS.paper);text(victory?'THE SUN RETURNS':'EXPEDITION ENDED',300,145,34,victory?COLORS.gold:COLORS.red,'center');drawCharacter(300,330);text(`${state.score}/5 IDOLS`,300,470,24,COLORS.ink,'center');DAY.order.forEach((type,i)=>drawIdol(type,104+i*98,530,.68,!state.results[i]));button('RETRY DAY 1',70,635,460,76,COLORS.ink);button('COPY RESULT',70,730,460,66,'#e5ddd3',COLORS.ink);text('Your shared result contains no answers.',300,820,13,'#78838a','center')}
+  function drawSuccessObstacle(type,p){
+    if(type==='logic'){rounded(414,526,72,84,14,'#8d6552');poly([[402,610],[440,548],[478,610]],'#b77a5e')}
+    else if(type==='memory'){if(p<.52){rounded(422,486,42,124,12,'#7561a8');for(let y=500;y<600;y+=24)line(424,y,462,y+18,'#c9b7ff',5)}else{poly([[400,610],[420,555],[440,610]],'#7561a8');poly([[450,610],[470,530],[490,610]],'#a58ed9')}}
+    else if(type==='trivia'){rounded(404-p*28,490,38,120,8,'#477f69');rounded(458+p*28,490,38,120,8,'#477f69');line(423-p*28,510,423-p*28,590,'#efcf8a',6);line(477+p*28,510,477+p*28,590,'#efcf8a',6)}
+    else if(type==='platformer'){rounded(422,520,48,90,9,'#5f5147');poly([[406,610],[435,550],[464,610]],COLORS.coral)}
+    else{rounded(418,520,66,90,12,'#8b594a');drawIdol('finale',451,540,.55,false)}
+  }
+  function drawSuccess(){const type=currentType(),e=elapsed(state.modeStarted),action=clamp((e-1450)/1150,0,1);drawBackdrop(type);drawHUD();text('IDOL RECOVERED',300,158,15,META[type].color,'center');text(IDOLS[type].name,300,198,30,COLORS.ink,'center');rounded(28,238,544,470,30,'#ffffffd9');line(54,610,546,610,'#c9b59e',8);drawSuccessObstacle(type,action);let x=90,y=585,pose=null;if(e<850)x=90+210*clamp(e/850,0,1);else if(e>1450){x=300+280*action;if(['logic','platformer','finale'].includes(type))y-=Math.sin(action*Math.PI)*112;if(type==='memory'&&action>.3&&action<.65)pose='interact'}drawCharacter(x,y,pose);if(e<1450){const grab=clamp((e-850)/600,0,1),s=1.55*(1-grab*.68);drawIdol(type,350-45*grab,480-45*grab,s,false)}text(e<850?'THE IDOL APPEARS':e<1450?'TAKING IT IN HAND…':type==='memory'?'SMASH THROUGH!':type==='trivia'?'THE ARCHIVE OPENS':state.roomIndex===4?'THE SUNSTONE AWAKENS':'CLEAR THE WAY!',300,666,14,META[type].color,'center');text(state.message,300,760,14,'#64727a','center')}
+  function drawFail(){if(currentType()==='platformer'){drawPlatformer();ctx.fillStyle='#c9404040';ctx.fillRect(0,0,W,H);rounded(46,270,508,86,22,'#fffdfae8');drawWrapped(state.detail,300,306,450,18,COLORS.red,25,800);return}drawBackdrop(currentType());drawHUD();ctx.fillStyle='#c9404033';ctx.fillRect(0,0,W,H);drawCharacter(300,570);drawWrapped(state.detail,300,210,500,22,COLORS.red,30,800)}
+  function drawCoins(){for(let i=0;i<34;i++){const speed=.035+(i%4)*.018,x=(i*97+state.clock*speed)%640-20,y=(i*151+state.clock*(speed+.025))%920-20,r=7+i%3;ctx.fillStyle=i%2?'#efb643':'#ffd66e';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();line(x-2,y-r+3,x+3,y+r-3,'#bf7e22',2)}}
+  function drawEnd(victory){drawBackdrop(victory?'finale':currentType());ctx.fillStyle='#ffffffbf';ctx.fillRect(0,0,W,H);if(victory)drawCoins();rounded(26,50,548,800,34,COLORS.paper);if(victory)drawCoins();text(victory?'THE SUN RETURNS':'EXPEDITION ENDED',300,128,34,victory?COLORS.gold:COLORS.red,'center');if(victory)drawWrapped(`YOU’VE SURVIVED ${DAY.title} — DAY 1`,300,171,470,16,COLORS.ink,22,800);drawCharacter(300,350,victory?'celebrate':null);text(`${state.score}/5 IDOLS`,300,478,24,COLORS.ink,'center');DAY.order.forEach((type,i)=>drawIdol(type,104+i*98,535,.68,!state.results[i]));button('RETRY DAY 1',70,635,460,76,COLORS.ink);button('COPY RESULT',70,730,460,66,'#e5ddd3',COLORS.ink);text('Your shared result contains no answers.',300,820,13,'#78838a','center')}
   function render(){ctx.clearRect(0,0,W,H);if(state.mode==='start')drawStart();else if(state.mode==='transition')drawTransition();else if(state.mode==='ready')drawReady();else if(state.mode==='room')drawRoom();else if(state.mode==='success')drawSuccess();else if(state.mode==='fail')drawFail();else if(state.mode==='gameover')drawEnd(false);else drawEnd(true);if(state.infoOpen)drawInfo()}
 
-  function resetPuzzles(){state.logic={selected:[]};state.memory={round:0,phase:'show',phaseStarted:state.clock,input:[],replayUsed:false};state.trivia={index:0,selected:-1};state.platformer={phase:'countdown',countdownStarted:0,runStarted:0,jumpStarted:-1,checked:[],distance:0};state.finale={phase:'question',selected:[],input:[],readyAt:0,activeAt:0};state.infoOpen=false}
+  function resetPuzzles(){state.logic={selected:[]};state.memory={round:0,phase:'show',phaseStarted:state.clock,input:[],replayUsed:false};state.trivia={index:0,selected:-1};state.platformer={phase:'countdown',countdownStarted:0,runStarted:0,jumpStarted:-1,checked:[],distance:0};state.finale={phase:'question',selected:[],input:[],readyAt:0,activeAt:0,leapStarted:0};state.infoOpen=false}
   function startRun(retry=false,startRoom=0,testing=false){state.mode='transition';state.modeStarted=state.clock;state.roomIndex=startRoom;state.score=0;state.results=[];state.message='';state.detail='';state.testing=testing;if(retry){state.attempt++;state.official=false}else{state.attempt=1;state.official=!testing}resetPuzzles();setAnim('walk');render()}
   function showReady(){state.mode='ready';state.modeStarted=state.clock;setAnim('idle');render()}
   function enterRoom(){state.mode='room';state.modeStarted=state.clock;const t=currentType();if(t==='memory'){state.memory.phase='show';state.memory.phaseStarted=state.clock}if(t==='platformer'){state.platformer.phase='countdown';state.platformer.countdownStarted=state.clock;state.platformer.runStarted=0;state.platformer.checked=[]}render()}
@@ -197,15 +228,15 @@
   function chooseMemory(i){if(state.memory.phase!=='input')return;const seq=memoryRounds[state.memory.round],pos=state.memory.input.length;if(i!==seq[pos])return fail('shadow','A wrong echo wakes the chamber shadows.');state.memory.input.push(i);if(state.memory.input.length===seq.length){if(state.memory.round===0){state.memory.round=1;state.memory.phase='pause';state.memory.phaseStarted=state.clock;state.memory.input=[];state.memory.replayUsed=false}else success('Both echo patterns return perfectly.')}render()}
   function replayMemory(){if(state.memory.phase!=='input'||state.memory.replayUsed)return;state.memory.phase='show';state.memory.phaseStarted=state.clock;state.memory.input=[];state.memory.replayUsed=true;render()}
   function chooseTrivia(i){const t=trivia[state.trivia.index];state.trivia.selected=i;if(i!==t.correct)return fail('fall','The incorrect tablet opens a hidden trap.');state.trivia.index++;state.trivia.selected=-1;if(state.trivia.index>=trivia.length)success('Four answers reveal the archive seal.');else{state.message='Correct';setAnim('celebrate')}render()}
-  function doJump(){const p=state.platformer;if(currentType()==='platformer'){if(p.phase!=='running')return;if(p.jumpStarted<0||elapsed(p.jumpStarted)>=JUMP_DURATION){p.jumpStarted=state.clock;setAnim('run')}return}const f=state.finale;if(currentType()==='finale'){if(f.phase==='reactionWaiting')return fail('blast','The Sunstone rejects the early strike.');if(f.phase==='reactionActive')return success('The Sunstone awakens and daylight returns!')}}
+  function doJump(){const p=state.platformer;if(currentType()==='platformer'){if(p.phase!=='running')return;if(p.jumpStarted<0||elapsed(p.jumpStarted)>=JUMP_DURATION){p.jumpStarted=state.clock;setAnim('run')}return}const f=state.finale;if(currentType()==='finale'){if(f.phase==='reactionWaiting')return fail('blast','The Sunstone rejects the early strike.');if(f.phase==='reactionActive'){f.phase='reactionLeap';f.leapStarted=state.clock;setAnim('run');render()}}}
   function chooseFinale(i){const f=state.finale;if(f.phase==='question'){if(i!==1)return fail('blast','The guardian rejects that direction.');f.phase='runes';f.selected=[]}else if(f.phase==='runes'){if(!f.selected.includes(i)&&f.selected.length<3)f.selected.push(i)}else if(f.phase==='memory'){const seq=[0,2,1],pos=f.input.length;if(i!==seq[pos])return fail('shadow','The final echo fractures the seal.');f.input.push(i);if(f.input.length===3){f.phase='reactionWaiting';f.readyAt=state.clock+1300}}render()}
   function confirmFinale(){const f=state.finale;if(f.phase!=='runes'||f.selected.length!==3)return;if([0,1,2].every((v,i)=>f.selected[i]===v)){f.phase='memory';f.input=[];f.selected=[]}else fail('burn','The solar cycle ignites the guardian.');render()}
 
-  function updatePlatformer(){const p=state.platformer;if(p.phase==='countdown'){if(elapsed(p.countdownStarted)>=3000){p.phase='running';p.runStarted=state.clock;setAnim('run')}return}const e=platformElapsed();if(p.jumpStarted>=0&&elapsed(p.jumpStarted)>=JUMP_DURATION)p.jumpStarted=-1;obstacleTimes.forEach((time,i)=>{if(p.checked[i]||e<time)return;const h=jumpHeight();if(h<52)fail('crushed','The explorer collides with a temple obstacle.');else p.checked[i]=true});if(state.mode==='room'&&e>=30000)success('Thirty seconds survived. The passage seal is yours.')}
-  function pauseTimers(ms){state.modeStarted+=ms;state.character.animStarted+=ms;state.memory.phaseStarted+=ms;if(state.platformer.countdownStarted)state.platformer.countdownStarted+=ms;if(state.platformer.runStarted)state.platformer.runStarted+=ms;if(state.platformer.jumpStarted>=0)state.platformer.jumpStarted+=ms;if(state.finale.readyAt)state.finale.readyAt+=ms;if(state.finale.activeAt)state.finale.activeAt+=ms}
+  function updatePlatformer(){const p=state.platformer;if(p.phase==='countdown'){if(elapsed(p.countdownStarted)>=3000){p.phase='running';p.runStarted=state.clock;setAnim('run')}return}const e=platformElapsed();if(p.jumpStarted>=0&&elapsed(p.jumpStarted)>=JUMP_DURATION)p.jumpStarted=-1;obstacleTimes.forEach((time,i)=>{if(p.checked[i]||state.mode!=='room')return;const x=130+(time-e)*COURSE_SPEED,right=x+62,left=x-12;if(right<96){p.checked[i]=true;return}const touching=left<144&&right>96;if(touching){const obstacleTop=i%3===0?438:468,characterBottom=571-jumpHeight();if(characterBottom>obstacleTop+5)fail('crushed','The obstacle visibly strikes the explorer.')}});if(state.mode==='room'&&e>=30000)success('Thirty seconds survived. The passage seal is yours.')}
+  function pauseTimers(ms){state.modeStarted+=ms;state.character.animStarted+=ms;state.memory.phaseStarted+=ms;if(state.platformer.countdownStarted)state.platformer.countdownStarted+=ms;if(state.platformer.runStarted)state.platformer.runStarted+=ms;if(state.platformer.jumpStarted>=0)state.platformer.jumpStarted+=ms;if(state.finale.readyAt)state.finale.readyAt+=ms;if(state.finale.activeAt)state.finale.activeAt+=ms;if(state.finale.leapStarted)state.finale.leapStarted+=ms}
   function update(ms){state.clock+=ms;if(state.infoOpen){pauseTimers(ms);return}if(state.mode==='transition'&&elapsed(state.modeStarted)>=(state.reducedMotion?150:1400))showReady();if(state.mode==='success'&&elapsed(state.modeStarted)>=(state.reducedMotion?650:2600)){if(state.roomIndex===4){state.mode='victory';setAnim('celebrate');saveRun(true)}else nextRoom()}if(state.mode==='fail'&&elapsed(state.modeStarted)>=(state.reducedMotion?300:1200)){state.mode='gameover';saveRun(false)}if(state.mode!=='room')return;
     if(currentType()==='memory'){const m=state.memory,seq=memoryRounds[m.round];if(m.phase==='show'&&elapsed(m.phaseStarted)>=seq.length*650+400){m.phase='input';m.input=[]}if(m.phase==='pause'&&elapsed(m.phaseStarted)>=800){m.phase='show';m.phaseStarted=state.clock}}
-    if(currentType()==='platformer')updatePlatformer();if(currentType()==='finale'){const f=state.finale;if(f.phase==='reactionWaiting'&&state.clock>=f.readyAt){f.phase='reactionActive';f.activeAt=state.clock}if(f.phase==='reactionActive'&&elapsed(f.activeAt)>1100)fail('blast','The final sunbeam fades away.')}}
+    if(currentType()==='platformer')updatePlatformer();if(currentType()==='finale'){const f=state.finale;if(f.phase==='reactionWaiting'&&state.clock>=f.readyAt){f.phase='reactionActive';f.activeAt=state.clock}if(f.phase==='reactionActive'&&elapsed(f.activeAt)>1100)fail('blast','The final sunbeam fades away.');if(f.phase==='reactionLeap'&&elapsed(f.leapStarted)>=1100)success('The explorer clears the altar and awakens the Sunstone!')}}
   function point(event){const r=canvas.getBoundingClientRect();return{x:(event.clientX-r.left)*W/r.width,y:(event.clientY-r.top)*H/r.height}}
   function roomTap(x,y){const t=currentType();if(x>=420&&y>=100&&y<=180){state.infoOpen=true;return render()}if(t==='logic'){if(y>=450&&y<=650){const col=x<300?0:1,row=y<560?0:1;return chooseLogic(row*2+col)}if(y>=650&&x<220){state.logic.selected=[];return render()}if(y>=650)return confirmLogic()}
     if(t==='memory'){if(y>=410&&y<=680){const col=x<300?0:1,row=y<552?0:1;return chooseMemory(row*2+col)}if(y>=700)return replayMemory()}
@@ -215,7 +246,7 @@
   function handleKey(event){if(event.key.toLowerCase()==='f')return document.fullscreenElement?document.exitFullscreen():canvas.requestFullscreen();if(state.infoOpen){if(['Escape','Enter'].includes(event.key)){state.infoOpen=false;render()}return}if(state.mode==='start'&&event.key==='Enter')return startRun(false,0,false);if(state.mode==='ready'&&event.key==='Enter')return enterRoom();if((state.mode==='gameover'||state.mode==='victory')&&['r','R','Enter'].includes(event.key))return startRun(true,0,false);if(state.mode!=='room')return;if(event.key===' '){event.preventDefault();return doJump()}if(currentType()==='logic'&&event.key==='Enter')return confirmLogic();if(currentType()==='finale'&&event.key==='Enter')return confirmFinale();if(['1','2','3','4'].includes(event.key)){const i=Number(event.key)-1;if(currentType()==='logic')chooseLogic(i);else if(currentType()==='memory')chooseMemory(i);else if(currentType()==='trivia')chooseTrivia(i);else if(currentType()==='finale')chooseFinale(i)}}
   function shareText(){return`FIVE ROOMS · DAY 1\n🏺 ${DAY.title}\n${state.results.map(v=>v?'🟨':'🟥').join('')}\n${state.score}/5 seals`}
   window.advanceTime=(ms)=>{manualTime=true;const n=Math.max(1,Math.round(ms/(1000/60)));for(let i=0;i<n;i++)update(ms/n);render()};
-  window.render_game_to_text=()=>JSON.stringify({coordinateSystem:'portrait canvas 600x900; origin top-left',day:DAY.id,mode:state.mode,room:state.roomIndex+1,roomType:currentType(),score:state.score,results:state.results,attempt:state.attempt,official:state.official,testing:state.testing,infoOpen:state.infoOpen,collected:DAY.order.filter((_,i)=>state.results[i]),character:{animation:state.character.anim,carrying:DAY.order.filter((_,i)=>state.results[i])},puzzle:currentType()==='logic'?{selected:state.logic.selected}:currentType()==='memory'?{round:state.memory.round+1,phase:state.memory.phase,inputLength:state.memory.input.length,replayAvailable:!state.memory.replayUsed}:currentType()==='trivia'?{question:state.trivia.index+1,total:4}:currentType()==='platformer'?{phase:state.platformer.phase,elapsedMs:Math.round(platformElapsed()),obstaclesCleared:state.platformer.checked.length,totalObstacles:obstacleTimes.length,jumping:jumpHeight()>0,jumpDurationMs:JUMP_DURATION,courseSpeed:'fast'}:{phase:state.finale.phase,inputLength:state.finale.input.length,selected:state.finale.selected},controls:'Tap; 1-4 choose; Enter ready/confirm; Space jumps; F fullscreen'});
+  window.render_game_to_text=()=>JSON.stringify({coordinateSystem:'portrait canvas 600x900; origin top-left',day:DAY.id,mode:state.mode,room:state.roomIndex+1,roomType:currentType(),score:state.score,results:state.results,attempt:state.attempt,official:state.official,testing:state.testing,infoOpen:state.infoOpen,collected:DAY.order.filter((_,i)=>state.results[i]),character:{animation:state.character.anim,carrying:DAY.order.filter((_,i)=>state.results[i])},puzzle:currentType()==='logic'?{selected:state.logic.selected}:currentType()==='memory'?{round:state.memory.round+1,phase:state.memory.phase,inputLength:state.memory.input.length,replayAvailable:!state.memory.replayUsed,highlightedPosition:state.memory.phase==='show'?memoryLit()+1:null,highlightedCount:state.memory.phase==='show'&&memoryLit()>=0?1:0}:currentType()==='trivia'?{question:state.trivia.index+1,total:4}:currentType()==='platformer'?{phase:state.platformer.phase,elapsedMs:Math.round(platformElapsed()),obstaclesCleared:state.platformer.checked.length,totalObstacles:obstacleTimes.length,jumping:jumpHeight()>0,jumpDurationMs:JUMP_DURATION,courseSpeed:'fast'}:{phase:state.finale.phase,inputLength:state.finale.input.length,selected:state.finale.selected},controls:'Tap; 1-4 choose; Enter ready/confirm; Space jumps; F fullscreen'});
   canvas.addEventListener('pointerup',handlePointer);window.addEventListener('keydown',handleKey);setInterval(()=>{if(!manualTime){update(50);render()}},50);state.stats=loadStats();render();
 })();
 </script>
