@@ -3,115 +3,381 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Five Rooms</title>
+  <title>Five Rooms: Temple of the Sun</title>
   <style>
-    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    :root { color-scheme: dark; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #07111f; }
-    canvas { width: min(94vw, 980px); height: auto; aspect-ratio: 16 / 10; border: 2px solid #28415f; border-radius: 18px; box-shadow: 0 24px 80px #0009; background: #0d1d31; touch-action: manipulation; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; overflow: hidden; background: #09070f; }
+    canvas { width: min(96vw, 960px); height: auto; aspect-ratio: 16 / 10; border: 4px solid #4d315f; border-radius: 4px; background: #160f23; box-shadow: 0 20px 80px #000c; image-rendering: pixelated; touch-action: manipulation; }
   </style>
 </head>
 <body>
-<canvas id="game" width="980" height="612" aria-label="Five Rooms daily puzzle game"></canvas>
+<canvas id="game" width="960" height="600" aria-label="Five Rooms: Temple of the Sun"></canvas>
 <script>
 (() => {
+  'use strict';
   const canvas = document.querySelector('#game');
   const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
   const W = canvas.width, H = canvas.height;
-  const TIMEZONE = 'America/Los_Angeles';
-  const ROOM_NAMES = ['TRIVIA', 'LOGIC', 'MEMORY', 'REACTION', 'FINALE'];
-  const ROOM_ICONS = ['?', '◆', '✦', '!', '★'];
-  const ROOM_COLORS = ['#4ed1b4', '#8bb5ff', '#d7a2ff', '#ffbe63', '#ff7f9c'];
-  const THEMES = ['Donut Day', 'Deep Sea', 'Retro Arcade', 'Night Garden', 'Space Station', 'Ancient Maps', 'Cozy Kitchen', 'Rainy City', 'Tiny Giants', 'Movie Magic', 'Wild Weather', 'Hidden History', 'Ocean Myths', 'Bright Futures'];
-  const triviaPool = [
-    ['Which ancient civilization built Machu Picchu?', ['Maya', 'Inca', 'Roman', 'Phoenician'], 1],
-    ['What is the chemical symbol for tungsten?', ['T', 'Tu', 'W', 'Tg'], 2],
-    ['Which novel begins with “Call me Ishmael”?', ['Moby-Dick', 'The Odyssey', 'Ulysses', 'The Great Gatsby'], 0],
-    ['What is the smallest prime number greater than 50?', ['51', '53', '57', '59'], 1],
-    ['Which composer wrote “The Four Seasons”?', ['Mozart', 'Bach', 'Vivaldi', 'Beethoven'], 2],
-    ['What is the capital city of Mongolia?', ['Astana', 'Bishkek', 'Ulaanbaatar', 'Tashkent'], 2],
-    ['In computing, what does CPU stand for?', ['Central Processing Unit', 'Computer Power Utility', 'Core Program Upload', 'Central Program User'], 0],
-    ['Which layer surrounds Earth’s inner core?', ['Crust', 'Mantle', 'Outer core', 'Lithosphere'], 2],
-    ['What is the main language spoken in Brazil?', ['Spanish', 'Portuguese', 'French', 'Italian'], 1],
-    ['Which mathematician is associated with a² + b² = c²?', ['Euclid', 'Pythagoras', 'Archimedes', 'Fermat'], 1],
-    ['Which gas makes up most of Earth’s atmosphere?', ['Oxygen', 'Nitrogen', 'Argon', 'Carbon dioxide'], 1],
-    ['What is the hardest natural mineral?', ['Quartz', 'Topaz', 'Diamond', 'Graphite'], 2],
-    ['Which instrument measures atmospheric pressure?', ['Barometer', 'Altimeter', 'Hygrometer', 'Anemometer'], 0],
-    ['How many bones are in the adult human body, approximately?', ['106', '206', '306', '406'], 1]
-  ];
+  const DAY = {
+    id: 'day-001-ancient-temple-v1',
+    title: 'TEMPLE OF THE SUN',
+    subtitle: 'The Eclipse Trial',
+    story: 'The sun is vanishing. Recover four sacred seals, then awaken the Sunstone before the eclipse becomes eternal.',
+    order: ['logic', 'memory', 'trivia', 'reaction', 'finale']
+  };
+  const META = {
+    logic: { name: 'BRIDGE OF IDOLS', short: 'LOGIC', color: '#e69c55' },
+    memory: { name: 'CHAMBER OF ECHOES', short: 'MEMORY', color: '#a890ff' },
+    trivia: { name: 'ARCHIVE OF GLYPHS', short: 'TRIVIA', color: '#59d8bd' },
+    reaction: { name: 'THE BOULDER PASSAGE', short: 'REACTION', color: '#ff6b65' },
+    finale: { name: 'THE SUNSTONE VAULT', short: 'FINALE', color: '#ffd45c' }
+  };
+  const SYMBOLS = ['SUN', 'SERPENT', 'JAGUAR', 'OWL'];
+  const GLYPHS = ['☀', '≈', '◆', '▲'];
   const state = {
-    mode: 'start', room: 0, score: 0, official: true, attempt: 1, startedAt: 0, roomStartedAt: 0,
-    selected: -1, roomResult: [], feedback: '', clock: 0, transitionUntil: 0, sequence: [], sequenceIndex: 0,
-    reactionReadyAt: 0, reactionStarted: false, reactionStart: 0, level: null, stats: null, prefersReducedMotion: false
+    mode: 'start', clock: 0, attempt: 1, official: true, roomIndex: 0, score: 0,
+    roomResults: [], modeStarted: 0, roomStarted: 0, message: '', detail: '',
+    character: { x: 110, y: 488, anim: 'idle', animStarted: 0, facing: 1 },
+    logic: { selected: [] },
+    memory: { round: 0, phase: 'show', input: [], phaseStarted: 0, lit: -1 },
+    trivia: { selected: -1 },
+    reaction: { gate: 0, phase: 'waiting', readyAt: 0, activeAt: 0 },
+    finale: { phase: 'question', selected: [], input: [], readyAt: 0, activeAt: 0 },
+    stats: {}, reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches
+  };
+  const memoryRounds = [[0, 2, 1, 3], [0, 2, 1, 3, 2, 0]];
+  const reactionWaits = [1100, 1450, 900];
+  const logicSolution = [0, 1, 2, 3];
+  const finaleRuneSolution = [0, 1, 2];
+  const finaleMemorySolution = memoryRounds[1].slice(0, 3);
+  let manualTime = false;
+
+  function loadStats() { try { return JSON.parse(localStorage.getItem('fiveRoomsTempleStats') || '{}'); } catch { return {}; } }
+  function saveRun(completed) {
+    const prev = loadStats(); const best = Math.max(prev.best || 0, state.score); const attempts = (prev.attempts || 0) + 1;
+    const next = { best, attempts, completed: Boolean(prev.completed || completed), firstAttemptScore: prev.firstAttemptScore ?? (state.official ? state.score : null) };
+    localStorage.setItem('fiveRoomsTempleStats', JSON.stringify(next)); state.stats = next;
+  }
+  function px(x, y, w, h, color) { ctx.fillStyle = color; ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); }
+  function outline(x, y, w, h, fill, stroke = '#0c0912', line = 4) { px(x, y, w, h, stroke); px(x + line, y + line, w - line * 2, h - line * 2, fill); }
+  function text(value, x, y, size, color = '#fff5d7', align = 'left', weight = 700) { ctx.font = `${weight} ${size}px ui-monospace, SFMono-Regular, Menlo, monospace`; ctx.textAlign = align; ctx.fillStyle = color; ctx.fillText(value, x, y); }
+  function wrap(value, maxWidth) { const words = value.split(' '), lines = []; let line = ''; for (const word of words) { const test = line ? `${line} ${word}` : word; if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = word; } else line = test; } if (line) lines.push(line); return lines; }
+  function hashNoise(n) { const x = Math.sin(n * 9187.31) * 43758.5453; return x - Math.floor(x); }
+  function ease(t) { return t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+  function setAnim(anim) { state.character.anim = anim; state.character.animStarted = state.clock; }
+  function elapsedSince(start) { return state.clock - start; }
+
+  function drawTempleBase(palette, roomType) {
+    const drift = Math.sin(state.clock / 1800) * 3;
+    px(0, 0, W, H, palette.sky);
+    // Far wall and parallax moon/sun.
+    px(0, 90 + drift, W, 270, palette.far);
+    px(70 - drift * 2, 120, 820, 22, palette.band);
+    for (let i = 0; i < 12; i++) { px(85 + i * 70, 116, 16, 12, palette.glow); px(89 + i * 70, 120, 8, 4, palette.sky); }
+    // Perspective floor.
+    px(0, 360, W, 240, palette.floor);
+    ctx.strokeStyle = palette.line; ctx.lineWidth = 3;
+    for (let i = -5; i <= 5; i++) { ctx.beginPath(); ctx.moveTo(W / 2, 360); ctx.lineTo(W / 2 + i * 150, H); ctx.stroke(); }
+    for (let y = 385; y < 600; y += 38) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    // Pillars create the foreground layer.
+    [30, 850].forEach((x) => { px(x, 70, 80, 430, palette.pillarDark); px(x + 10, 70, 60, 430, palette.pillar); px(x - 10, 55, 100, 32, palette.trim); px(x - 4, 492, 88, 34, palette.trim); });
+    // Floating dust.
+    for (let i = 0; i < 24; i++) { const x = hashNoise(i + roomType.length) * W; const y = (hashNoise(i * 3 + 8) * 330 + state.clock * (i % 3 + 1) * .005) % 330 + 45; px(x, y, 2 + i % 2, 2 + i % 2, palette.dust); }
+  }
+  const palettes = {
+    logic: { sky:'#170e18', far:'#3c1f2d', band:'#6a3a36', glow:'#eda95f', floor:'#2d1b22', line:'#4b2d31', pillarDark:'#24121d', pillar:'#6f3d3b', trim:'#b66a49', dust:'#efb86d' },
+    memory: { sky:'#0d1022', far:'#222653', band:'#383b78', glow:'#b6a0ff', floor:'#171a38', line:'#2d315f', pillarDark:'#101329', pillar:'#34396b', trim:'#695fa1', dust:'#b7adff' },
+    trivia: { sky:'#0a1717', far:'#163b36', band:'#286555', glow:'#68dfbd', floor:'#112d2b', line:'#1e4b44', pillarDark:'#0c211f', pillar:'#2c5d50', trim:'#4a9075', dust:'#75e0c1' },
+    reaction: { sky:'#1b1010', far:'#51211d', band:'#78382b', glow:'#ff8d5f', floor:'#351814', line:'#5c2920', pillarDark:'#2b1110', pillar:'#6c2f25', trim:'#a44b34', dust:'#ff9a6d' },
+    finale: { sky:'#1d1322', far:'#56304e', band:'#8b594a', glow:'#ffd35a', floor:'#3a2430', line:'#684052', pillarDark:'#281422', pillar:'#7b4751', trim:'#c47b50', dust:'#ffe178' }
   };
 
-  const levelQueue = THEMES.map((theme, i) => ({
-    id: `2026-demo-${String(i + 1).padStart(2, '0')}`,
-    theme, approved: true, difficultyTarget: 'challenging',
-    finalPrompt: [`Arrange these bakery clues from smallest to largest: crumb, bite, pastry, feast`, `Which creature is most at home in this theme?`, `Which sequence completes the arcade pattern?`, `Which clue belongs in a night garden?`, `Which object would you pack for orbit?`, `Which map clue points furthest east?`, `Which ingredient changes the recipe most?`, `Which city clue belongs in the rain?`, `Which animal is tiny but mighty?`, `Which film clue is the odd one out?`, `Which weather clue signals a storm?`, `Which historical clue is oldest?`, `Which sea legend is the outlier?`, `Which invention best represents the future?`][i],
-    finalChoices: [
-      ['crumb → bite → pastry → feast', 'feast → pastry → bite → crumb', 'bite → crumb → feast → pastry', 'pastry → feast → crumb → bite'],
-      ['Jellyfish', 'Camel', 'Mole', 'Yak'], ['A-B-C-D', 'A-C-B-D', 'D-C-B-A', 'B-A-D-C'], ['Moonflower', 'Cactus', 'Pine tree', 'Wheat'], ['A telescope', 'A surfboard', 'A snow shovel', 'A canoe'], ['The sunrise', 'The sunset', 'The compass', 'The anchor'], ['Salt', 'A wooden spoon', 'A plate', 'A napkin'], ['Umbrella', 'Sunglasses', 'Sandals', 'Fan'], ['Tardigrade', 'Giraffe', 'Blue whale', 'Eagle'], ['A director', 'A camera', 'A screenplay', 'A toaster'], ['Pressure drop', 'Clear skies', 'Warm blanket', 'Dry pavement'], ['A smartphone', 'A clay tablet', 'A steam engine', 'A radio'], ['Mermaid', 'Kelp forest', 'Coral reef', 'Mountain goat'], ['Solar panel', 'Telegraph', 'Abacus', 'Candle']
-    ],
-    finalAnswer: [0, 0, 1, 0, 0, 2, 0, 0, 0, 3, 0, 1, 3, 0][i]
-  }));
-  let level;
+  function drawLogicBackground() {
+    drawTempleBase(palettes.logic, 'logic');
+    // Chasm and staggered stone bridge.
+    px(115, 410, 730, 160, '#08070c');
+    for (let i = 0; i < 6; i++) { const yy = 505 - i * 18; outline(365 + i * 44, yy, 72, 34, i % 2 ? '#755044' : '#8b5b48', '#23161a', 4); }
+    // Idol alcoves.
+    for (let i = 0; i < 4; i++) { const x = 205 + i * 150; outline(x, 175, 110, 120, '#4a2830', '#1b1017', 5); px(x + 16, 188, 78, 70, '#2a1720'); text(GLYPHS[i], x + 55, 239, 38, '#f0b967', 'center'); }
+  }
+  function drawMemoryBackground() {
+    drawTempleBase(palettes.memory, 'memory');
+    // Echo wall with crystals and concentric carved rings.
+    ctx.strokeStyle = '#786bc0'; ctx.lineWidth = 6;
+    for (let r = 55; r <= 145; r += 30) { ctx.beginPath(); ctx.arc(W / 2, 275, r, Math.PI, Math.PI * 2); ctx.stroke(); }
+    for (let i = 0; i < 5; i++) { const x = 175 + i * 150; px(x, 315, 18, 65, '#776ed0'); px(x + 5, 300, 8, 15, '#c4b8ff'); }
+  }
+  function drawTriviaBackground() {
+    drawTempleBase(palettes.trivia, 'trivia');
+    // Tablet shelves and hanging vines.
+    for (let row = 0; row < 3; row++) { px(145, 165 + row * 75, 670, 12, '#5d4632'); for (let i = 0; i < 8; i++) outline(160 + i * 80, 120 + row * 75, 55, 48, '#7a6a4b', '#2a211c', 3); }
+    for (let i = 0; i < 8; i++) { px(120 + i * 100, 75, 5, 55 + (i % 3) * 20, '#2f6c4c'); px(116 + i * 100, 125 + (i % 3) * 20, 13, 8, '#4da468'); }
+  }
+  function drawReactionBackground() {
+    drawTempleBase(palettes.reaction, 'reaction');
+    // Deep corridor and looming boulder.
+    for (let i = 0; i < 5; i++) outline(170 + i * 55, 175 + i * 28, 620 - i * 110, 210 - i * 40, '#5a2d26', '#231314', 5);
+    const boulderX = state.reaction.phase === 'active' ? 200 + Math.min(500, elapsedSince(state.reaction.activeAt) * .45) : 120;
+    ctx.fillStyle = '#6a4a3b'; ctx.beginPath(); ctx.arc(boulderX, 430, 68, 0, Math.PI * 2); ctx.fill(); px(boulderX - 18, 390, 28, 16, '#94705a'); px(boulderX + 20, 430, 20, 22, '#4a3029');
+  }
+  function drawFinaleBackground() {
+    drawTempleBase(palettes.finale, 'finale');
+    // Guardian statues and central Sunstone.
+    [180, 690].forEach((x) => { outline(x, 180, 95, 230, '#6c4a49', '#25151f', 6); px(x + 26, 135, 44, 50, '#8a5e50'); px(x + 34, 151, 8, 8, '#ffd45c'); px(x + 56, 151, 8, 8, '#ffd45c'); });
+    ctx.fillStyle = state.finale.phase === 'reactionActive' ? '#fff2a3' : '#e9ad42'; ctx.beginPath(); ctx.arc(W / 2, 270, 76, 0, Math.PI * 2); ctx.fill();
+    for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; const len = state.finale.phase === 'reactionActive' ? 115 : 95; ctx.strokeStyle = '#ffd45c'; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(W/2 + Math.cos(a)*84, 270 + Math.sin(a)*84); ctx.lineTo(W/2 + Math.cos(a)*len, 270 + Math.sin(a)*len); ctx.stroke(); }
+    text('☀', W / 2, 289, 58, '#6a3b2f', 'center');
+  }
+  function drawCurrentBackground(type = currentType()) { if (type === 'logic') drawLogicBackground(); else if (type === 'memory') drawMemoryBackground(); else if (type === 'trivia') drawTriviaBackground(); else if (type === 'reaction') drawReactionBackground(); else drawFinaleBackground(); }
 
-  function pad(n) { return String(n).padStart(2, '0'); }
-  function dateKeyInTimezone(date = new Date()) {
-    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date).reduce((o, p) => (o[p.type] = p.value, o), {});
-    return `${parts.year}-${parts.month}-${parts.day}`;
+  function drawExplorer(x = state.character.x, y = state.character.y) {
+    const t = elapsedSince(state.character.animStarted); const anim = state.character.anim;
+    const bob = anim === 'walk' || anim === 'run' ? Math.round(Math.sin(t / (anim === 'run' ? 55 : 90)) * 4) : anim === 'celebrate' ? -Math.abs(Math.round(Math.sin(t / 100) * 10)) : anim === 'jump' ? -Math.max(0, Math.round(Math.sin(Math.min(1, t / 450) * Math.PI) * 30)) : 0;
+    let dx = 0, dy = bob, squash = 0;
+    if (anim === 'fall') { dy += Math.min(100, t * .09); dx += t * .03; }
+    if (anim === 'burn') { dx += Math.round(Math.sin(t / 35) * 7); }
+    if (anim === 'shadow') { dy += Math.min(28, t * .025); squash = Math.min(10, t * .01); }
+    if (anim === 'crushed') { squash = Math.min(24, t * .03); dy += squash; }
+    if (anim === 'blast') { dx += t * .08; dy -= t * .025; }
+    const xx = Math.round(x + dx), yy = Math.round(y + dy);
+    // Shadow.
+    px(xx - 25, y + 42, 52, 8, '#09070c88');
+    // Legs.
+    const stride = anim === 'walk' || anim === 'run' ? Math.round(Math.sin(t / (anim === 'run' ? 55 : 90)) * 7) : 0;
+    px(xx - 15 + stride, yy + 20, 10, Math.max(4, 24 - squash), '#302238'); px(xx + 6 - stride, yy + 20, 10, Math.max(4, 24 - squash), '#302238');
+    // Body and satchel.
+    px(xx - 21, yy - 20, 42, Math.max(12, 44 - squash), '#d99546'); px(xx - 17, yy - 15, 34, 10, '#f2c35d'); px(xx + 18, yy - 5, 13, 22, '#6f3c35');
+    // Arms react to interaction and celebration.
+    const armY = anim === 'celebrate' ? yy - 42 : anim === 'interact' ? yy - 18 : yy - 8;
+    px(xx - 30, armY, 10, 26, '#b76e3d'); px(xx + 21, armY, 10, 26, '#b76e3d');
+    // Head, hair, hat.
+    px(xx - 17, yy - 49, 34, 30, '#c9824c'); px(xx - 18, yy - 51, 36, 10, '#402635'); px(xx - 24, yy - 58, 48, 9, '#b46b3e'); px(xx - 14, yy - 68, 28, 12, '#c17a45');
+    px(xx - 9, yy - 37, 5, 5, '#201522'); px(xx + 7, yy - 37, 5, 5, '#201522');
+    if (anim === 'burn') { px(xx - 20, yy - 76, 12, 18, '#ff5b36'); px(xx - 9, yy - 84, 12, 22, '#ffb52e'); px(xx + 5, yy - 73, 10, 15, '#ff713e'); }
+    if (anim === 'shadow') { ctx.globalAlpha = Math.min(.8, t / 800); px(xx - 35, yy - 80, 70, 130, '#211a3b'); ctx.globalAlpha = 1; }
   }
-  function dayNumber(key) { return Math.floor(Date.UTC(...key.split('-').map(Number).map((v, i) => i === 1 ? v - 1 : v)) / 86400000); }
-  function levelForDate(key) { const exact = levelQueue.find((item) => item.date === key); const source = exact || levelQueue[((dayNumber(key) % levelQueue.length) + levelQueue.length) % levelQueue.length]; return { ...source, id: `five-rooms-${key}-v1`, dateKey: key }; }
-  function formatDate(key) { return new Intl.DateTimeFormat('en-US', { timeZone: TIMEZONE, month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(`${key}T12:00:00Z`)); }
-  function loadStats() { try { return JSON.parse(localStorage.getItem('fiveRoomsStats') || '{}'); } catch { return {}; } }
-  function saveStats(result) {
-    const stats = loadStats(); const key = state.level.dateKey; const previous = stats.days?.[key];
-    const days = stats.days || {}; days[key] = { ...result, bestScore: Math.max(result.score, previous?.bestScore || 0), attempts: (previous?.attempts || 0) + 1 };
-    const keys = Object.keys(days).sort(); const last = keys[keys.length - 2];
-    const currentStreak = previous ? (stats.currentStreak || 1) : (last && dayNumber(key) - dayNumber(last) === 1 ? (days[last]?.completed ? (stats.currentStreak || 0) + 1 : 1) : 1);
-    const next = { days, streak: Math.max(stats.streak || 0, currentStreak), currentStreak };
-    localStorage.setItem('fiveRoomsStats', JSON.stringify(next)); state.stats = next; return next;
+
+  function drawHUD() {
+    px(0, 0, W, 66, '#09070edd');
+    text(`DAY 1 · ${DAY.title}`, 24, 27, 13, '#f4cc68');
+    text(state.official ? 'OFFICIAL RUN' : `RETRY ${state.attempt}`, 24, 49, 12, '#b9a5c8');
+    for (let i = 0; i < DAY.order.length; i++) { const x = 560 + i * 70; const type = DAY.order[i]; const done = state.roomResults[i]; const active = i === state.roomIndex && ['room','success','fail'].includes(state.mode); outline(x, 17, 50, 32, done ? '#4cc38a' : active ? META[type].color : '#33253d', '#100b16', 3); text(done ? '✓' : `${i + 1}`, x + 25, 39, 15, done ? '#102419' : '#fff5d7', 'center'); }
   }
-  function resetRun(isRetry = false) {
-    state.mode = 'playing'; state.room = 0; state.score = 0; state.official = !isRetry; state.attempt = isRetry ? state.attempt + 1 : 1; state.startedAt = state.clock; state.roomStartedAt = state.clock; state.selected = -1; state.roomResult = []; state.feedback = ''; state.transitionUntil = 0; state.sequence = []; state.sequenceIndex = 0; state.reactionReadyAt = 0; state.reactionStarted = false; state.reactionStart = 0;
+  function drawPanel(x, y, w, h, color = '#161020e8', border = '#745185') { outline(x, y, w, h, color, border, 4); }
+  function drawButton(label, x, y, w, h, active = false, color = '#3c2a48') { outline(x, y, w, h, active ? '#f0c760' : color, '#120d18', 4); text(label, x + w / 2, y + h / 2 + 6, 16, active ? '#241526' : '#fff5d7', 'center'); }
+  function drawRoomTitle(type, instruction) { drawHUD(); text(META[type].name, W / 2, 96, 22, META[type].color, 'center'); text(instruction, W / 2, 120, 13, '#d8c9df', 'center'); }
+
+  function drawStart() {
+    drawFinaleBackground(); px(0, 0, W, H, '#09070e99');
+    drawPanel(110, 80, 740, 440, '#15101fde', '#c1844f');
+    text('FIVE ROOMS', W / 2, 140, 48, '#ffe18a', 'center');
+    text(DAY.title, W / 2, 184, 25, '#e89552', 'center'); text(DAY.subtitle, W / 2, 215, 15, '#bda8ca', 'center');
+    ctx.font = '700 17px ui-monospace, monospace'; wrap(DAY.story, 650).forEach((line, i) => text(line, W / 2, 275 + i * 27, 17, '#fff5d7', 'center'));
+    text('Five trials. One wrong move ends the expedition.', W / 2, 350, 14, '#ff9b78', 'center');
+    drawButton('BEGIN EXPEDITION', 310, 390, 340, 68, true);
+    text('Click or Enter · 1–4 choose · Space reacts · F fullscreen', W / 2, 490, 12, '#a991b7', 'center');
+    text(`BEST ${state.stats.best || 0}/5   ·   ATTEMPTS ${state.stats.attempts || 0}`, W / 2, 550, 13, '#d7bd78', 'center');
   }
-  function startGame() { resetRun(false); render(); }
-  function retryGame() { resetRun(true); render(); }
-  function setLevel() { const key = dateKeyInTimezone(); level = levelForDate(key); level.dateKey = key; state.level = level; state.stats = loadStats(); state.prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches; }
-  function text(value, x, y, size, color, align = 'left', weight = 500) { ctx.font = `${weight} ${size}px Inter, system-ui, sans-serif`; ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(value, x, y); }
-  function roundRect(x, y, w, h, r, fill, stroke = null) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 2; ctx.stroke(); } }
-  function wrap(value, maxWidth) { const lines = []; let line = ''; for (const word of value.split(' ')) { const test = line ? `${line} ${word}` : word; if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = word; } else line = test; } if (line) lines.push(line); return lines; }
-  function drawBackground() { const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, '#102b4b'); g.addColorStop(1, '#07111f'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.fillStyle = ROOM_COLORS[state.room % ROOM_COLORS.length]; ctx.globalAlpha = .10; ctx.beginPath(); ctx.arc(95, 95, 150, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(875, 540, 210, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; }
-  function drawCharacter(x, y) { ctx.fillStyle = '#f5fbff'; ctx.beginPath(); ctx.arc(x, y - 26, 18, 0, Math.PI * 2); ctx.fill(); roundRect(x - 22, y - 8, 44, 48, 16, ROOM_COLORS[state.room % ROOM_COLORS.length]); ctx.fillStyle = '#061827'; ctx.beginPath(); ctx.arc(x - 6, y - 28, 3, 0, Math.PI * 2); ctx.arc(x + 6, y - 28, 3, 0, Math.PI * 2); ctx.fill(); }
-  function drawRoomPath() { const x0 = 105, gap = 158; for (let i = 0; i < 5; i++) { const x = x0 + i * gap; if (i < 4) { ctx.strokeStyle = i < state.room ? '#4ed1b4' : '#29455f'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x + 24, 108); ctx.lineTo(x + gap - 24, 108); ctx.stroke(); } ctx.fillStyle = i < state.room ? '#4ed1b4' : i === state.room ? ROOM_COLORS[i] : '#203b58'; ctx.beginPath(); ctx.arc(x, 108, 24, 0, Math.PI * 2); ctx.fill(); text(i < state.room ? '✓' : ROOM_ICONS[i], x, 116, 21, '#07111f', 'center', 800); text(ROOM_NAMES[i], x, 152, 12, i <= state.room ? '#dcecff' : '#7190ad', 'center', 800); } }
-  function header(instruction = '') { drawRoomPath(); text(level.theme.toUpperCase(), 55, 55, 16, '#4ed1b4', 'left', 800); text(`${formatDate(level.dateKey)} · ${state.official ? 'OFFICIAL RUN' : 'RETRY'}`, W - 55, 55, 15, '#b7cce0', 'right', 600); if (instruction) text(instruction, W / 2, 205, 18, '#a9c4dc', 'center'); }
-  function drawStart() { text('FIVE ROOMS', W / 2, 175, 62, '#f5fbff', 'center', 850); text('A shared daily puzzle run', W / 2, 217, 22, '#a9c4dc', 'center'); roundRect(170, 260, 640, 110, 22, '#102b47', '#315473'); text(`TODAY: ${level.theme.toUpperCase()}`, W / 2, 303, 25, '#4ed1b4', 'center', 800); text('Five rooms · about 5 minutes · same challenge for everyone', W / 2, 340, 17, '#dcecff', 'center'); roundRect(330, 405, 320, 72, 18, '#4ed1b4'); text('ENTER THE ROOMS', W / 2, 450, 22, '#06201e', 'center', 800); const stats = state.stats || {}; text(`CURRENT STREAK  ${stats.currentStreak || 0}    BEST SCORE  ${stats.days?.[level.dateKey]?.bestScore || '—'}`, W / 2, 535, 16, '#a9c4dc', 'center', 700); text('Click or press Enter · F toggles fullscreen · no account required', W / 2, 570, 14, '#7997b3', 'center'); }
-  function drawTimer(limit) { const elapsed = Math.max(0, (state.clock - state.roomStartedAt) / 1000); const remaining = Math.max(0, limit - elapsed); text(`${Math.ceil(remaining)}s`, W - 60, 194, 18, remaining < 10 ? '#ff8c8c' : '#dcecff', 'right', 800); ctx.fillStyle = '#203b58'; ctx.fillRect(120, 220, 740, 7); ctx.fillStyle = remaining < 10 ? '#ff7f9c' : '#4ed1b4'; ctx.fillRect(120, 220, 740 * (remaining / limit), 7); return remaining; }
-  function choiceButton(label, x, y, w, h, active = false) { roundRect(x, y, w, h, 13, active ? '#4ed1b4' : '#142c46', active ? '#eafff9' : '#2a4865'); text(label, x + 22, y + h / 2 + 7, 18, active ? '#06201e' : '#f5fbff', 'left', 700); }
-  function drawTrivia() { header('Warm up with the day’s question'); const item = triviaPool[dayNumber(level.dateKey) % triviaPool.length]; const lines = wrap(item[0], 720); lines.forEach((line, i) => text(line, W / 2, 275 + i * 35, 28, '#f5fbff', 'center', 800)); item[1].forEach((choice, i) => choiceButton(`${String.fromCharCode(65 + i)}  ${choice}`, 175, 345 + i * 53, 630, 42, state.selected === i)); }
-  function drawLogic() { header('Put the clues in the correct order'); text('Which sequence is logically ordered from smallest to largest?', W / 2, 272, 27, '#f5fbff', 'center', 800); const choices = [['Seed → sprout → tree → forest', 0], ['Forest → tree → sprout → seed', 1], ['Sprout → seed → forest → tree', 2], ['Tree → forest → seed → sprout', 3]]; choices.forEach((item, i) => choiceButton(`${String.fromCharCode(65 + i)}  ${item[0]}`, 175, 330 + i * 53, 630, 42, state.selected === i)); }
-  function ensureSequence() { if (!state.sequence.length) { const seed = dayNumber(level.dateKey) % 4; state.sequence = [0, 1, 2, 3].map((_, i) => (i + seed) % 4); state.sequenceIndex = -1; } }
-  function drawMemory() { ensureSequence(); header('Watch the pattern, then repeat it'); const showing = state.sequenceIndex === -1; text(showing ? 'Memorize this four-symbol sequence' : `Repeat the sequence · ${state.sequenceIndex + 1} / 4`, W / 2, 255, 24, '#f5fbff', 'center', 750); const symbols = ['◆', '●', '▲', '■']; state.sequence.forEach((v, i) => { const x = 300 + i * 125; const lit = showing ? true : i < state.sequenceIndex; roundRect(x, 300, 85, 75, 16, lit ? ROOM_COLORS[v] : '#142c46'); text(symbols[v], x + 42, 350, 32, '#07111f', 'center', 800); }); if (showing) { text('The pattern will be ready in a moment…', W / 2, 430, 17, '#a9c4dc', 'center'); } else { symbols.forEach((s, i) => choiceButton(`${s}  SYMBOL ${i + 1}`, 145 + (i % 2) * 360, 445 + Math.floor(i / 2) * 53, 330, 42, false)); } }
-  function drawReaction() { header('Wait for the signal, then react'); const remaining = drawTimer(8); if (!state.reactionStarted) { text('When the circle turns green, click it.', W / 2, 275, 26, '#f5fbff', 'center', 800); roundRect(370, 325, 240, 120, 60, '#a4565d'); text('WAIT', W / 2, 398, 30, '#fff4f4', 'center', 850); } else { text('GO!', W / 2, 275, 34, '#4ed1b4', 'center', 850); ctx.fillStyle = '#4ed1b4'; ctx.beginPath(); ctx.arc(W / 2, 385, 78, 0, Math.PI * 2); ctx.fill(); text('CLICK', W / 2, 397, 26, '#06201e', 'center', 850); } if (remaining <= 0) failRoom('Too slow — the signal passed.'); }
-  function drawFinale() { header('One last themed deduction'); const lines = wrap(level.finalPrompt, 720); lines.forEach((line, i) => text(line, W / 2, 260 + i * 35, 26, '#f5fbff', 'center', 800)); level.finalChoices.forEach((choice, i) => choiceButton(`${String.fromCharCode(65 + i)}  ${choice}`, 175, 340 + i * 53, 630, 42, state.selected === i)); }
-  function drawPlay() { if (state.room === 0) drawTrivia(); else if (state.room === 1) drawLogic(); else if (state.room === 2) drawMemory(); else if (state.room === 3) drawReaction(); else drawFinale(); drawCharacter(70 + state.room * 10, 575); if (state.feedback) text(state.feedback, W / 2, 575, 17, state.feedback.startsWith('Correct') ? '#6de2c4' : '#ffb4b4', 'center', 750); }
-  function resultText(completed) { const symbols = Array.from({ length: 5 }, (_, i) => state.roomResult[i] == null ? '⬜' : (state.roomResult[i] ? '🟩' : '🟥')).join(''); return `FIVE ROOMS · ${level.dateKey}\n${level.theme}\n${symbols} ${completed ? '5/5 COMPLETE' : `${state.room}/5 REACHED`}\nScore ${state.score}/5 · ${state.official ? 'Official run' : 'Retry'}`; }
-  function drawResults() { const completed = state.mode === 'complete'; text(completed ? 'YOU CLEARED THE ROOMS' : 'THE ROOMS GOT YOU', W / 2, 175, 42, '#f5fbff', 'center', 850); text(`${level.theme} · ${formatDate(level.dateKey)}`, W / 2, 218, 19, '#4ed1b4', 'center', 700); roundRect(185, 260, 610, 132, 20, '#102b47', '#315473'); text(state.roomResult.map((r) => r ? '🟩' : '🟥').join('  '), W / 2, 315, 30, '#f5fbff', 'center'); text(completed ? 'A perfect route through all five rooms.' : `You reached room ${Math.min(state.room + 1, 5)}. Retry to improve your route.`, W / 2, 360, 17, '#c7d9e9', 'center'); text(`SCORE  ${state.score}/5     ATTEMPT  ${state.attempt}`, W / 2, 430, 18, '#dcecff', 'center', 750); roundRect(210, 475, 260, 58, 14, '#4ed1b4'); text('RETRY TODAY', 340, 512, 18, '#06201e', 'center', 800); roundRect(510, 475, 260, 58, 14, '#142c46', '#3a5d7b'); text('COPY RESULT', 640, 512, 18, '#f5fbff', 'center', 800); text('Your share card never reveals the answers.', W / 2, 570, 14, '#7997b3', 'center'); }
-  function render() { drawBackground(); if (state.mode === 'start') drawStart(); else if (state.mode === 'playing') drawPlay(); else drawResults(); }
-  function beginRoom() { state.roomStartedAt = state.clock; state.selected = -1; state.feedback = ''; state.sequence = []; state.sequenceIndex = 0; state.reactionStarted = false; state.reactionReadyAt = state.clock + (state.prefersReducedMotion ? 700 : 1400); }
-  function correctRoom() { state.score++; state.roomResult[state.room] = true; state.feedback = 'Correct!'; state.transitionUntil = state.clock + (state.prefersReducedMotion ? 150 : 650); }
-  function failRoom(reason) { if (state.mode !== 'playing') return; state.roomResult[state.room] = false; state.feedback = reason; state.mode = 'failed'; saveStats({ completed: false, score: state.score, room: state.room, official: state.official }); render(); }
-  function answer(index) { if (state.mode !== 'playing' || state.selected !== -1 || state.transitionUntil) return; state.selected = index; let correct = false; if (state.room === 0) correct = index === triviaPool[dayNumber(level.dateKey) % triviaPool.length][2]; if (state.room === 1) correct = index === 0; if (state.room === 4) correct = index === level.finalAnswer; if (correct) correctRoom(); else failRoom('That answer closed the door.'); render(); }
-  function clickMemory(index) { if (state.transitionUntil) return; ensureSequence(); if (state.sequenceIndex === -1) return; if (index !== state.sequence[state.sequenceIndex]) return failRoom('The pattern broke.'); state.sequenceIndex++; if (state.sequenceIndex >= state.sequence.length) correctRoom(); render(); }
-  function clickReaction() { if (!state.reactionStarted || state.transitionUntil) return; const elapsed = (state.clock - state.reactionStart) / 1000; if (elapsed < .15) return failRoom('Too early — wait for the green signal.'); correctRoom(); render(); }
-  function handleClick(event) { const rect = canvas.getBoundingClientRect(); const x = (event.clientX - rect.left) * W / rect.width, y = (event.clientY - rect.top) * H / rect.height; if (state.mode === 'start') return startGame(); if (state.mode === 'failed' || state.mode === 'complete') { if (y > 455 && y < 550 && x < 490) return retryGame(); if (y > 455 && y < 550 && x >= 490) return navigator.clipboard?.writeText(resultText(state.mode === 'complete')).then(() => { state.feedback = 'Result copied!'; render(); }); return; } if (state.mode !== 'playing') return; if (state.room === 3) return clickReaction(); if (state.room === 2 && state.sequenceIndex >= 0 && y > 435) return clickMemory(Math.floor((x - 145) / 360) + (y > 488 ? 2 : 0)); if (y >= 330 && y < 560) answer(Math.floor((y - 330) / 53)); }
-  function handleKey(event) { if (event.key === 'Enter' && state.mode === 'start') startGame(); else if ((event.key === 'r' || event.key === 'Enter') && (state.mode === 'failed' || state.mode === 'complete')) retryGame(); else if (event.key.toLowerCase() === 'f') document.fullscreenElement ? document.exitFullscreen() : canvas.requestFullscreen(); else if (state.mode === 'playing' && state.room !== 2 && state.room !== 3 && ['1','2','3','4'].includes(event.key)) answer(Number(event.key) - 1); else if (state.mode === 'playing' && state.room === 2 && ['1','2','3','4'].includes(event.key)) clickMemory(Number(event.key) - 1); else if (state.mode === 'playing' && state.room === 3 && event.key === ' ') clickReaction(); }
-  function update(ms) { state.clock += ms; if (state.mode === 'playing') { if (state.room === 2 && state.sequenceIndex === -1 && state.clock - state.roomStartedAt > 1800) { state.sequenceIndex = 0; render(); } if (state.room === 3 && !state.reactionStarted && state.clock >= state.reactionReadyAt) { state.reactionStarted = true; state.reactionStart = state.clock; render(); } const limit = [60, 60, 45, 8, 75][state.room] * 1000; if (state.clock - state.roomStartedAt > limit) failRoom('Time ran out.'); if (state.transitionUntil && state.clock >= state.transitionUntil) { state.transitionUntil = 0; state.room++; if (state.room >= 5) { state.mode = 'complete'; state.roomResult = [true, true, true, true, true]; saveStats({ completed: true, score: state.score, room: 5, official: state.official }); } else beginRoom(); render(); } } }
-  window.advanceTime = (ms) => { const steps = Math.max(1, Math.round(ms / 50)); for (let i = 0; i < steps; i++) update(ms / steps); render(); };
-  window.render_game_to_text = () => JSON.stringify({ mode: state.mode, date: level.dateKey, theme: level.theme, room: Math.min(state.room + 1, 5), totalRooms: 5, score: state.score, attempt: state.attempt, official: state.official, roomTypes: ROOM_NAMES, roomResult: state.roomResult, controls: 'Click or press 1-4; Space reacts; R or Enter retries; F fullscreen' });
-  canvas.addEventListener('click', handleClick); window.addEventListener('keydown', handleKey); setInterval(() => update(50), 50); setLevel(); render();
+  function drawTransition() {
+    const from = Math.max(0, state.roomIndex - 1), to = state.roomIndex; const type = DAY.order[to]; drawCurrentBackground(type); drawHUD();
+    const t = Math.min(1, elapsedSince(state.modeStarted) / (state.reducedMotion ? 200 : 1300)); state.character.x = 100 + ease(t) * 690; state.character.y = 490; state.character.anim = 'walk';
+    drawExplorer(); px(230, 250, 500, 90, '#09070ecc'); text(`ROOM ${to + 1}`, W / 2, 284, 15, META[type].color, 'center'); text(META[type].name, W / 2, 319, 23, '#fff5d7', 'center');
+    if (from !== to) text('The explorer presses deeper into the temple…', W / 2, 365, 13, '#cfbdd8', 'center');
+  }
+  function drawLogic() {
+    drawLogicBackground(); drawRoomTitle('logic', 'Place the four idols from LEFT to RIGHT, then confirm.');
+    drawPanel(130, 140, 700, 120); text('CLUES', 155, 168, 14, '#e9a05d');
+    ['The SUN stands immediately before the SERPENT.', 'The SERPENT stands left of the JAGUAR.', 'The OWL watches from somewhere after the JAGUAR.'].forEach((v, i) => text(`• ${v}`, 155, 195 + i * 24, 13, '#fff5d7'));
+    // Selected pedestal slots.
+    for (let i = 0; i < 4; i++) { const x = 180 + i * 150; outline(x, 285, 120, 62, '#271927', '#936045', 4); text(state.logic.selected[i] == null ? `${i + 1}` : GLYPHS[state.logic.selected[i]], x + 60, 327, 28, state.logic.selected[i] == null ? '#6d566e' : '#ffd17c', 'center'); }
+    // Idol choices.
+    for (let i = 0; i < 4; i++) { const used = state.logic.selected.includes(i); drawButton(`${GLYPHS[i]} ${SYMBOLS[i]}`, 130 + i * 180, 370, 160, 50, used, used ? '#423040' : '#5b342f'); }
+    drawButton('RESET', 250, 445, 190, 48, false); drawButton('CONFIRM ORDER', 470, 445, 240, 48, state.logic.selected.length === 4);
+    drawExplorer(90, 515);
+  }
+  function memoryLitIndex() {
+    const seq = memoryRounds[state.memory.round]; const e = elapsedSince(state.memory.phaseStarted); const index = Math.floor(e / 650); return index < seq.length ? seq[index] : -1;
+  }
+  function drawMemory() {
+    drawMemoryBackground(); drawRoomTitle('memory', `Repeat both echo patterns · sequence ${state.memory.round + 1} of 2`);
+    const seq = memoryRounds[state.memory.round]; const showing = state.memory.phase === 'show';
+    drawPanel(160, 150, 640, 135, '#111127e8', '#6960a8');
+    text(showing ? 'WATCH THE WALL' : `REPEAT THE ECHO · ${state.memory.input.length}/${seq.length}`, W / 2, 184, 16, '#c1b3ff', 'center');
+    const lit = showing ? memoryLitIndex() : -1;
+    for (let i = 0; i < seq.length; i++) { const x = W/2 - (seq.length * 54)/2 + i * 54; outline(x, 208, 44, 48, lit === seq[i] ? '#fff0a0' : '#2b2754', '#0e0d1b', 3); text(showing && i <= Math.floor(elapsedSince(state.memory.phaseStarted)/650) ? GLYPHS[seq[i]] : '·', x + 22, 241, 22, lit === seq[i] ? '#4b3260' : '#8c83b8', 'center'); }
+    for (let i = 0; i < 4; i++) drawButton(`${GLYPHS[i]} ${SYMBOLS[i]}`, 120 + i * 185, 335, 170, 62, false, '#39306a');
+    text(showing ? 'The glyphs pulse without sound.' : 'Choose the glyphs in the exact order shown.', W / 2, 435, 13, '#d1c5dd', 'center');
+    drawExplorer(105, 515);
+  }
+  function drawTrivia() {
+    drawTriviaBackground(); drawRoomTitle('trivia', 'The archive opens only for a keeper of ancient knowledge.');
+    drawPanel(130, 145, 700, 115, '#10211fe8', '#388873');
+    ctx.font = '700 18px ui-monospace, SFMono-Regular, Menlo, monospace';
+    wrap('Which material did ancient Egyptians famously use as writing paper?', 650).forEach((line, i) => text(line, W / 2, 188 + i * 28, 18, '#fff5d7', 'center'));
+    const choices = ['MARBLE', 'PAPYRUS', 'SILK', 'BAMBOO'];
+    for (let i = 0; i < 4; i++) drawButton(`${i + 1}. ${choices[i]}`, 165 + (i % 2) * 325, 300 + Math.floor(i / 2) * 78, 300, 60, state.trivia.selected === i, '#235348');
+    text('Choose carefully. The archive floor is older than it looks.', W / 2, 470, 13, '#c7ddd3', 'center'); drawExplorer(105, 515);
+  }
+  function drawReaction() {
+    drawReactionBackground(); drawRoomTitle('reaction', `Escape three gates · gate ${Math.min(state.reaction.gate + 1, 3)} of 3`);
+    drawPanel(270, 155, 420, 150, '#281310e8', '#a64934');
+    const active = state.reaction.phase === 'active'; const waiting = state.reaction.phase === 'waiting';
+    text(active ? 'NOW!' : waiting ? 'WAIT FOR THE SUN' : 'GATE CLEARED', W / 2, 205, 24, active ? '#fff09a' : '#ffb19b', 'center');
+    text(active ? 'Click or press Space before the boulder reaches you.' : 'A false start ends the expedition.', W / 2, 245, 13, '#fff5d7', 'center');
+    drawButton(active ? 'JUMP!' : waiting ? 'WAIT…' : 'RUNNING…', 330, 335, 300, 82, active, active ? '#f6c74e' : '#5d2721');
+    const remaining = active ? Math.max(0, 900 - elapsedSince(state.reaction.activeAt)) : 900; px(330, 432, 300, 10, '#321516'); px(330, 432, 300 * (remaining / 900), 10, active ? '#ffd45c' : '#7a352b');
+    drawExplorer(130 + state.reaction.gate * 110, 515);
+  }
+  function drawFinale() {
+    drawFinaleBackground(); drawRoomTitle('finale', 'Awaken the Sunstone by combining every lesson.');
+    drawPanel(120, 365, 720, 170, '#1a1020ed', '#b8714c');
+    const f = state.finale;
+    if (f.phase === 'question') {
+      text('I rise where morning begins. Which direction opens the first seal?', W / 2, 399, 15, '#ffe8a0', 'center');
+      ['NORTH', 'EAST', 'SOUTH', 'WEST'].forEach((v, i) => drawButton(`${i + 1}. ${v}`, 145 + i * 170, 435, 150, 58, f.selected[0] === i, '#714237'));
+    } else if (f.phase === 'runes') {
+      text('Order the solar cycle: DAWN → ZENITH → DUSK', W / 2, 398, 15, '#ffe8a0', 'center');
+      ['DAWN', 'ZENITH', 'DUSK', 'ECLIPSE'].forEach((v, i) => drawButton(`${GLYPHS[i]} ${v}`, 145 + i * 170, 425, 150, 52, f.selected.includes(i), '#714237'));
+      text(`SEAL: ${f.selected.map((i) => GLYPHS[i]).join('  ') || '—'}`, 350, 510, 14, '#fff5d7', 'center'); drawButton('CONFIRM', 585, 488, 180, 38, f.selected.length === 3);
+    } else if (f.phase === 'memory') {
+      text('Repeat the first three echoes from the Chamber.', W / 2, 398, 15, '#ffe8a0', 'center');
+      for (let i = 0; i < 4; i++) drawButton(`${GLYPHS[i]} ${SYMBOLS[i]}`, 145 + i * 170, 435, 150, 58, false, '#714237');
+      text(`${f.input.length}/3 GLYPHS RESTORED`, W / 2, 515, 13, '#fff5d7', 'center');
+    } else {
+      const active = f.phase === 'reactionActive'; text(active ? 'STRIKE THE SUNSTONE!' : 'WAIT FOR THE FINAL SUNBEAM…', W / 2, 404, 17, active ? '#fff39a' : '#d5b990', 'center');
+      drawButton(active ? 'AWAKEN!' : 'WAIT…', 340, 435, 280, 68, active, active ? '#f6d15b' : '#624238');
+    }
+    drawExplorer(92, 520);
+  }
+  function drawRoom() { const type = currentType(); if (type === 'logic') drawLogic(); else if (type === 'memory') drawMemory(); else if (type === 'trivia') drawTrivia(); else if (type === 'reaction') drawReaction(); else drawFinale(); }
+  function drawSuccess() { drawRoom(); px(0, 0, W, H, '#19121f66'); drawPanel(275, 215, 410, 120, '#15101ff0', META[currentType()].color); text('SEAL RECOVERED', W / 2, 263, 24, '#fff2af', 'center'); text(state.message, W / 2, 302, 13, '#fff5d7', 'center'); }
+  function drawFailure() {
+    drawCurrentBackground(); drawHUD();
+    const flash = Math.floor(elapsedSince(state.modeStarted) / 120) % 2 === 0; if (flash) px(0, 0, W, H, '#7d1f2855');
+    text(state.detail, W / 2, 150, 18, '#ffafa0', 'center'); drawExplorer();
+    if (state.character.anim === 'crushed') { const bx = Math.max(state.character.x + 20, 780 - elapsedSince(state.modeStarted) * .45); ctx.fillStyle = '#6b4b3f'; ctx.beginPath(); ctx.arc(bx, 465, 70, 0, Math.PI * 2); ctx.fill(); }
+  }
+  function shareText() { const cells = Array.from({length:5}, (_, i) => state.roomResults[i] ? '🟨' : i === state.roomIndex ? '🟥' : '⬛').join(''); return `FIVE ROOMS · DAY 1\n🏺 ${DAY.title}\n${cells}\n${state.score}/5 seals · ${state.official ? 'Official run' : `Retry ${state.attempt}`}`; }
+  function drawEnd(victory) {
+    drawFinaleBackground(); px(0, 0, W, H, '#09070e99'); drawPanel(150, 80, 660, 440, '#15101ff2', victory ? '#e0af4a' : '#9a4651');
+    text(victory ? 'THE SUN RETURNS' : 'EXPEDITION ENDED', W / 2, 145, 34, victory ? '#ffe58b' : '#ff9e91', 'center');
+    text(victory ? 'The explorer raises the Sunstone as daylight floods the temple.' : state.detail, W / 2, 190, 14, '#fff5d7', 'center');
+    text(state.roomResults.map((r) => r ? '■' : '□').join('  ') + (state.roomResults.length < 5 ? '  □'.repeat(5 - state.roomResults.length) : ''), W / 2, 250, 28, victory ? '#ffd45c' : '#d76d68', 'center');
+    text(`${state.score}/5 SEALS   ·   ${state.official ? 'OFFICIAL RUN' : `RETRY ${state.attempt}`}`, W / 2, 300, 16, '#d8c8df', 'center');
+    drawButton('RETRY DAY 1', 220, 355, 240, 60, true); drawButton('COPY RESULT', 500, 355, 240, 60, false);
+    text('The shared result contains no puzzle answers.', W / 2, 455, 12, '#ae97b9', 'center'); text('R or Enter retries · F fullscreen', W / 2, 485, 12, '#ae97b9', 'center');
+  }
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+    if (state.mode === 'start') drawStart(); else if (state.mode === 'transition') drawTransition(); else if (state.mode === 'room') drawRoom(); else if (state.mode === 'success') drawSuccess(); else if (state.mode === 'fail') drawFailure(); else if (state.mode === 'gameover') drawEnd(false); else drawEnd(true);
+  }
+
+  function currentType() { return DAY.order[Math.min(state.roomIndex, DAY.order.length - 1)]; }
+  function resetPuzzles() {
+    state.logic.selected = []; state.memory = { round:0, phase:'show', input:[], phaseStarted:state.clock, lit:-1 }; state.trivia.selected = -1;
+    state.reaction = { gate:0, phase:'waiting', readyAt:0, activeAt:0 }; state.finale = { phase:'question', selected:[], input:[], readyAt:0, activeAt:0 };
+  }
+  function startRun(retry = false) {
+    state.mode = 'transition'; state.modeStarted = state.clock; state.roomIndex = 0; state.score = 0; state.roomResults = []; state.message = ''; state.detail = '';
+    if (retry) { state.attempt++; state.official = false; } else { state.attempt = 1; state.official = true; }
+    state.character = { x:100, y:488, anim:'walk', animStarted:state.clock, facing:1 }; resetPuzzles(); render();
+  }
+  function enterRoom() {
+    state.mode = 'room'; state.modeStarted = state.clock; state.roomStarted = state.clock; state.character.x = 105; state.character.y = 515; setAnim('idle');
+    const type = currentType(); if (type === 'memory') { state.memory.phase = 'show'; state.memory.phaseStarted = state.clock; state.memory.input = []; } if (type === 'reaction') beginReactionGate(); render();
+  }
+  function beginReactionGate() { state.reaction.phase = 'waiting'; state.reaction.readyAt = state.clock + reactionWaits[state.reaction.gate]; state.reaction.activeAt = 0; setAnim('run'); }
+  function roomSuccess(message) { if (state.mode !== 'room') return; state.roomResults[state.roomIndex] = true; state.score++; state.message = message; state.mode = 'success'; state.modeStarted = state.clock; setAnim('celebrate'); render(); }
+  function roomFailure(anim, detail) { if (state.mode !== 'room') return; state.roomResults[state.roomIndex] = false; state.detail = detail; state.mode = 'fail'; state.modeStarted = state.clock; setAnim(anim); render(); }
+  function advanceRoom() { state.roomIndex++; state.mode = 'transition'; state.modeStarted = state.clock; state.character.x = 100; setAnim('walk'); render(); }
+  function finishRun() { state.mode = 'victory'; state.modeStarted = state.clock; state.detail = 'All five seals restored.'; saveRun(true); render(); }
+  function finishFailure() { state.mode = 'gameover'; saveRun(false); render(); }
+
+  function chooseLogic(index) { if (state.logic.selected.includes(index) || state.logic.selected.length >= 4) return; state.logic.selected.push(index); setAnim('interact'); render(); }
+  function confirmLogic() { if (state.logic.selected.length < 4) return; const correct = logicSolution.every((v, i) => state.logic.selected[i] === v); if (correct) roomSuccess('The idols bow. A bridge rises from the chasm.'); else roomFailure('burn', 'The Serpent Idol breathes sacred fire!'); }
+  function resetLogic() { state.logic.selected = []; setAnim('idle'); render(); }
+  function chooseMemory(index) {
+    if (state.memory.phase !== 'input') return; const seq = memoryRounds[state.memory.round]; const pos = state.memory.input.length; setAnim('interact');
+    if (index !== seq[pos]) return roomFailure('shadow', 'A wrong echo wakes the shadows in the wall.');
+    state.memory.input.push(index); if (state.memory.input.length === seq.length) { if (state.memory.round === 0) { state.memory.round = 1; state.memory.phase = 'pause'; state.memory.phaseStarted = state.clock; state.memory.input = []; } else roomSuccess('Both echoes return. The violet seal glows.'); } render();
+  }
+  function chooseTrivia(index) { if (state.trivia.selected !== -1) return; state.trivia.selected = index; setAnim('interact'); if (index === 1) roomSuccess('The Papyrus Tablet reveals the hidden path.'); else roomFailure('fall', 'The false tablet opens a trap beneath the explorer!'); }
+  function react() {
+    if (currentType() === 'reaction') {
+      if (state.reaction.phase === 'waiting') return roomFailure('crushed', 'A false start releases the boulder too soon!');
+      if (state.reaction.phase !== 'active') return;
+      if (elapsedSince(state.reaction.activeAt) > 900) return roomFailure('crushed', 'The boulder closes the distance!');
+      state.reaction.gate++; setAnim('jump');
+      if (state.reaction.gate >= 3) roomSuccess('Three gates cleared. The boulder crashes behind you.'); else { state.reaction.phase = 'cleared'; state.reaction.readyAt = state.clock + 500; } render(); return;
+    }
+    if (currentType() === 'finale' && state.finale.phase === 'reactionWaiting') return roomFailure('blast', 'The Sunstone rejects the early strike!');
+    if (currentType() === 'finale' && state.finale.phase === 'reactionActive') { if (elapsedSince(state.finale.activeAt) > 1000) return roomFailure('blast', 'The final sunbeam fades before the strike!'); roomSuccess('The Sunstone awakens. Daylight pours through the temple!'); }
+  }
+  function chooseFinale(index) {
+    const f = state.finale; if (f.phase === 'question') { f.selected = [index]; setAnim('interact'); if (index === 1) { f.phase = 'runes'; f.selected = []; } else return roomFailure('blast', 'The guardian rejects the false direction!'); }
+    else if (f.phase === 'runes') { if (!f.selected.includes(index) && f.selected.length < 3) f.selected.push(index); setAnim('interact'); }
+    else if (f.phase === 'memory') { const pos = f.input.length; setAnim('interact'); if (index !== finaleMemorySolution[pos]) return roomFailure('shadow', 'The final echo fractures the Sunstone seal!'); f.input.push(index); if (f.input.length === 3) { f.phase = 'reactionWaiting'; f.readyAt = state.clock + 1300; } }
+    render();
+  }
+  function confirmFinaleRunes() { const f = state.finale; if (f.phase !== 'runes' || f.selected.length !== 3) return; if (finaleRuneSolution.every((v, i) => f.selected[i] === v)) { f.phase = 'memory'; f.selected = []; f.input = []; setAnim('celebrate'); } else roomFailure('burn', 'The solar cycle is broken. The guardian ignites!'); render(); }
+
+  function logicalPoint(event) { const rect = canvas.getBoundingClientRect(); return { x:(event.clientX - rect.left) * W / rect.width, y:(event.clientY - rect.top) * H / rect.height }; }
+  function handleRoomClick(x, y) {
+    const type = currentType();
+    if (type === 'logic') { if (y >= 360 && y <= 430) return chooseLogic(Math.max(0, Math.min(3, Math.floor((x - 130) / 180)))); if (y >= 435 && y <= 510) return x < 460 ? resetLogic() : confirmLogic(); }
+    if (type === 'memory' && y >= 320 && y <= 415) return chooseMemory(Math.max(0, Math.min(3, Math.floor((x - 120) / 185))));
+    if (type === 'trivia' && y >= 285 && y <= 450) { const col = x < 480 ? 0 : 1, row = y < 378 ? 0 : 1; return chooseTrivia(row * 2 + col); }
+    if (type === 'reaction' && y >= 315 && y <= 435) return react();
+    if (type === 'finale') { if (state.finale.phase === 'question' && y >= 420 && y <= 510) return chooseFinale(Math.max(0, Math.min(3, Math.floor((x - 145) / 170)))); if (state.finale.phase === 'runes') { if (y >= 415 && y <= 485) return chooseFinale(Math.max(0, Math.min(3, Math.floor((x - 145) / 170)))); if (y >= 480 && x >= 540) return confirmFinaleRunes(); } if (state.finale.phase === 'memory' && y >= 420 && y <= 510) return chooseFinale(Math.max(0, Math.min(3, Math.floor((x - 145) / 170)))); if (state.finale.phase.startsWith('reaction') && y >= 420 && y <= 520) return react(); }
+  }
+  function handleClick(event) {
+    const {x,y} = logicalPoint(event); if (state.mode === 'start') return startRun(false); if (state.mode === 'room') return handleRoomClick(x,y);
+    if (state.mode === 'gameover' || state.mode === 'victory') { if (y >= 335 && y <= 435 && x < 480) return startRun(true); if (y >= 335 && y <= 435 && x >= 480) navigator.clipboard?.writeText(shareText()); }
+  }
+  function handleKey(event) {
+    if (event.key.toLowerCase() === 'f') return document.fullscreenElement ? document.exitFullscreen() : canvas.requestFullscreen();
+    if (state.mode === 'start' && event.key === 'Enter') return startRun(false);
+    if ((state.mode === 'gameover' || state.mode === 'victory') && ['r','R','Enter'].includes(event.key)) return startRun(true);
+    if (state.mode !== 'room') return;
+    if (event.key === ' ') { event.preventDefault(); return react(); }
+    if (currentType() === 'logic' && event.key === 'Enter') return confirmLogic();
+    if (currentType() === 'logic' && (event.key === 'Backspace' || event.key === 'Delete')) return resetLogic();
+    if (currentType() === 'finale' && event.key === 'Enter') return confirmFinaleRunes();
+    if (['1','2','3','4'].includes(event.key)) { const i = Number(event.key) - 1; if (currentType() === 'logic') chooseLogic(i); else if (currentType() === 'memory') chooseMemory(i); else if (currentType() === 'trivia') chooseTrivia(i); else if (currentType() === 'finale') chooseFinale(i); }
+  }
+  function update(ms) {
+    state.clock += ms;
+    if (state.character.anim === 'interact' && elapsedSince(state.character.animStarted) > 350 && state.mode === 'room') setAnim('idle');
+    if (state.mode === 'transition' && elapsedSince(state.modeStarted) >= (state.reducedMotion ? 200 : 1300)) enterRoom();
+    if (state.mode === 'success' && elapsedSince(state.modeStarted) >= (state.reducedMotion ? 250 : 1100)) { if (state.roomIndex === 4) finishRun(); else advanceRoom(); }
+    if (state.mode === 'fail' && elapsedSince(state.modeStarted) >= (state.reducedMotion ? 350 : 1500)) finishFailure();
+    if (state.mode !== 'room') return;
+    if (currentType() === 'memory') {
+      const seq = memoryRounds[state.memory.round];
+      if (state.memory.phase === 'show' && elapsedSince(state.memory.phaseStarted) >= seq.length * 650 + 450) { state.memory.phase = 'input'; state.memory.input = []; setAnim('idle'); }
+      if (state.memory.phase === 'pause' && elapsedSince(state.memory.phaseStarted) >= 900) { state.memory.phase = 'show'; state.memory.phaseStarted = state.clock; state.memory.input = []; }
+    }
+    if (currentType() === 'reaction') {
+      if (state.reaction.phase === 'waiting' && state.clock >= state.reaction.readyAt) { state.reaction.phase = 'active'; state.reaction.activeAt = state.clock; setAnim('run'); }
+      if (state.reaction.phase === 'active' && elapsedSince(state.reaction.activeAt) > 900) roomFailure('crushed', 'The boulder closes the distance!');
+      if (state.reaction.phase === 'cleared' && state.clock >= state.reaction.readyAt) beginReactionGate();
+    }
+    if (currentType() === 'finale') {
+      if (state.finale.phase === 'reactionWaiting' && state.clock >= state.finale.readyAt) { state.finale.phase = 'reactionActive'; state.finale.activeAt = state.clock; setAnim('interact'); }
+      if (state.finale.phase === 'reactionActive' && elapsedSince(state.finale.activeAt) > 1000) roomFailure('blast', 'The final sunbeam fades before the strike!');
+    }
+  }
+  window.advanceTime = (ms) => { manualTime = true; const steps = Math.max(1, Math.round(ms / (1000 / 60))); for (let i = 0; i < steps; i++) update(ms / steps); render(); };
+  window.render_game_to_text = () => JSON.stringify({
+    coordinateSystem:'canvas origin top-left; x right; y down; 960x600', day:DAY.id, title:DAY.title, mode:state.mode,
+    room:state.roomIndex + 1, roomType:currentType(), roomOrder:DAY.order, score:state.score, attempt:state.attempt, official:state.official,
+    results:state.roomResults, character:{x:Math.round(state.character.x), y:Math.round(state.character.y), animation:state.character.anim},
+    puzzle: currentType() === 'logic' ? {selected:state.logic.selected, options:SYMBOLS} : currentType() === 'memory' ? {round:state.memory.round + 1, phase:state.memory.phase, inputLength:state.memory.input.length} : currentType() === 'trivia' ? {question:'Which material did ancient Egyptians famously use as writing paper?', options:['Marble','Papyrus','Silk','Bamboo']} : currentType() === 'reaction' ? {gate:state.reaction.gate + 1, phase:state.reaction.phase} : {phase:state.finale.phase, selected:state.finale.selected, inputLength:state.finale.input.length},
+    controls:'Mouse/touch; 1-4 choose; Enter confirms; Space reacts; Backspace resets logic; R retries; F fullscreen'
+  });
+  canvas.addEventListener('click', handleClick); window.addEventListener('keydown', handleKey); setInterval(() => { if (!manualTime) { update(50); render(); } }, 50); state.stats = loadStats(); render();
 })();
 </script>
 </body>
