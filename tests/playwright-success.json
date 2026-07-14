@@ -1,15 +1,15 @@
 {
   "steps": [
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 240, "mouse_y": 406 },
-    { "buttons": [], "frames": 55 },
+    { "buttons": [], "frames": 85 },
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 240, "mouse_y": 594 },
 
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 126, "mouse_y": 406 },
+    { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 354, "mouse_y": 476 },
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 354, "mouse_y": 406 },
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 126, "mouse_y": 476 },
-    { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 354, "mouse_y": 476 },
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 320, "mouse_y": 569 },
-    { "buttons": [], "frames": 170 },
+    { "buttons": [], "frames": 245 },
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 240, "mouse_y": 594 },
 
     { "buttons": [], "frames": 185 },
@@ -24,14 +24,14 @@
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 354, "mouse_y": 485 },
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 126, "mouse_y": 485 },
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 126, "mouse_y": 386 },
-    { "buttons": [], "frames": 170 },
+    { "buttons": [], "frames": 245 },
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 240, "mouse_y": 594 },
 
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 240, "mouse_y": 412 },
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 240, "mouse_y": 346 },
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 240, "mouse_y": 478 },
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 240, "mouse_y": 543 },
-    { "buttons": [], "frames": 170 },
+    { "buttons": [], "frames": 245 },
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 240, "mouse_y": 594 },
 
     { "buttons": [], "frames": 185 },
@@ -63,8 +63,7 @@
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 240, "mouse_y": 610 },
     { "buttons": [], "frames": 24 },
     { "buttons": [], "frames": 210 },
-    { "buttons": [], "frames": 120 },
-    { "buttons": [], "frames": 55 },
+    { "buttons": [], "frames": 245 },
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 240, "mouse_y": 594 },
 
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 348, "mouse_y": 484 },
@@ -77,6 +76,6 @@
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 348, "mouse_y": 466 },
     { "buttons": [], "frames": 80 },
     { "buttons": ["left_mouse_button"], "frames": 2, "mouse_x": 240, "mouse_y": 536 },
-    { "buttons": [], "frames": 120 }
+    { "buttons": [], "frames": 160 }
   ]
 }

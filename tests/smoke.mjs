@@ -40,7 +40,7 @@ function boot() {
 
 function startToLogic(game) {
   game.key('Enter');
-  game.advance(900);
+  game.advance(1500);
   assert.equal(game.state().mode, 'ready');
   assert.equal(game.state().roomType, 'logic');
   game.key('Enter');
@@ -48,10 +48,10 @@ function startToLogic(game) {
 }
 
 function passLogic(game) {
-  ['1', '2', '3', '4', 'Enter'].forEach(game.key);
+  ['1', '4', '2', '3', 'Enter'].forEach(game.key);
   assert.equal(game.state().mode, 'success');
   assert.deepEqual(game.state().collected, ['logic']);
-  game.advance(2000); game.advance(900);
+  game.advance(2700); game.advance(1500);
   assert.equal(game.state().mode, 'ready');
   assert.equal(game.state().roomType, 'memory');
   game.key('Enter');
@@ -62,7 +62,7 @@ function passMemory(game) {
   ['1', '3', '2', '4'].forEach(game.key);
   game.advance(900); game.advance(4400);
   ['1', '3', '2', '4', '3', '1'].forEach(game.key);
-  game.advance(2000); game.advance(900);
+  game.advance(2700); game.advance(1500);
   assert.equal(game.state().mode, 'ready');
   assert.equal(game.state().roomType, 'trivia');
   game.key('Enter');
@@ -70,7 +70,7 @@ function passMemory(game) {
 
 function passTrivia(game) {
   ['2', '1', '3', '4'].forEach(game.key);
-  game.advance(2000); game.advance(900);
+  game.advance(2700); game.advance(1500);
   assert.equal(game.state().mode, 'ready');
   assert.equal(game.state().roomType, 'platformer');
   game.key('Enter');
@@ -86,7 +86,7 @@ function passPlatformer(game) {
   }
   const remaining = 30000 - game.state().puzzle.elapsedMs + 50;
   game.advance(Math.max(0, remaining));
-  game.advance(2000); game.advance(900);
+  game.advance(2700); game.advance(1500);
   assert.equal(game.state().mode, 'ready');
   assert.equal(game.state().roomType, 'finale');
   game.key('Enter');
@@ -97,7 +97,7 @@ function passFinale(game) {
   ['1', '2', '3', 'Enter'].forEach(game.key);
   ['1', '3', '2'].forEach(game.key);
   game.advance(1350); game.key(' ');
-  game.advance(2000);
+  game.advance(2700);
 }
 
 function passDayOne(game) {
@@ -112,7 +112,7 @@ assert.deepEqual(success.state().results, [true, true, true, true, true]);
 
 const failure = boot();
 startToLogic(failure);
-['2', '1', '3', '4', 'Enter'].forEach(failure.key);
+['1', '2', '3', '4', 'Enter'].forEach(failure.key);
 assert.equal(failure.state().mode, 'fail');
 assert.equal(failure.state().character.animation, 'burn');
 failure.advance(1600);
@@ -120,6 +120,17 @@ assert.equal(failure.state().mode, 'gameover');
 failure.key('Enter');
 assert.equal(failure.state().attempt, 2);
 assert.equal(failure.state().official, false);
+
+const transitionTiming = boot();
+startToLogic(transitionTiming);
+['1', '4', '2', '3', 'Enter'].forEach(transitionTiming.key);
+transitionTiming.advance(2500);
+assert.equal(transitionTiming.state().mode, 'success');
+transitionTiming.advance(100); transitionTiming.advance(1200);
+assert.equal(transitionTiming.state().mode, 'transition');
+assert.deepEqual(transitionTiming.state().character.carrying, ['logic']);
+transitionTiming.advance(250);
+assert.equal(transitionTiming.state().mode, 'ready');
 
 const memoryFailure = boot();
 startToLogic(memoryFailure); passLogic(memoryFailure); memoryFailure.advance(3100); memoryFailure.key('2');
@@ -151,7 +162,7 @@ const roomTesting = boot();
 roomTesting.click(410, 680);
 assert.equal(roomTesting.state().roomType, 'platformer');
 assert.equal(roomTesting.state().testing, true);
-roomTesting.advance(900); roomTesting.key('Enter'); roomTesting.advance(3100);
+roomTesting.advance(1500); roomTesting.key('Enter'); roomTesting.advance(3100);
 const beforeInfo = roomTesting.state().puzzle.elapsedMs;
 roomTesting.click(500, 130);
 assert.equal(roomTesting.state().infoOpen, true);
