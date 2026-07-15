@@ -1,6 +1,6 @@
 # The Daily Venture
 
-A mobile-first daily puzzle anthology built with Vite, React, TypeScript, Phaser, Matter physics, Zod, and Supabase. Week 1 contains seven complete draft adventures, each with trivia, logic, rhythm, spatial, and multi-stage finale rooms.
+A mobile-first daily puzzle anthology built with Vite, React, TypeScript, Phaser, Matter physics, Zod, and Supabase. Week 1 contains seven complete draft adventures, each with trivia, varied logic, rhythm, memory, and multi-stage finale rooms.
 
 ## Run locally
 
