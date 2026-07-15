@@ -92,4 +92,12 @@ assert.equal(official.isPreview, false);
 await guestService.scheduleWeek(addDays(localDateKey(new Date(), 'UTC'), 1));
 await assert.rejects(() => guestService.startAttempt(WEEK_ONE[0].id, false, 'UTC'), /not released/);
 
+localStorage.clear();
+localStorage.setItem('dailyVentureLocalReviewerProfile', JSON.stringify({
+  id: 'existing-reviewer', email: 'existing@example.com', role: 'reviewer', attempts: [],
+  settings: { ...DEFAULT_SETTINGS, highContrast: false },
+}));
+const migratedService = createVentureService();
+assert.equal((await migratedService.getProfile())?.settings.highContrast, true);
+
 console.log('unit: 7 schemas, timezone gating, attempts, archive rules, idempotency, and achievement thresholds passed');

@@ -5,6 +5,8 @@ import { addDays, localDateKey } from './date';
 
 const PROFILE_KEY = 'dailyVentureLocalReviewerProfile';
 const LAUNCH_KEY = 'dailyVentureWeekOneLaunchDate';
+const SETTINGS_VERSION_KEY = 'dailyVentureSettingsVersion';
+const SETTINGS_VERSION = '2';
 const DEFAULT_SETTINGS: Settings = {
   sound: true,
   music: true,
@@ -51,6 +53,11 @@ class LocalReviewService implements VentureService {
     try {
       const saved = localStorage.getItem(PROFILE_KEY);
       this.profile = saved ? JSON.parse(saved) as PlayerProfile : null;
+      if (this.profile && localStorage.getItem(SETTINGS_VERSION_KEY) !== SETTINGS_VERSION) {
+        this.profile.settings = { ...this.profile.settings, highContrast: true };
+        localStorage.setItem(SETTINGS_VERSION_KEY, SETTINGS_VERSION);
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(this.profile));
+      }
     } catch {
       this.profile = null;
     }
