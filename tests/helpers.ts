@@ -26,10 +26,14 @@ export function winCurrentPuzzle(state: SessionState): SessionState {
   if (config.type === 'trivia') {
     for (const question of config.questions) state = send(state, { type: 'CHOOSE', value: question.correct });
   } else if (config.type === 'logic') {
-    for (const token of config.solution) state = send(state, { type: 'CHOOSE', value: token });
+    if (config.mechanic === 'order') for (const token of config.solution) state = send(state, { type: 'CHOOSE', value: token });
+    else state = send(state, { type: 'CHOOSE', value: config.correct });
     state = send(state, { type: 'CONFIRM' });
-  } else if (config.type === 'spatial') {
-    state = send(state, { type: 'CANVAS_TAP', x: config.target.x, y: config.target.y });
+  } else if (config.type === 'memory') {
+    for (const sequence of config.rounds) {
+      state = send(state, { type: 'TICK', ms: sequence.length * config.revealMs });
+      for (const symbol of sequence) state = send(state, { type: 'CHOOSE', value: symbol });
+    }
   } else if (config.type === 'rhythm') {
     let elapsed = 0;
     for (const beat of config.beatMap) {
@@ -50,7 +54,8 @@ function winFinale(state: SessionState, config: FinaleConfig): SessionState {
   state = send(state, { type: 'CHOOSE', value: config.question.correct });
   for (const token of config.orderSolution) state = send(state, { type: 'CHOOSE', value: token });
   state = send(state, { type: 'CONFIRM' });
-  state = send(state, { type: 'CANVAS_TAP', x: config.scanTarget.x, y: config.scanTarget.y });
+  state = send(state, { type: 'TICK', ms: config.memorySequence.length * config.memoryRevealMs });
+  for (const symbol of config.memorySequence) state = send(state, { type: 'CHOOSE', value: symbol });
   let elapsed = 0;
   for (const beat of config.rhythmBeats) {
     state = send(state, { type: 'TICK', ms: beat - elapsed });
@@ -70,14 +75,17 @@ export function failCurrentPuzzle(state: SessionState, config: PuzzleConfig): Se
   if (config.type === 'trivia') {
     state = send(state, { type: 'CHOOSE', value: (config.questions[0].correct + 1) % 4 });
   } else if (config.type === 'logic') {
-    for (const token of [...config.solution].reverse()) state = send(state, { type: 'CHOOSE', value: token });
+    if (config.mechanic === 'order') for (const token of [...config.solution].reverse()) state = send(state, { type: 'CHOOSE', value: token });
+    else state = send(state, { type: 'CHOOSE', value: (config.correct + 1) % 4 });
     state = send(state, { type: 'CONFIRM' });
   } else if (config.type === 'rhythm') {
     state = send(state, { type: 'RHYTHM_TAP' });
     state = send(state, { type: 'RHYTHM_TAP' });
     state = send(state, { type: 'RHYTHM_TAP' });
-  } else if (config.type === 'spatial') {
-    for (let index = 0; index < 3; index += 1) state = send(state, { type: 'CANVAS_TAP', x: 4, y: 4 });
+  } else if (config.type === 'memory') {
+    const sequence = config.rounds[0];
+    state = send(state, { type: 'TICK', ms: sequence.length * config.revealMs });
+    state = send(state, { type: 'CHOOSE', value: config.symbols.find((symbol) => symbol !== sequence[0])! });
   } else {
     state = send(state, { type: 'CHOOSE', value: (config.question.correct + 1) % 4 });
   }

@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import { WEEK_ONE } from './content/week1';
 import { VentureCanvas, type CanvasView } from './game/VentureCanvas';
 import { currentPuzzleConfig, initialSessionState, sessionReducer, sessionSnapshot } from './game/session';
-import type { DailyAdventure, FinaleConfig, LogicConfig, PuzzleConfig, RhythmConfig, Settings, SpatialConfig, TriviaConfig } from './game/types';
+import type { DailyAdventure, FinaleConfig, LogicConfig, MemoryConfig, PuzzleConfig, RhythmConfig, Settings, TriviaConfig } from './game/types';
 import { calculateAchievements, newlyUnlocked } from './services/achievements';
 import { formatDate, localDateKey } from './services/date';
 import { createVentureService, DEFAULT_SETTINGS, type CalendarDay } from './services/ventureService';
 
-type Modal = 'help' | 'login' | 'achievements' | 'settings' | null;
+type Modal = 'help' | 'login' | 'achievements' | 'settings' | 'rooms' | null;
 type HomePage = 'home' | 'archive' | 'review';
 
 function formatDuration(ms: number) {
@@ -52,13 +52,20 @@ function TriviaPuzzle({ config, index, choose }: { config: TriviaConfig; index: 
   </div>;
 }
 
-function LogicPuzzle({ config, selected, choose, confirm }: { config: LogicConfig; selected: string[]; choose: (token: string) => void; confirm: () => void }) {
+function LogicPuzzle({ config, selected, choice, choose, confirm }: { config: LogicConfig; selected: string[]; choice: number | null; choose: (value: number | string) => void; confirm: () => void }) {
+  if (config.mechanic === 'deduction') return <div className="puzzle-panel logic-panel deduction-panel">
+    <div className="eyebrow">Multi-clue deduction</div>
+    <h2>{config.prompt}</h2>
+    <div className="clue-list">{config.clues.map((clue) => <p key={clue}>• {clue}</p>)}</div>
+    <div className="choice-grid two-column">{config.choices.map((answer, index) => <button key={answer} className={choice === index ? 'selected' : ''} onClick={() => choose(index)}>{answer}</button>)}</div>
+    <button className="primary-button compact" disabled={choice === null} onClick={confirm}>Commit answer</button>
+  </div>;
   return <div className="puzzle-panel logic-panel">
-    <div className="eyebrow">Build the only valid order</div>
-    <div className="logic-slots">{Array.from({ length: 4 }, (_, index) => <div key={index} className={selected[index] ? 'filled' : ''}>{selected[index] ?? index + 1}</div>)}</div>
+    <div className="eyebrow">Linked-order deduction</div>
+    <div className={`logic-slots ${config.tokens.length === 5 ? 'five' : ''}`}>{Array.from({ length: config.tokens.length }, (_, index) => <div key={index} className={selected[index] ? 'filled' : ''}>{selected[index] ?? index + 1}</div>)}</div>
     <div className="clue-list">{config.clues.map((clue) => <p key={clue.text}>• {clue.text}</p>)}</div>
-    <div className="choice-grid two-column">{config.tokens.map((token) => <button key={token} className={selected.includes(token) ? 'selected' : ''} disabled={selected.includes(token)} onClick={() => choose(token)}>{token}</button>)}</div>
-    <button className="primary-button compact" disabled={selected.length !== 4} onClick={confirm}>Confirm order</button>
+    <div className="choice-grid token-grid">{config.tokens.map((token) => <button key={token} className={selected.includes(token) ? 'selected' : ''} disabled={selected.includes(token)} onClick={() => choose(token)}>{token}</button>)}</div>
+    <button className="primary-button compact" disabled={selected.length !== config.tokens.length} onClick={confirm}>Confirm order</button>
   </div>;
 }
 
@@ -74,20 +81,29 @@ function RhythmPuzzle({ config, elapsedMs, beatIndex, errors, tap }: { config: R
   </div>;
 }
 
-function SpatialPuzzle({ config, taps, hint }: { config: SpatialConfig; taps: number; hint: string }) {
-  return <div className="puzzle-panel spatial-panel">
-    <div className="eyebrow">Tap the illustrated scene</div>
-    <h2>{config.clue}</h2>
-    <div className="tap-counter">{Array.from({ length: 3 }, (_, index) => <span className={index < taps ? 'used' : ''} key={index}>{index < taps ? '×' : '•'}</span>)}</div>
-    <p>{hint || 'You have exactly three attempts.'}</p>
+function MemoryPuzzle({ config, puzzle, choose, replay }: { config: MemoryConfig; puzzle: Extract<ReturnType<typeof sessionSnapshot>['puzzle'], object> & { phase?: string; roundIndex?: number; revealIndex?: number; selected?: string[]; replayUsed?: boolean }; choose: (symbol: string) => void; replay: () => void }) {
+  const roundIndex = puzzle.roundIndex ?? 0;
+  const sequence = config.rounds[roundIndex];
+  const showing = puzzle.phase === 'showing';
+  return <div className="puzzle-panel memory-panel">
+    <div className="memory-meta"><span>Sequence {roundIndex + 1} of 3</span><span>{sequence.length} symbols</span></div>
+    <div className={`memory-display ${showing ? 'showing' : 'recall'}`} aria-live="polite">
+      {showing ? <strong>{sequence[puzzle.revealIndex ?? 0] ?? 'Remember'}</strong> : <strong>Your turn</strong>}
+      <div>{sequence.map((_, index) => <span key={index} className={!showing && index < (puzzle.selected?.length ?? 0) ? 'filled' : showing && index === (puzzle.revealIndex ?? 0) ? 'current' : ''}>{!showing && index < (puzzle.selected?.length ?? 0) ? '✓' : index + 1}</span>)}</div>
+    </div>
+    <div className="choice-grid two-column memory-choices">{config.symbols.map((symbol) => <button key={symbol} disabled={showing} onClick={() => choose(symbol)}>{symbol}</button>)}</div>
+    <button className="text-button replay-button" disabled={showing || puzzle.replayUsed} onClick={replay}>{puzzle.replayUsed ? 'Replay used' : 'Replay this sequence once'}</button>
   </div>;
 }
 
-function FinalePuzzle({ config, puzzle, choose, confirm, tapRhythm }: { config: FinaleConfig; puzzle: Extract<ReturnType<typeof sessionSnapshot>['puzzle'], object> & { phase?: string; selected?: string[]; elapsedMs?: number; beatIndex?: number; errors?: number; physicsChoice?: number | null; scanTaps?: number }; choose: (value: number | string) => void; confirm: () => void; tapRhythm: () => void }) {
+function FinalePuzzle({ config, puzzle, choose, confirm, replay, tapRhythm }: { config: FinaleConfig; puzzle: Extract<ReturnType<typeof sessionSnapshot>['puzzle'], object> & { phase?: string; selected?: string[]; memoryPhase?: string; memoryRevealIndex?: number; replayUsed?: boolean; elapsedMs?: number; beatIndex?: number; errors?: number; physicsChoice?: number | null }; choose: (value: number | string) => void; confirm: () => void; replay: () => void; tapRhythm: () => void }) {
   const phase = puzzle.phase;
   if (phase === 'question') return <div className="puzzle-panel question-panel"><div className="eyebrow">Finale · Recall</div><h2>{config.question.prompt}</h2><div className="choice-grid single-column">{config.question.choices.map((choice, index) => <button key={choice} onClick={() => choose(index)}><span>{index + 1}</span>{choice}</button>)}</div></div>;
   if (phase === 'order') return <div className="puzzle-panel"><div className="eyebrow">Finale · Restore</div><h2>Place the three remembered signs in order.</h2><div className="logic-slots three">{Array.from({ length: 3 }, (_, index) => <div key={index}>{puzzle.selected?.[index] ?? index + 1}</div>)}</div><div className="choice-grid three-column">{config.orderTokens.map((token) => <button key={token} disabled={puzzle.selected?.includes(token)} onClick={() => choose(token)}>{token}</button>)}</div><button className="primary-button compact" disabled={puzzle.selected?.length !== 3} onClick={confirm}>Lock sequence</button></div>;
-  if (phase === 'scan') return <div className="puzzle-panel spatial-panel"><div className="eyebrow">Finale · Find</div><h2>{config.scanClue}</h2><div className="tap-counter">{Array.from({ length: 3 }, (_, index) => <span className={index < (puzzle.scanTaps ?? 0) ? 'used' : ''} key={index}>{index < (puzzle.scanTaps ?? 0) ? '×' : '•'}</span>)}</div><p>Tap the world, not this card.</p></div>;
+  if (phase === 'memory') {
+    const showing = puzzle.memoryPhase === 'showing';
+    return <div className="puzzle-panel memory-panel"><div className="eyebrow">Finale · Remember</div><div className={`memory-display ${showing ? 'showing' : 'recall'}`} aria-live="polite"><strong>{showing ? config.memorySequence[puzzle.memoryRevealIndex ?? 0] ?? 'Remember' : 'Repeat the engine code'}</strong><div>{config.memorySequence.map((_, index) => <span key={index} className={!showing && index < (puzzle.selected?.length ?? 0) ? 'filled' : showing && index === (puzzle.memoryRevealIndex ?? 0) ? 'current' : ''}>{!showing && index < (puzzle.selected?.length ?? 0) ? '✓' : index + 1}</span>)}</div></div><div className="choice-grid two-column memory-choices">{config.memorySymbols.map((symbol) => <button key={symbol} disabled={showing} onClick={() => choose(symbol)}>{symbol}</button>)}</div><button className="text-button replay-button" disabled={showing || puzzle.replayUsed} onClick={replay}>{puzzle.replayUsed ? 'Replay used' : 'Replay code once'}</button></div>;
+  }
   if (phase === 'rhythm') {
     const beat = config.rhythmBeats[puzzle.beatIndex ?? 0];
     const active = beat !== undefined && Math.abs((puzzle.elapsedMs ?? 0) - beat) <= 360;
@@ -145,7 +161,7 @@ export function App() {
   }, [modal, session]);
 
   useEffect(() => {
-    if (session.mode !== 'results' || !profile || !session.attemptId || finalizedAttempt.current === session.attemptId || !session.finalOutcome) return;
+    if (session.mode !== 'results' || session.isTesting || !profile || !session.attemptId || finalizedAttempt.current === session.attemptId || !session.finalOutcome) return;
     finalizedAttempt.current = session.attemptId;
     const before = profile.attempts.map((attempt) => ({ ...attempt, levelResults: [...attempt.levelResults] }));
     service.finishAttempt({ attemptId: session.attemptId, outcome: session.finalOutcome, activeMs: session.activeMs, levelResults: session.results }).then(async () => {
@@ -156,7 +172,7 @@ export function App() {
         dispatch({ type: 'SET_NEW_ACHIEVEMENTS', codes: unlocked });
       }
     }).catch((error) => setShareMessage(`Result is pending sync: ${String(error)}`));
-  }, [profile, service, session.activeMs, session.attemptId, session.finalOutcome, session.mode, session.results]);
+  }, [profile, service, session.activeMs, session.attemptId, session.finalOutcome, session.isTesting, session.mode, session.results]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -326,7 +342,7 @@ export function App() {
 
   return <main className={`app ${settings.highContrast ? 'high-contrast' : ''} ${settings.reducedMotion ? 'reduced-motion' : ''}`}>
     <div className="phone-stage">
-      <VentureCanvas view={session.mode === 'home' ? homeCanvasView : canvasView} onTap={(x, y) => dispatch({ type: 'CANVAS_TAP', x, y })} />
+      <VentureCanvas view={session.mode === 'home' ? homeCanvasView : canvasView} />
 
       {session.mode === 'home' && page === 'home' && <section className="screen-overlay home-screen">
         <header className="home-toolbar">
@@ -357,30 +373,33 @@ export function App() {
       </section>}
 
       {session.mode !== 'home' && session.adventure && <>
-        <header className="game-hud"><button className="icon-button glass" onClick={goHome} aria-label="Leave run">×</button><div><strong>{session.adventure.title}</strong><span>{session.isArchive ? 'ARCHIVE' : session.reviewer ? 'REVIEW' : 'DAILY'} · ATTEMPT {session.attemptNumber}</span></div><button className="icon-button glass" onClick={() => setModal('settings')} aria-label="Settings">⚙</button></header>
+        <header className="game-hud"><button className="icon-button glass" onClick={goHome} aria-label="Leave run">×</button><div><strong>{session.adventure.title}</strong><span>{session.isTesting ? 'ROOM TEST · NOT SAVED' : session.isArchive ? 'ARCHIVE' : session.reviewer ? 'REVIEW' : 'DAILY'} · ATTEMPT {session.attemptNumber}</span></div><button className="icon-button glass" onClick={() => setModal('settings')} aria-label="Settings">⚙</button></header>
         {session.mode !== 'intro' && session.mode !== 'results' && <ProgressDots adventure={session.adventure} levelIndex={session.levelIndex} results={session.results} />}
+        {session.reviewer && session.mode !== 'results' && <button className="room-jump-button glass" onClick={() => setModal('rooms')}>ROOMS</button>}
       </>}
 
       {session.mode === 'intro' && session.adventure && <section className="screen-overlay intro-screen">
         <div className="intro-card"><div className="eyebrow">DAY {session.adventure.weekIndex + 1} · {session.adventure.estimatedMinutes}</div><h1>{session.adventure.title}</h1><h2>{session.adventure.subtitle}</h2><p>{session.adventure.synopsis}</p><div className="trail-preview">{session.adventure.levelOrder.map((type, index) => <span key={type}>{index + 1}<small>{type}</small></span>)}</div><button className="primary-button" onClick={() => dispatch({ type: 'SHOW_READY' })}>ENTER THE TRAIL</button></div>
       </section>}
 
-      {session.mode === 'ready' && config && session.adventure && <section className="screen-overlay ready-screen"><div className="ready-card"><div className="eyebrow">ROOM {session.levelIndex + 1} OF 5 · {config.type}</div><h1>{config.title}</h1><p>{config.brief}</p>{config.type === 'rhythm' && <div className="rule-pill">30 SEC · ONE BUTTON · THREE STRIKES</div>}{config.type === 'spatial' && <div className="rule-pill">THREE TAPS · STUDY THE SCENE</div>}{config.type === 'finale' && <div className="rule-pill">RECALL · FIND · RHYTHM · PHYSICS</div>}<button className="primary-button" onClick={() => dispatch({ type: 'BEGIN_LEVEL' })}>READY</button></div></section>}
+      {session.mode === 'ready' && config && session.adventure && <section className="screen-overlay ready-screen"><div className="ready-card"><div className="eyebrow">ROOM {session.levelIndex + 1} OF 5 · {config.type}</div><h1>{config.title}</h1><p>{config.brief}</p>{config.type === 'rhythm' && <div className="rule-pill">30 SEC · ONE BUTTON · THREE STRIKES</div>}{config.type === 'memory' && <div className="rule-pill">WATCH · REPEAT · THREE SEQUENCES</div>}{config.type === 'logic' && <div className="rule-pill">READ EVERY CLUE · COMMIT ONCE</div>}{config.type === 'finale' && <div className="rule-pill">RECALL · MEMORY · RHYTHM · PHYSICS</div>}<button className="primary-button" onClick={() => dispatch({ type: 'BEGIN_LEVEL' })}>READY</button></div></section>}
 
       {session.mode === 'puzzle' && config && <section className="screen-overlay puzzle-screen">
         <div className="puzzle-heading"><div className="eyebrow">ROOM {session.levelIndex + 1} · {config.type}</div><h1>{config.title}</h1></div>
         {config.type === 'trivia' && session.puzzle.kind === 'trivia' && <TriviaPuzzle config={config as TriviaConfig} index={session.puzzle.questionIndex} choose={(value) => dispatch({ type: 'CHOOSE', value })} />}
-        {config.type === 'logic' && session.puzzle.kind === 'logic' && <LogicPuzzle config={config as LogicConfig} selected={session.puzzle.selected} choose={(value) => dispatch({ type: 'CHOOSE', value })} confirm={() => dispatch({ type: 'CONFIRM' })} />}
+        {config.type === 'logic' && session.puzzle.kind === 'logic' && <LogicPuzzle config={config as LogicConfig} selected={session.puzzle.selected} choice={session.puzzle.choice} choose={(value) => dispatch({ type: 'CHOOSE', value })} confirm={() => dispatch({ type: 'CONFIRM' })} />}
         {config.type === 'rhythm' && session.puzzle.kind === 'rhythm' && <RhythmPuzzle config={config as RhythmConfig} elapsedMs={session.puzzle.elapsedMs} beatIndex={session.puzzle.beatIndex} errors={session.puzzle.errors} tap={feedbackPulse} />}
-        {config.type === 'spatial' && session.puzzle.kind === 'spatial' && <SpatialPuzzle config={config as SpatialConfig} taps={session.puzzle.taps} hint={session.puzzle.hint} />}
-        {config.type === 'finale' && session.puzzle.kind === 'finale' && <FinalePuzzle config={config as FinaleConfig} puzzle={session.puzzle} choose={(value) => dispatch({ type: 'CHOOSE', value })} confirm={() => dispatch({ type: 'CONFIRM' })} tapRhythm={feedbackPulse} />}
+        {config.type === 'memory' && session.puzzle.kind === 'memory' && <MemoryPuzzle config={config as MemoryConfig} puzzle={session.puzzle} choose={(value) => dispatch({ type: 'CHOOSE', value })} replay={() => dispatch({ type: 'MEMORY_REPLAY' })} />}
+        {config.type === 'finale' && session.puzzle.kind === 'finale' && <FinalePuzzle config={config as FinaleConfig} puzzle={session.puzzle} choose={(value) => dispatch({ type: 'CHOOSE', value })} confirm={() => dispatch({ type: 'CONFIRM' })} replay={() => dispatch({ type: 'MEMORY_REPLAY' })} tapRhythm={feedbackPulse} />}
       </section>}
 
       {session.mode === 'resolution' && config && <section className="screen-overlay resolution-screen"><div className="resolution-card"><div className="eyebrow">{session.resolutionOutcome === 'success' ? 'TRAIL CLEARED' : 'RUN ENDED'}</div><h1>{session.resolutionOutcome === 'success' ? `${session.adventure?.art.artifact} recovered` : 'The Venture claims you'}</h1><p>{session.resolutionOutcome === 'success' ? 'The explorer crosses the obstacle and carries the relic onward.' : 'A stylized defeat closes this trail. Your result is waiting.'}</p><div className="resolution-meter"><span style={{ width: `${Math.min(100, session.resolutionElapsedMs / (session.reducedMotion ? 1200 : 4800) * 100)}%` }} /></div></div></section>}
 
       {session.mode === 'results' && session.adventure && <section className="screen-overlay results-screen"><div className="results-card"><div className="eyebrow">{session.finalOutcome === 'survived' ? 'VENTURE SURVIVED' : 'EXPEDITION ENDED'}</div><h1>{session.finalOutcome === 'survived' ? 'The trail opens' : `Room ${session.results.length} stopped you`}</h1><h2>{session.adventure.title}</h2><div className="result-tiles">{Array.from({ length: 5 }, (_, index) => <span key={index} className={session.results[index]?.success ? 'success' : session.results[index] ? 'failed' : ''}>{session.results[index]?.success ? '✓' : session.results[index] ? '×' : '·'}</span>)}</div><div className="result-stats"><div><strong>{session.results.filter((item) => item.success).length}/5</strong><small>cleared</small></div><div><strong>{formatDuration(session.activeMs)}</strong><small>active time</small></div><div><strong>{session.attemptNumber}</strong><small>attempt</small></div></div>{session.newlyUnlocked.length > 0 && <p className="achievement-toast">Achievement unlocked · {session.newlyUnlocked.join(', ')}</p>}<button className="primary-button" onClick={retry}>RETRY FULL TRAIL</button><button className="secondary-button" disabled={!profile || !session.authenticated} onClick={share}>{profile && session.authenticated ? 'SHARE RESULT' : 'LOG IN BEFORE PLAYING TO SHARE'}</button>{!session.authenticated && <p className="guest-note">Guest results are never saved or made shareable. Logging in now only applies to your next run.</p>}{shareMessage && <p className="share-message">{shareMessage}</p>}<button className="text-button" onClick={goHome}>Return home</button></div></section>}
 
-      {modal === 'help' && <ModalFrame title="What is The Daily Venture?" onClose={() => setModal(null)}><p>Every calendar day opens one themed five-room trail: trivia, logic, rhythm, spatial discovery, and a physics finale.</p><p>One wrong answer or failed obstacle ends the run. You can retry, but only a release-day victory on attempt one earns Survive on Your First Try.</p><p>Guests can play freely, but only signed-in explorers save stats, achievements, settings, and shareable results.</p><div className="modal-note">This reviewer build contains the first seven adventures. They remain unpublished until a launch date is approved.</div></ModalFrame>}
+      {modal === 'help' && <ModalFrame title="What is The Daily Venture?" onClose={() => setModal(null)}><p>Every calendar day opens one themed five-room trail: trivia, deeper logic, rhythm, memory, and a multi-stage physics finale.</p><p>One wrong answer or failed obstacle ends the run. You can retry, but only a release-day victory on attempt one earns Survive on Your First Try.</p><p>Guests can play freely, but only signed-in explorers save stats, achievements, settings, and shareable results.</p><div className="modal-note">This reviewer build contains the first seven adventures. They remain unpublished until a launch date is approved.</div></ModalFrame>}
+
+      {modal === 'rooms' && session.adventure && <ModalFrame title="Test any room" onClose={() => setModal(null)}><p>Jump directly to a puzzle without completing the earlier rooms. Test-room outcomes are not saved.</p><div className="room-picker">{session.adventure.levelOrder.map((type, index) => <button key={`${type}-${index}`} onClick={() => { dispatch({ type: 'JUMP_TO_LEVEL', levelIndex: index }); setModal(null); }}><span>{index + 1}</span><strong>{session.adventure?.puzzles[type].title}</strong><small>{type}</small></button>)}</div></ModalFrame>}
 
       {modal === 'login' && <ModalFrame title="Save your expeditions" onClose={() => setModal(null)}><form className="login-form" onSubmit={submitLogin}><label htmlFor="email">Email address</label><input id="email" type="email" required value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} placeholder="explorer@example.com" /><button className="primary-button" type="submit">{service.mode === 'supabase' ? 'SEND MAGIC LINK' : 'CREATE LOCAL REVIEWER'}</button></form><p className="modal-note">{service.mode === 'supabase' ? 'A one-time secure link will be emailed to you.' : 'Supabase keys are not configured, so this creates a local reviewer profile for complete offline QA.'}</p>{loginMessage && <p>{loginMessage}</p>}</ModalFrame>}
 

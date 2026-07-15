@@ -9,7 +9,7 @@ const DEFAULT_SETTINGS: Settings = {
   sound: true,
   music: true,
   reducedMotion: globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
-  highContrast: false,
+  highContrast: true,
   vibration: true,
 };
 

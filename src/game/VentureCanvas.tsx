@@ -16,14 +16,12 @@ export interface CanvasView {
 
 interface VentureScene extends Phaser.Scene {
   setView(view: CanvasView): void;
-  setTapHandler(handler: (x: number, y: number) => void): void;
 }
 
 const BACKPLATES = ['home', 'temple', 'airship', 'library', 'forest', 'observatory', 'caravan', 'citadel'];
 
 class DailyVentureScene extends Phaser.Scene implements VentureScene {
   private view: CanvasView = { adventure: null, mode: 'home', levelIndex: 0, puzzle: { kind: 'none' }, resolutionOutcome: null, resolutionElapsedMs: 0, reducedMotion: false };
-  private tapHandler: (x: number, y: number) => void = () => undefined;
   private art!: Phaser.GameObjects.Container;
   private matterBodies: MatterJS.BodyType[] = [];
   private physicsKind = '';
@@ -37,7 +35,6 @@ class DailyVentureScene extends Phaser.Scene implements VentureScene {
 
   create() {
     this.art = this.add.container(0, 0);
-    this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => this.tapHandler(pointer.x, pointer.y));
     this.renderView();
   }
 
@@ -45,8 +42,6 @@ class DailyVentureScene extends Phaser.Scene implements VentureScene {
     this.view = view;
     if (this.sys.isActive()) this.renderView();
   }
-
-  setTapHandler(handler: (x: number, y: number) => void) { this.tapHandler = handler; }
 
   private clearMatter() {
     this.matterBodies.forEach((body) => this.matter.world.remove(body));
@@ -58,15 +53,44 @@ class DailyVentureScene extends Phaser.Scene implements VentureScene {
     const g = this.add.graphics();
     const failed = pose.startsWith('failed');
     const defeatVariant = failed ? Number(pose.split('-')[1] ?? 0) : 0;
-    const bounce = pose === 'celebrate' ? -Math.abs(Math.sin(this.time.now / 180)) * 12 : pose === 'walk' ? Math.sin(this.time.now / 110) * 3 : 0;
+    const time = this.time.now;
+    const gait = pose === 'walk' ? Math.sin(time / 105) : 0;
+    const breath = pose === 'idle' || ['study', 'think', 'focus', 'brace'].includes(pose) ? Math.sin(time / 520) : 0;
+    const celebration = pose === 'celebrate' ? Math.sin(time / 150) : 0;
+    const bounce = pose === 'celebrate' ? -Math.abs(celebration) * 11 : pose === 'walk' ? Math.abs(gait) * -3 : breath * 1.4;
+    const lean = pose === 'think' ? -0.05 : pose === 'brace' ? 0.07 : gait * 0.025;
     y += bounce;
-    g.fillStyle(0x172b35, 0.25); g.fillEllipse(x, y + 38, 50, 12);
-    g.lineStyle(9, 0xb8673e); g.lineBetween(x - 13, y + 8, x - 19, y + 35); g.lineBetween(x + 13, y + 8, x + 19, y + 35);
-    g.lineStyle(8, 0xd67e46); g.lineBetween(x - 15, y - 12, x - 29, y + (pose === 'celebrate' ? -38 : 9)); g.lineBetween(x + 15, y - 12, x + 29, y + (pose === 'celebrate' ? -38 : 9));
-    g.fillStyle(0xe08e4f); g.fillRoundedRect(x - 22, y - 30, 44, 50, 14);
-    g.fillStyle(0xbd7145); g.fillCircle(x, y - 50, 18);
-    g.fillStyle(0x8b563d); g.fillRoundedRect(x - 27, y - 70, 54, 10, 5); g.fillRoundedRect(x - 15, y - 80, 30, 14, 5);
-    g.fillStyle(0x172b35); g.fillCircle(x - 6, y - 52, 2.5); g.fillCircle(x + 7, y - 52, 2.5);
+
+    g.fillStyle(0x07171b, 0.3); g.fillEllipse(x, y + 42, 56, 11);
+
+    const leftKneeX = x - 11 + gait * 8;
+    const rightKneeX = x + 11 - gait * 8;
+    const leftFootX = x - 16 - gait * 11;
+    const rightFootX = x + 16 + gait * 11;
+    g.lineStyle(9, 0x684b3d); g.lineBetween(x - 10, y + 7, leftKneeX, y + 23); g.lineBetween(leftKneeX, y + 23, leftFootX, y + 39);
+    g.lineBetween(x + 10, y + 7, rightKneeX, y + 23); g.lineBetween(rightKneeX, y + 23, rightFootX, y + 39);
+    g.fillStyle(0x26343a); g.fillEllipse(leftFootX - 2, y + 41, 20, 8); g.fillEllipse(rightFootX + 2, y + 41, 20, 8);
+
+    g.fillStyle(0x8b5a3c); g.fillRoundedRect(x - 26, y - 28, 13, 42, 6);
+    g.fillStyle(0xc77a43); g.fillRoundedRect(x - 20, y - 32, 40, 48 + breath, 11);
+    g.fillStyle(0xe4a14f); g.fillTriangle(x - 17, y - 30, x + 13, y + 12, x + 20, y - 27);
+    g.lineStyle(3, 0x6f4937, 0.8); g.lineBetween(x + 5, y - 28, x + 5, y + 12);
+
+    const armSwing = pose === 'walk' ? gait * 14 : pose === 'celebrate' ? 24 : pose === 'study' ? -6 : pose === 'think' ? -15 : 0;
+    const leftHandY = pose === 'celebrate' ? y - 61 : pose === 'study' ? y - 4 : y + 8 + armSwing;
+    const rightHandY = pose === 'celebrate' ? y - 59 : pose === 'think' ? y - 48 : y + 8 - armSwing;
+    g.lineStyle(8, 0xc77a43); g.lineBetween(x - 16, y - 22, x - 29, leftHandY); g.lineBetween(x + 16, y - 22, x + 29, rightHandY);
+    g.fillStyle(0xb96f4b); g.fillCircle(x - 29, leftHandY, 5); g.fillCircle(x + 29, rightHandY, 5);
+
+    g.fillStyle(0xb96f4b); g.fillRect(x - 6, y - 41, 12, 12);
+    g.fillStyle(0xd49469); g.fillEllipse(x + lean * 50, y - 53, 32, 39);
+    g.fillStyle(0x513a32); g.fillEllipse(x - 4, y - 68, 31, 14); g.fillRoundedRect(x - 20, y - 69, 13, 24, 6);
+    g.fillStyle(0x1a292f); g.fillCircle(x - 5, y - 55, 2.3); g.fillCircle(x + 7, y - 54, 2.3);
+    g.lineStyle(2, 0x8f5947); g.lineBetween(x + 1, y - 49, x + 7, y - 48);
+    g.fillStyle(0x7b4e36); g.fillRoundedRect(x - 24, y - 80, 49, 9, 4); g.fillRoundedRect(x - 14, y - 90, 29, 14, 5);
+
+    const scarfLift = pose === 'walk' ? gait * 4 : pose === 'brace' ? 5 : breath;
+    g.lineStyle(5, 0x4aa69c); g.lineBetween(x - 12, y - 40, x - 29, y - 43 - scarfLift); g.lineBetween(x - 29, y - 43 - scarfLift, x - 38, y - 36 - scarfLift * 1.5);
     if (failed) {
       const hazardColors = [0xe76f51, 0x7c8cff, 0x56cfe1, 0xb88bd4, 0xf1b45a];
       g.fillStyle(hazardColors[defeatVariant % hazardColors.length], 0.7);
@@ -74,33 +98,6 @@ class DailyVentureScene extends Phaser.Scene implements VentureScene {
       else if (defeatVariant % 3 === 1) g.fillRoundedRect(x - 44, y - 72, 88, 102, 20);
       else { g.lineStyle(12, hazardColors[defeatVariant % hazardColors.length], 0.75); g.strokeCircle(x, y - 22, 56); }
       g.setRotation((defeatVariant - 2) * 0.06);
-    }
-    this.art.add(g);
-  }
-
-  private drawFallbackLayers(accent: number, accent2: number, type?: PuzzleType) {
-    const g = this.add.graphics();
-    const seed = (this.view.adventure?.weekIndex ?? 0) * 5 + this.view.levelIndex;
-    g.fillStyle(accent, 0.19); g.fillCircle(330, 135, 115); g.fillCircle(52, 365, 95);
-    g.fillStyle(accent2, 0.34); g.fillTriangle(-40, 550, 130, 290, 250, 550); g.fillTriangle(170, 550, 330, 250, 455, 550);
-    g.fillStyle(0x0c1f27, 0.62); g.fillRect(0, 560, 390, 284);
-    for (let i = 0; i < 7; i += 1) {
-      const offset = ((seed * 17 + i * 11) % 29) - 14;
-      g.fillStyle(i % 2 ? accent : accent2, 0.55);
-      g.fillRoundedRect(-15 + i * 68 + offset, 690 + ((i + seed) % 3) * 18, 45 + (seed + i) % 13, 154, 16);
-    }
-    if (type === 'trivia') {
-      for (let i = 0; i < 3; i += 1) { g.fillStyle(i % 2 ? accent : accent2, 0.55); g.fillRoundedRect(52 + i * 103, 352 + ((seed + i) % 2) * 24, 74, 96, 10); }
-    } else if (type === 'logic') {
-      for (let i = 0; i < 4; i += 1) { g.lineStyle(5, i % 2 ? accent : accent2, 0.7); g.strokeCircle(60 + i * 90, 405 - ((seed + i) % 3) * 18, 23); }
-    } else if (type === 'rhythm') {
-      for (let i = 0; i < 5; i += 1) { const x = 30 + i * 82; g.fillStyle(i % 2 ? accent : accent2, 0.66); g.fillTriangle(x - 18, 560, x, 492 - ((seed + i) % 2) * 25, x + 18, 560); }
-    } else if (type === 'finale') {
-      g.lineStyle(9, accent, 0.7); g.strokeCircle(195, 390, 96); g.lineStyle(4, accent2, 0.75); g.strokeCircle(195, 390, 62); g.lineBetween(99, 390, 291, 390); g.lineBetween(195, 294, 195, 486);
-    }
-    if (type === 'spatial' || (type === 'finale' && this.view.puzzle.kind === 'finale' && this.view.puzzle.phase === 'scan')) {
-      g.lineStyle(4, accent, 0.6); g.lineBetween(45, 260, 310, 430); g.lineBetween(350, 250, 92, 430);
-      g.fillStyle(accent2, 0.45); g.fillCircle(195, 375, 20);
     }
     this.art.add(g);
   }
@@ -161,10 +158,6 @@ class DailyVentureScene extends Phaser.Scene implements VentureScene {
     } else {
       const base = this.add.rectangle(195, 422, 390, 844, 0x17383a); this.art.add(base);
     }
-    const accent = Phaser.Display.Color.HexStringToColor(adventure?.art.accent ?? '#f2b544').color;
-    const accent2 = Phaser.Display.Color.HexStringToColor(adventure?.art.accent2 ?? '#5bc0be').color;
-    this.drawFallbackLayers(accent, accent2, this.view.levelType);
-
     if (this.view.mode === 'home') {
       this.drawExplorer(195, 610, 'walk');
       return;
@@ -184,7 +177,12 @@ class DailyVentureScene extends Phaser.Scene implements VentureScene {
       if (this.view.levelType === 'rhythm' || (this.view.levelType === 'finale' && this.view.puzzle.kind === 'finale' && this.view.puzzle.phase === 'rhythm')) this.drawRhythm();
       if (this.view.levelType === 'finale' && this.view.puzzle.kind === 'finale' && this.view.puzzle.phase === 'physics') this.ensurePhysics((adventure?.puzzles.finale as FinaleConfig | undefined)?.physics.kind ?? 'mirror', this.view.puzzle.physicsChoice);
       else if (this.physicsKind) this.clearMatter();
-      this.drawExplorer(72, 690, this.view.levelType === 'rhythm' ? 'walk' : 'idle');
+      const pose = this.view.levelType === 'trivia' ? 'study'
+        : this.view.levelType === 'logic' ? 'think'
+          : this.view.levelType === 'memory' ? 'focus'
+            : this.view.levelType === 'rhythm' ? 'brace'
+              : 'brace';
+      this.drawExplorer(326, 258, pose);
       return;
     }
 
@@ -205,12 +203,10 @@ class DailyVentureScene extends Phaser.Scene implements VentureScene {
   }
 }
 
-export function VentureCanvas({ view, onTap }: { view: CanvasView; onTap: (x: number, y: number) => void }) {
+export function VentureCanvas({ view }: { view: CanvasView }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
   const sceneRef = useRef<VentureScene | null>(null);
-  const tapRef = useRef(onTap);
-  tapRef.current = onTap;
 
   useEffect(() => {
     if (!hostRef.current || gameRef.current) return;
@@ -230,7 +226,6 @@ export function VentureCanvas({ view, onTap }: { view: CanvasView; onTap: (x: nu
     });
     gameRef.current = game;
     sceneRef.current = scene;
-    scene.setTapHandler((x, y) => tapRef.current(x, y));
     return () => { game.destroy(true); gameRef.current = null; sceneRef.current = null; };
   }, []);
 

@@ -24,16 +24,21 @@ for (const [index, adventure] of WEEK_ONE.entries()) {
   assert.equal(adventure.publishDate, null);
   assert.equal(adventure.levelOrder.length, 5);
   assert.equal(adventure.levelOrder[4], 'finale');
-  assert.deepEqual(new Set(adventure.levelOrder.slice(0, 4)), new Set(['trivia', 'logic', 'rhythm', 'spatial']));
+  assert.deepEqual(new Set(adventure.levelOrder.slice(0, 4)), new Set(['trivia', 'logic', 'rhythm', 'memory']));
   assert.equal(adventure.puzzles.trivia.questions.length, 3);
   adventure.puzzles.trivia.questions.forEach((question) => assert.ok(question.correct >= 0 && question.correct <= 3));
   assert.equal(adventure.puzzles.rhythm.beatMap.length, 12);
   assert.ok(adventure.puzzles.rhythm.beatMap.every((beat, beatIndex, map) => beatIndex === 0 || beat > map[beatIndex - 1]));
   assert.equal(adventure.puzzles.rhythm.durationMs, 30000);
   assert.equal(adventure.puzzles.rhythm.maxErrors, 3);
-  assert.equal(adventure.puzzles.spatial.maxTaps, 3);
-  assert.equal(countLogicSolutions(adventure.puzzles.logic), 1);
-  assert.ok(satisfiesLogicClues(adventure.puzzles.logic.solution, adventure.puzzles.logic));
+  assert.deepEqual(adventure.puzzles.memory.rounds.map((round) => round.length), [4, 5, 6]);
+  assert.ok(adventure.puzzles.memory.rounds.flat().every((symbol) => adventure.puzzles.memory.symbols.includes(symbol)));
+  if (adventure.puzzles.logic.mechanic === 'order') {
+    assert.equal(countLogicSolutions(adventure.puzzles.logic), 1);
+    assert.ok(satisfiesLogicClues(adventure.puzzles.logic.solution, adventure.puzzles.logic));
+  } else {
+    assert.ok(adventure.puzzles.logic.correct >= 0 && adventure.puzzles.logic.correct <= 3);
+  }
   dailyAdventureSchema.parse(adventure);
 }
 
@@ -63,7 +68,8 @@ assert.equal(calculateAchievements([releaseVictory]).find((item) => item.code ==
 const uniqueVictories = Array.from({ length: 10 }, (_, index) => attempt({ id: `win-${index}`, adventureId: `venture-${index}`, outcome: 'survived', attemptNumber: 2 }));
 assert.equal(calculateAchievements(uniqueVictories).find((item) => item.code === 'survive-10')?.unlocked, true);
 
-const { createVentureService } = await import('../src/services/ventureService');
+const { createVentureService, DEFAULT_SETTINGS } = await import('../src/services/ventureService');
+assert.equal(DEFAULT_SETTINGS.highContrast, true);
 const guestService = createVentureService();
 await assert.rejects(() => guestService.startAttempt(WEEK_ONE[0].id, false, 'UTC'), /Authentication/);
 const profile = await guestService.enterLocalReview();

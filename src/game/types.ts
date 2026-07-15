@@ -1,4 +1,4 @@
-export type PuzzleType = 'trivia' | 'logic' | 'rhythm' | 'spatial' | 'finale';
+export type PuzzleType = 'trivia' | 'logic' | 'rhythm' | 'memory' | 'finale';
 export type AdventureStatus = 'draft' | 'approved' | 'scheduled' | 'published';
 
 export interface TriviaQuestion {
@@ -26,14 +26,29 @@ export interface TriviaConfig {
   questions: [TriviaQuestion, TriviaQuestion, TriviaQuestion];
 }
 
-export interface LogicConfig {
+interface LogicBaseConfig {
   type: 'logic';
   title: string;
   brief: string;
-  tokens: [string, string, string, string];
-  clues: [LogicClue, LogicClue, LogicClue, ...LogicClue[]];
-  solution: [string, string, string, string];
 }
+
+export interface LogicOrderConfig extends LogicBaseConfig {
+  mechanic: 'order';
+  tokens: [string, string, string, string, ...string[]];
+  clues: [LogicClue, LogicClue, LogicClue, ...LogicClue[]];
+  solution: [string, string, string, string, ...string[]];
+}
+
+export interface LogicDeductionConfig extends LogicBaseConfig {
+  mechanic: 'deduction';
+  prompt: string;
+  clues: [string, string, string, ...string[]];
+  choices: [string, string, string, string];
+  correct: number;
+  explanation: string;
+}
+
+export type LogicConfig = LogicOrderConfig | LogicDeductionConfig;
 
 export interface RhythmConfig {
   type: 'rhythm';
@@ -47,15 +62,13 @@ export interface RhythmConfig {
   maxErrors: number;
 }
 
-export interface SpatialConfig {
-  type: 'spatial';
+export interface MemoryConfig {
+  type: 'memory';
   title: string;
   brief: string;
-  clue: string;
-  targetLabel: string;
-  target: { x: number; y: number; radius: number };
-  hints: [string, string];
-  maxTaps: 3;
+  symbols: [string, string, string, string];
+  rounds: [string[], string[], string[]];
+  revealMs: number;
 }
 
 export type PhysicsKind = 'mirror' | 'ballast' | 'buoyancy' | 'balance' | 'dish' | 'sandglass' | 'orrery';
@@ -67,8 +80,9 @@ export interface FinaleConfig {
   question: TriviaQuestion;
   orderTokens: [string, string, string];
   orderSolution: [string, string, string];
-  scanClue: string;
-  scanTarget: { x: number; y: number; radius: number };
+  memorySymbols: [string, string, string, string];
+  memorySequence: [string, string, string, string, string];
+  memoryRevealMs: number;
   rhythmBeats: [number, number, number, number];
   physics: {
     kind: PhysicsKind;
@@ -79,7 +93,7 @@ export interface FinaleConfig {
   };
 }
 
-export type PuzzleConfig = TriviaConfig | LogicConfig | RhythmConfig | SpatialConfig | FinaleConfig;
+export type PuzzleConfig = TriviaConfig | LogicConfig | RhythmConfig | MemoryConfig | FinaleConfig;
 
 export interface ThemeArt {
   key: string;
@@ -104,7 +118,13 @@ export interface DailyAdventure {
   estimatedMinutes: string;
   art: ThemeArt;
   levelOrder: [PuzzleType, PuzzleType, PuzzleType, PuzzleType, 'finale'];
-  puzzles: Record<PuzzleType, PuzzleConfig>;
+  puzzles: {
+    trivia: TriviaConfig;
+    logic: LogicConfig;
+    rhythm: RhythmConfig;
+    memory: MemoryConfig;
+    finale: FinaleConfig;
+  };
 }
 
 export type ScreenMode = 'home' | 'archive' | 'intro' | 'ready' | 'puzzle' | 'resolution' | 'results';
@@ -169,6 +189,7 @@ export interface GameSnapshot {
   attemptNumber: number;
   authenticated: boolean;
   reviewer: boolean;
+  testing: boolean;
   results: LevelResult[];
   activeMs: number;
   puzzle: Record<string, unknown>;

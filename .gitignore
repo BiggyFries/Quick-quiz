@@ -5,6 +5,7 @@ test-results/
 playwright-report/
 .env
 .env.local
+.vite/
 .DS_Store
 *.tsbuildinfo
 vite.config.js

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { WEEK_ONE } from '../src/content/week1';
-import { currentPuzzleConfig } from '../src/game/session';
+import { currentPuzzleConfig, sessionReducer } from '../src/game/session';
 import { beginCurrentLevel, failCurrentPuzzle, finishResolution, openAdventure, winCurrentPuzzle } from './helpers';
 
 let victories = 0;
@@ -39,4 +39,18 @@ for (const adventure of WEEK_ONE) {
 
 assert.equal(victories, 7);
 assert.equal(failureRoutes, 35);
-console.log(`smoke: ${victories} complete victories and ${failureRoutes} room-specific failure routes passed`);
+
+let replayState = openAdventure(WEEK_ONE[0]);
+replayState = sessionReducer(replayState, { type: 'JUMP_TO_LEVEL', levelIndex: 3 });
+replayState = beginCurrentLevel(replayState);
+const memory = WEEK_ONE[0].puzzles.memory;
+replayState = sessionReducer(replayState, { type: 'TICK', ms: memory.rounds[0].length * memory.revealMs });
+assert.equal(replayState.puzzle.kind, 'memory');
+if (replayState.puzzle.kind === 'memory') assert.equal(replayState.puzzle.phase, 'recall');
+replayState = sessionReducer(replayState, { type: 'MEMORY_REPLAY' });
+if (replayState.puzzle.kind === 'memory') {
+  assert.equal(replayState.puzzle.phase, 'showing');
+  assert.equal(replayState.puzzle.replayUsed, true);
+}
+
+console.log(`smoke: ${victories} complete victories, ${failureRoutes} room-specific failure routes, memory replay, and room jumping passed`);

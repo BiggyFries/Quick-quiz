@@ -21,13 +21,6 @@ async function advance(page: Page, ms: number) {
   await page.waitForTimeout(35);
 }
 
-async function canvasTap(page: Page, x: number, y: number) {
-  const box = await page.locator('canvas').boundingBox();
-  expect(box).not.toBeNull();
-  await page.mouse.click(box!.x + x / 390 * box!.width, box!.y + y / 844 * box!.height);
-  await page.waitForTimeout(35);
-}
-
 async function openPreview(page: Page, adventure: DailyAdventure) {
   await page.getByRole('button', { name: /PREVIEW WEEK 1/i }).click();
   const row = page.locator('.review-list button').filter({ hasText: adventure.title });
@@ -44,8 +37,13 @@ async function completePuzzle(page: Page, config: PuzzleConfig, physicsCapture?:
       await page.waitForTimeout(25);
     }
   } else if (config.type === 'logic') {
-    for (const token of config.solution) await page.getByRole('button', { name: token, exact: true }).click();
-    await page.getByRole('button', { name: 'Confirm order' }).click();
+    if (config.mechanic === 'order') {
+      for (const token of config.solution) await page.getByRole('button', { name: token, exact: true }).click();
+      await page.getByRole('button', { name: 'Confirm order' }).click();
+    } else {
+      await page.locator('.deduction-panel .choice-grid button').nth(config.correct).click();
+      await page.getByRole('button', { name: 'Commit answer' }).click();
+    }
   } else if (config.type === 'rhythm') {
     let elapsed = 0;
     for (const beat of config.beatMap) {
@@ -54,13 +52,17 @@ async function completePuzzle(page: Page, config: PuzzleConfig, physicsCapture?:
       await page.locator('.rhythm-button').click();
     }
     await advance(page, config.durationMs - elapsed);
-  } else if (config.type === 'spatial') {
-    await canvasTap(page, config.target.x, config.target.y);
+  } else if (config.type === 'memory') {
+    for (const sequence of config.rounds) {
+      await advance(page, sequence.length * config.revealMs);
+      for (const symbol of sequence) await page.locator('.memory-choices button').filter({ hasText: symbol }).click();
+    }
   } else {
     await page.locator('.question-panel .choice-grid button').nth(config.question.correct).click();
     for (const token of config.orderSolution) await page.getByRole('button', { name: token, exact: true }).click();
     await page.getByRole('button', { name: 'Lock sequence' }).click();
-    await canvasTap(page, config.scanTarget.x, config.scanTarget.y);
+    await advance(page, config.memorySequence.length * config.memoryRevealMs);
+    for (const symbol of config.memorySequence) await page.locator('.memory-choices button').filter({ hasText: symbol }).click();
     let elapsed = 0;
     for (const beat of config.rhythmBeats) {
       await advance(page, beat - elapsed);
@@ -79,14 +81,22 @@ async function failPuzzle(page: Page, config: PuzzleConfig) {
   if (config.type === 'trivia') {
     await page.locator('.question-panel .choice-grid button').nth((config.questions[0].correct + 1) % 4).click();
   } else if (config.type === 'logic') {
-    for (const token of [...config.solution].reverse()) await page.getByRole('button', { name: token, exact: true }).click();
-    await page.getByRole('button', { name: 'Confirm order' }).click();
+    if (config.mechanic === 'order') {
+      for (const token of [...config.solution].reverse()) await page.getByRole('button', { name: token, exact: true }).click();
+      await page.getByRole('button', { name: 'Confirm order' }).click();
+    } else {
+      await page.locator('.deduction-panel .choice-grid button').nth((config.correct + 1) % 4).click();
+      await page.getByRole('button', { name: 'Commit answer' }).click();
+    }
   } else if (config.type === 'rhythm') {
     await page.locator('.rhythm-button').click();
     await page.locator('.rhythm-button').click();
     await page.locator('.rhythm-button').click();
-  } else if (config.type === 'spatial') {
-    await canvasTap(page, 4, 4); await canvasTap(page, 4, 4); await canvasTap(page, 4, 4);
+  } else if (config.type === 'memory') {
+    const sequence = config.rounds[0];
+    await advance(page, sequence.length * config.revealMs);
+    const wrong = config.symbols.find((symbol) => symbol !== sequence[0])!;
+    await page.locator('.memory-choices button').filter({ hasText: wrong }).click();
   } else {
     await page.locator('.question-panel .choice-grid button').nth((config.question.correct + 1) % 4).click();
   }
@@ -97,6 +107,7 @@ test('mobile home remains usable across the supported phone range', async ({ pag
   for (const viewport of [{ width: 360, height: 640 }, { width: 390, height: 844 }, { width: 430, height: 932 }]) {
     await page.setViewportSize(viewport);
     await page.goto('/');
+    await expect(page.locator('main.high-contrast')).toBeVisible();
     await expect(page.getByRole('heading', { name: /THE DAILY VENTURE/i })).toBeVisible();
     for (const label of ['PAST VENTURES', 'PREVIEW WEEK 1']) {
       const box = await page.getByRole('button', { name: new RegExp(label, 'i') }).boundingBox();
@@ -106,6 +117,21 @@ test('mobile home remains usable across the supported phone range', async ({ pag
     }
     await page.screenshot({ path: path.join(captures, `home-${viewport.width}x${viewport.height}.png`) });
   }
+});
+
+test('reviewer room picker jumps directly to each puzzle without saving a result', async ({ page }) => {
+  await page.goto('/');
+  await openPreview(page, WEEK_ONE[0]);
+  for (let index = 0; index < 5; index += 1) {
+    await page.getByRole('button', { name: 'ROOMS' }).click();
+    await page.locator('.room-picker button').nth(index).click();
+    await expect(page.getByText(`ROOM ${index + 1} OF 5`, { exact: false })).toBeVisible();
+    const state = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
+    expect(state.levelIndex).toBe(index);
+    expect(state.mode).toBe('ready');
+    expect(state.testing).toBe(true);
+  }
+  await expect(page.getByText(/ROOM TEST · NOT SAVED/i)).toBeVisible();
 });
 
 test('reviewer can survive all seven adventures through all 35 real room UIs', async ({ page }) => {
