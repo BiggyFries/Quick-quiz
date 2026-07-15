@@ -1,0 +1,24 @@
+{
+  "name": "The Daily Venture",
+  "short_name": "Venture",
+  "description": "Survive a new five-room puzzle trail every day.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0c1f27",
+  "theme_color": "#102a2a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "venture-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "venture-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

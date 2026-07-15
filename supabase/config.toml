@@ -1,0 +1,18 @@
+project_id = "the-daily-venture"
+
+[functions.get-adventure]
+verify_jwt = false
+[functions.list-calendar]
+verify_jwt = false
+[functions.list-review-adventures]
+verify_jwt = false
+[functions.schedule-week]
+verify_jwt = false
+[functions.start-attempt]
+verify_jwt = false
+[functions.finish-attempt]
+verify_jwt = false
+[functions.get-player-dashboard]
+verify_jwt = false
+[functions.update-settings]
+verify_jwt = false
