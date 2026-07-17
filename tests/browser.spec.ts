@@ -108,15 +108,51 @@ test('mobile home remains usable across the supported phone range', async ({ pag
     await page.setViewportSize(viewport);
     await page.goto('/');
     await expect(page.locator('main.high-contrast')).toBeVisible();
-    await expect(page.getByRole('heading', { name: /THE DAILY VENTURE/i })).toBeVisible();
-    for (const label of ['PAST VENTURES', 'PREVIEW WEEK 1']) {
-      const box = await page.getByRole('button', { name: new RegExp(label, 'i') }).boundingBox();
+    await expect(page.getByRole('heading', { name: /DAILY VENTURE/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'About Daily Venture' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Achievements' })).toBeEnabled();
+    for (const label of ['VENTURE', 'PAST VENTURES', 'PREVIEW TESTER GAME', 'PREVIEW WEEK 1']) {
+      const box = await page.getByRole('button', { name: new RegExp(`^${label}(?:\\s|$)`, 'i') }).boundingBox();
       expect(box).not.toBeNull();
       expect(box!.height).toBeGreaterThanOrEqual(44);
       expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height);
     }
     await page.screenshot({ path: path.join(captures, `home-${viewport.width}x${viewport.height}.png`) });
   }
+});
+
+test('Block Shift lab supports touch controls, undo, keyboard play, and a complete door unlock', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await page.getByRole('button', { name: /PREVIEW TESTER GAME/i }).click();
+  await expect(page.getByRole('heading', { name: /Block Shift/i })).toBeVisible();
+  await expect(page.getByLabel('Block Shift puzzle room')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Move right' }).click();
+  let state = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
+  expect(state.player).toEqual({ x: 2, y: 4 });
+  expect(state.moves).toBe(1);
+  await page.getByRole('button', { name: /UNDO/i }).click();
+  state = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
+  expect(state.player).toEqual({ x: 1, y: 4 });
+  expect(state.moves).toBe(0);
+
+  const solution = [
+    'ArrowRight', 'ArrowUp', 'ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowUp',
+    'ArrowRight', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowLeft', 'ArrowLeft',
+    'ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowRight',
+  ];
+  for (const key of solution) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(18);
+  }
+  state = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
+  expect(state.status).toBe('complete');
+  expect(state.keystone).toMatchObject({ x: 6, y: 3 });
+  await expect(page.getByText(/Door unlocked/i)).toBeVisible();
+  await page.screenshot({ path: path.join(captures, 'block-shift-complete.png') });
+  await page.getByRole('button', { name: 'Back to home' }).click();
+  await expect(page.getByRole('heading', { name: /DAILY VENTURE/i })).toBeVisible();
 });
 
 test('reviewer room picker jumps directly to each puzzle without saving a result', async ({ page }) => {
@@ -204,8 +240,8 @@ test('guest results stay memory-only and locked even after a later login', async
   await page.getByRole('button', { name: 'Back' }).click();
   await page.getByRole('button', { name: 'PROFILE' }).click();
   await page.getByRole('button', { name: 'SIGN OUT' }).click();
-  await expect(page.getByRole('button', { name: /PLAY TODAY/i })).toBeEnabled();
-  await page.getByRole('button', { name: /PLAY TODAY/i }).click();
+  await expect(page.getByRole('button', { name: /^VENTURE/i })).toBeEnabled();
+  await page.getByRole('button', { name: /^VENTURE/i }).click();
   await page.getByRole('button', { name: 'ENTER THE TRAIL' }).click();
   await page.getByRole('button', { name: 'READY' }).click();
   await failPuzzle(page, WEEK_ONE[0].puzzles.logic);

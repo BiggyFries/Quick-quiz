@@ -231,5 +231,5 @@ export function VentureCanvas({ view }: { view: CanvasView }) {
 
   useEffect(() => { sceneRef.current?.setView(view); }, [view]);
 
-  return <div className="game-canvas" ref={hostRef} aria-label="The Daily Venture illustrated game world" />;
+  return <div className="game-canvas" ref={hostRef} aria-label="Daily Venture illustrated game world" />;
 }

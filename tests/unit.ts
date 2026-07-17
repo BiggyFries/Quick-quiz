@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { WEEK_ONE } from '../src/content/week1';
 import { countLogicSolutions, dailyAdventureSchema, satisfiesLogicClues } from '../src/game/schema';
 import type { AttemptRecord } from '../src/game/types';
+import { blockShiftSnapshot, initialBlockShiftState, moveBlockShift, undoBlockShift } from '../src/lab/blockShift';
 import { calculateAchievements } from '../src/services/achievements';
 import { addDays, localDateKey } from '../src/services/date';
 
@@ -68,6 +69,44 @@ assert.equal(calculateAchievements([releaseVictory]).find((item) => item.code ==
 const uniqueVictories = Array.from({ length: 10 }, (_, index) => attempt({ id: `win-${index}`, adventureId: `venture-${index}`, outcome: 'survived', attemptNumber: 2 }));
 assert.equal(calculateAchievements(uniqueVictories).find((item) => item.code === 'survive-10')?.unlocked, true);
 
+const initialLab = initialBlockShiftState();
+assert.equal(initialLab.status, 'playing');
+assert.deepEqual(initialLab.blocks.find((block) => block.id === 'keystone'), {
+  id: 'keystone', kind: 'keystone', label: 'Keystone', color: '#f6c85f', x: 1, y: 3,
+});
+const blockedRailMove = moveBlockShift(initialLab, 'up');
+assert.equal(blockedRailMove.moves, 0);
+assert.match(blockedRailMove.message, /center rail/i);
+
+const labStep = moveBlockShift(moveBlockShift(initialLab, 'right'), 'up');
+assert.deepEqual(
+  (({ x, y }) => ({ x, y }))(labStep.blocks.find((block) => block.id === 'amber')!),
+  { x: 2, y: 2 },
+);
+assert.equal(labStep.pushes, 1);
+const undoneLabStep = undoBlockShift(labStep);
+assert.deepEqual(
+  (({ x, y }) => ({ x, y }))(undoneLabStep.blocks.find((block) => block.id === 'amber')!),
+  { x: 2, y: 3 },
+);
+assert.deepEqual(undoneLabStep.player, { x: 2, y: 4 });
+assert.equal(undoneLabStep.moves, 1);
+
+const labSolution = [
+  'right', 'up', 'up', 'right', 'down', 'up', 'right', 'down', 'up',
+  'left', 'left', 'left', 'left', 'down',
+  'right', 'right', 'right', 'right', 'right',
+] as const;
+const completedLab = labSolution.reduce(moveBlockShift, initialBlockShiftState());
+assert.equal(completedLab.status, 'complete');
+assert.deepEqual(completedLab.blocks.find((block) => block.id === 'keystone'), {
+  id: 'keystone', kind: 'keystone', label: 'Keystone', color: '#f6c85f', x: 6, y: 3,
+});
+assert.equal(completedLab.moves, 19);
+assert.equal(completedLab.pushes, 9);
+assert.equal(moveBlockShift(completedLab, 'left').moves, 19);
+assert.equal(blockShiftSnapshot(completedLab).status, 'complete');
+
 const { createVentureService, DEFAULT_SETTINGS } = await import('../src/services/ventureService');
 assert.equal(DEFAULT_SETTINGS.highContrast, true);
 const guestService = createVentureService();
@@ -100,4 +139,4 @@ localStorage.setItem('dailyVentureLocalReviewerProfile', JSON.stringify({
 const migratedService = createVentureService();
 assert.equal((await migratedService.getProfile())?.settings.highContrast, true);
 
-console.log('unit: 7 schemas, timezone gating, attempts, archive rules, idempotency, and achievement thresholds passed');
+console.log('unit: 7 schemas, Block Shift movement, timezone gating, attempts, archive rules, idempotency, and achievement thresholds passed');
