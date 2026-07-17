@@ -3,12 +3,13 @@ import { WEEK_ONE } from './content/week1';
 import { VentureCanvas, type CanvasView } from './game/VentureCanvas';
 import { currentPuzzleConfig, initialSessionState, sessionReducer, sessionSnapshot } from './game/session';
 import type { DailyAdventure, FinaleConfig, LogicConfig, MemoryConfig, PuzzleConfig, RhythmConfig, Settings, TriviaConfig } from './game/types';
+import { BlockShiftLab } from './lab/BlockShiftLab';
 import { calculateAchievements, newlyUnlocked } from './services/achievements';
 import { formatDate, localDateKey } from './services/date';
 import { createVentureService, DEFAULT_SETTINGS, type CalendarDay } from './services/ventureService';
 
 type Modal = 'help' | 'login' | 'achievements' | 'settings' | 'rooms' | null;
-type HomePage = 'home' | 'archive' | 'review';
+type HomePage = 'home' | 'archive' | 'review' | 'lab';
 
 function formatDuration(ms: number) {
   const total = Math.max(0, Math.round(ms / 1000));
@@ -19,7 +20,7 @@ function resultText(adventure: DailyAdventure, results: boolean[], activeMs: num
   const tiles = Array.from({ length: 5 }, (_, index) => results[index] == null ? '⬜' : results[index] ? '🟩' : '🟥').join('');
   const runLabel = adventure.publishDate === null ? 'Reviewer preview' : isArchive ? 'Archive' : attempt === 1 && adventure.publishDate === playedDate ? 'First try' : 'Release day';
   const earned = newlyEarned.length ? `\nNew achievements: ${newlyEarned.join(', ')}` : '';
-  return `THE DAILY VENTURE · ${formatDate(playedDate)}\n${adventure.title} · ${adventure.subtitle}\n${tiles}\n${results.filter(Boolean).length}/5 cleared · ${formatDuration(activeMs)} active · Attempt ${attempt}\n${runLabel}${earned}\nNo puzzle answers shared.`;
+  return `DAILY VENTURE · ${formatDate(playedDate)}\n${adventure.title} · ${adventure.subtitle}\n${tiles}\n${results.filter(Boolean).length}/5 cleared · ${formatDuration(activeMs)} active · Attempt ${attempt}\n${runLabel}${earned}\nNo puzzle answers shared.`;
 }
 
 function AppIcon({ children }: { children: string }) { return <span aria-hidden="true">{children}</span>; }
@@ -155,10 +156,11 @@ export function App() {
   useEffect(() => () => { ambientNodes.current?.oscillators.forEach((oscillator) => oscillator.stop()); void audioContext.current?.close(); }, []);
 
   useEffect(() => {
+    if (page === 'lab') return;
     const bridge = window as typeof window & { advanceTime?: (ms: number) => void; render_game_to_text?: () => string };
     bridge.advanceTime = (ms: number) => { manualTime.current = true; if (modal === null) dispatch({ type: 'TICK', ms }); };
     bridge.render_game_to_text = () => JSON.stringify(sessionSnapshot(session));
-  }, [modal, session]);
+  }, [modal, page, session]);
 
   useEffect(() => {
     if (session.mode !== 'results' || session.isTesting || !profile || !session.attemptId || finalizedAttempt.current === session.attemptId || !session.finalOutcome) return;
@@ -317,7 +319,7 @@ export function App() {
     if (!profile || !session.authenticated || !session.adventure) return;
     const text = resultText(session.adventure, session.results.map((result) => result.success), session.activeMs, session.attemptNumber, session.isArchive, session.adventure.publishDate ?? today, session.newlyUnlocked);
     try {
-      if (navigator.share) await navigator.share({ title: 'The Daily Venture', text });
+      if (navigator.share) await navigator.share({ title: 'Daily Venture', text });
       else await navigator.clipboard.writeText(text);
       setShareMessage('Spoiler-free result ready to share.');
     } catch (error) { if ((error as Error).name !== 'AbortError') setShareMessage('Sharing was unavailable on this device.'); }
@@ -342,18 +344,21 @@ export function App() {
 
   return <main className={`app ${settings.highContrast ? 'high-contrast' : ''} ${settings.reducedMotion ? 'reduced-motion' : ''}`}>
     <div className="phone-stage">
-      <VentureCanvas view={session.mode === 'home' ? homeCanvasView : canvasView} />
+      {!(session.mode === 'home' && page === 'lab') && <VentureCanvas view={session.mode === 'home' ? homeCanvasView : canvasView} />}
+
+      {session.mode === 'home' && page === 'lab' && <BlockShiftLab onExit={() => setPage('home')} />}
 
       {session.mode === 'home' && page === 'home' && <section className="screen-overlay home-screen">
         <header className="home-toolbar">
-          <button className="icon-button glass" onClick={() => setModal('help')} aria-label="About The Daily Venture"><AppIcon>?</AppIcon></button>
-          <button className="icon-button glass" disabled={!profile} onClick={() => setModal('achievements')} aria-label={profile ? 'Achievements' : 'Log in to view achievements'}><AppIcon>♜</AppIcon></button>
+          <button className="icon-button glass" onClick={() => setModal('help')} aria-label="About Daily Venture"><AppIcon>?</AppIcon></button>
+          <button className="icon-button glass" onClick={() => setModal('achievements')} aria-label="Achievements"><AppIcon>♜</AppIcon></button>
           <button className="account-button glass" onClick={() => setModal(profile ? 'settings' : 'login')}>{profile ? 'PROFILE' : 'LOG IN'}</button>
         </header>
-        <div className="home-title"><div className="eyebrow">ONE TRAIL · EVERY DAY</div><h1>THE DAILY<br />VENTURE</h1><p>Five shifting trials. One life. A new world tomorrow.</p></div>
+        <div className="home-title"><div className="eyebrow">ONE TRAIL · EVERY DAY</div><h1>DAILY<br />VENTURE</h1><p>Move through handcrafted puzzle worlds. One new venture every day.</p></div>
         <div className="home-actions">
-          <button className="primary-button" onClick={playToday} disabled={!todayAdventure}>PLAY TODAY <small>{todayAdventure ? todayAdventure.title : 'Awaiting launch date'}</small></button>
+          <button className="primary-button" onClick={playToday} disabled={!todayAdventure}>VENTURE <small>{todayAdventure ? todayAdventure.title : 'Awaiting launch date'}</small></button>
           <button className="secondary-button" onClick={openArchive}>PAST VENTURES</button>
+          <button className="lab-preview-button" onClick={() => setPage('lab')}>PREVIEW TESTER GAME <span>Block Shift · Lab 01</span></button>
           <button className="review-button" onClick={enterReview}>PREVIEW WEEK 1 <span>Reviewer build</span></button>
         </div>
       </section>}
@@ -397,13 +402,13 @@ export function App() {
 
       {session.mode === 'results' && session.adventure && <section className="screen-overlay results-screen"><div className="results-card"><div className="eyebrow">{session.finalOutcome === 'survived' ? 'VENTURE SURVIVED' : 'EXPEDITION ENDED'}</div><h1>{session.finalOutcome === 'survived' ? 'The trail opens' : `Room ${session.results.length} stopped you`}</h1><h2>{session.adventure.title}</h2><div className="result-tiles">{Array.from({ length: 5 }, (_, index) => <span key={index} className={session.results[index]?.success ? 'success' : session.results[index] ? 'failed' : ''}>{session.results[index]?.success ? '✓' : session.results[index] ? '×' : '·'}</span>)}</div><div className="result-stats"><div><strong>{session.results.filter((item) => item.success).length}/5</strong><small>cleared</small></div><div><strong>{formatDuration(session.activeMs)}</strong><small>active time</small></div><div><strong>{session.attemptNumber}</strong><small>attempt</small></div></div>{session.newlyUnlocked.length > 0 && <p className="achievement-toast">Achievement unlocked · {session.newlyUnlocked.join(', ')}</p>}<button className="primary-button" onClick={retry}>RETRY FULL TRAIL</button><button className="secondary-button" disabled={!profile || !session.authenticated} onClick={share}>{profile && session.authenticated ? 'SHARE RESULT' : 'LOG IN BEFORE PLAYING TO SHARE'}</button>{!session.authenticated && <p className="guest-note">Guest results are never saved or made shareable. Logging in now only applies to your next run.</p>}{shareMessage && <p className="share-message">{shareMessage}</p>}<button className="text-button" onClick={goHome}>Return home</button></div></section>}
 
-      {modal === 'help' && <ModalFrame title="What is The Daily Venture?" onClose={() => setModal(null)}><p>Every calendar day opens one themed five-room trail: trivia, deeper logic, rhythm, memory, and a multi-stage physics finale.</p><p>One wrong answer or failed obstacle ends the run. You can retry, but only a release-day victory on attempt one earns Survive on Your First Try.</p><p>Guests can play freely, but only signed-in explorers save stats, achievements, settings, and shareable results.</p><div className="modal-note">This reviewer build contains the first seven adventures. They remain unpublished until a launch date is approved.</div></ModalFrame>}
+      {modal === 'help' && <ModalFrame title="What is Daily Venture?" onClose={() => setModal(null)}><p>Every calendar day opens one themed trail of handcrafted, character-driven puzzle rooms.</p><p>Future ventures will let you guide the explorer through each environment, unlocking the next room only after solving the current obstacle.</p><p>Guests can play freely, but only signed-in explorers save stats, achievements, settings, and shareable results.</p><div className="modal-note">Puzzle Lab is where new game mechanics are built and refined before they receive a theme or enter a Daily Venture.</div></ModalFrame>}
 
       {modal === 'rooms' && session.adventure && <ModalFrame title="Test any room" onClose={() => setModal(null)}><p>Jump directly to a puzzle without completing the earlier rooms. Test-room outcomes are not saved.</p><div className="room-picker">{session.adventure.levelOrder.map((type, index) => <button key={`${type}-${index}`} onClick={() => { dispatch({ type: 'JUMP_TO_LEVEL', levelIndex: index }); setModal(null); }}><span>{index + 1}</span><strong>{session.adventure?.puzzles[type].title}</strong><small>{type}</small></button>)}</div></ModalFrame>}
 
       {modal === 'login' && <ModalFrame title="Save your expeditions" onClose={() => setModal(null)}><form className="login-form" onSubmit={submitLogin}><label htmlFor="email">Email address</label><input id="email" type="email" required value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} placeholder="explorer@example.com" /><button className="primary-button" type="submit">{service.mode === 'supabase' ? 'SEND MAGIC LINK' : 'CREATE LOCAL REVIEWER'}</button></form><p className="modal-note">{service.mode === 'supabase' ? 'A one-time secure link will be emailed to you.' : 'Supabase keys are not configured, so this creates a local reviewer profile for complete offline QA.'}</p>{loginMessage && <p>{loginMessage}</p>}</ModalFrame>}
 
-      {modal === 'achievements' && <ModalFrame title="Achievements" onClose={() => setModal(null)}><div className="achievement-list">{achievements.map((item) => <div key={item.code} className={item.unlocked ? 'unlocked' : ''}><span>{item.unlocked ? '◆' : '◇'}</span><p><strong>{item.title}</strong><small>{item.description}</small></p><b>{item.current}/{item.target}</b></div>)}</div></ModalFrame>}
+      {modal === 'achievements' && <ModalFrame title="Achievements" onClose={() => setModal(null)}>{!profile && <p className="modal-note">Achievement goals are visible to everyone. Log in before a Venture to save progress.</p>}<div className="achievement-list">{achievements.map((item) => <div key={item.code} className={item.unlocked ? 'unlocked' : ''}><span>{item.unlocked ? '◆' : '◇'}</span><p><strong>{item.title}</strong><small>{item.description}</small></p><b>{item.current}/{item.target}</b></div>)}</div></ModalFrame>}
 
       {modal === 'settings' && <ModalFrame title={profile ? 'Profile & settings' : 'Run settings'} onClose={() => setModal(null)}>{profile && <div className="profile-summary"><span>{profile.email.slice(0, 1).toUpperCase()}</span><p><strong>{profile.email}</strong><small>{profile.role} · {profile.attempts.length} attempts</small></p></div>}<div className="settings-list">{([['sound', 'Sound effects'], ['music', 'Ambient music'], ['vibration', 'Touch vibration'], ['reducedMotion', 'Reduced motion'], ['highContrast', 'High contrast']] as Array<[keyof Settings, string]>).map(([key, label]) => <button key={key} onClick={() => changeSetting(key)}><span>{label}</span><b className={settings[key] ? 'on' : ''}>{settings[key] ? 'ON' : 'OFF'}</b></button>)}</div>{profile ? <button className="danger-button" onClick={signOut}>SIGN OUT</button> : <button className="primary-button" onClick={() => setModal('login')}>LOG IN</button>}</ModalFrame>}
     </div>

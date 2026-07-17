@@ -24,24 +24,57 @@ h1 { font-family: Georgia, 'Times New Roman', serif; }
 .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: #f6c85f; }
 .glass { background: #0b2025b8 !important; backdrop-filter: blur(14px); border: 1px solid #ffffff30 !important; color: #fff; }
 .icon-button { min-width: 44px; height: 44px; border: 0; border-radius: 15px; background: #ffffffe8; color: #132b31; font-size: 21px; font-weight: 800; display: inline-grid; place-items: center; cursor: pointer; }
+.icon-button.glass { color: #fff; }
 .icon-button:disabled { opacity: .38; cursor: not-allowed; }
 .account-button { min-height: 44px; border-radius: 15px; border: 0; padding: 0 16px; font-size: 11px; font-weight: 800; letter-spacing: .1em; cursor: pointer; }
-.primary-button, .secondary-button, .review-button { width: 100%; min-height: 60px; border: 0; border-radius: 18px; font-weight: 800; letter-spacing: .04em; cursor: pointer; }
+.primary-button, .secondary-button, .review-button, .lab-preview-button { width: 100%; min-height: 60px; border: 0; border-radius: 18px; font-weight: 800; letter-spacing: .04em; cursor: pointer; }
 .primary-button { background: #f6c85fe8; color: #14262a; box-shadow: 0 10px 28px #0004; backdrop-filter: blur(8px); }
 .primary-button small { display: block; font-size: 10px; opacity: .66; margin-top: 2px; }
 .primary-button:disabled { background: #d2c4a1; color: #4e514d; box-shadow: none; cursor: not-allowed; }
 .secondary-button { background: #f7fbf1d9; color: #14262a; backdrop-filter: blur(8px); }
 .review-button { background: #112b31c9; border: 1px solid #ffffff38; color: #fff; backdrop-filter: blur(8px); }
 .review-button span { display: block; font-size: 10px; color: #8fe3da; }
+.lab-preview-button { background: #2d6768e8; border: 1px solid #b6fff069; color: #fff; backdrop-filter: blur(8px); }
+.lab-preview-button span { display: block; margin-top: 2px; color: #c9fff5; font-size: 10px; }
 .compact { min-height: 50px; margin-top: 10px; }
 .text-button { min-height: 44px; border: 0; background: transparent; color: #1f4144; text-decoration: underline; font-weight: 700; }
 
 .home-toolbar { position: absolute; top: max(18px, env(safe-area-inset-top)); left: 18px; right: 18px; display: flex; gap: 10px; }
 .home-toolbar .account-button { margin-left: auto; }
-.home-title { position: absolute; left: 26px; right: 26px; top: 98px; text-shadow: 0 3px 20px #000b; }
-.home-title h1 { font-size: clamp(42px, 12vw, 56px); line-height: .9; letter-spacing: -.04em; margin: 9px 0 14px; }
-.home-title p { width: 250px; font-size: 14px; line-height: 1.45; color: #edf6ee; }
+.home-title { position: absolute; left: 18px; right: 18px; top: 108px; text-align: center; text-shadow: 0 3px 8px #000, 0 8px 28px #000d; }
+.home-title h1 { font-size: clamp(44px, 12vw, 58px); line-height: .88; letter-spacing: -.04em; margin: 9px 0 14px; }
+.home-title p { width: auto; max-width: 290px; margin-inline: auto; font-size: 14px; line-height: 1.45; color: #fff; }
 .home-actions { position: absolute; left: 22px; right: 22px; bottom: max(24px, env(safe-area-inset-bottom)); display: grid; gap: 10px; }
+
+.lab-screen { position: absolute; inset: 0; z-index: 10; overflow: hidden; background: #173d42; color: #fff; }
+.lab-screen > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.lab-header { position: absolute; z-index: 2; top: max(12px, env(safe-area-inset-top)); left: 12px; right: 12px; display: grid; grid-template-columns: 44px 1fr 58px; gap: 8px; align-items: center; }
+.lab-header > div { min-width: 0; padding: 7px 11px; border-radius: 14px; background: #06171bd9; border: 1px solid #ffffff58; backdrop-filter: blur(10px); }
+.lab-header span, .lab-header h1 { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.lab-header span { color: #9fe8dc; font-size: 8px; font-weight: 900; letter-spacing: .1em; }
+.lab-header h1 { margin: 2px 0 0; font-family: inherit; font-size: 12px; }
+.lab-small-button { min-height: 44px; border-radius: 14px; font-size: 9px; font-weight: 900; }
+.lab-brief { position: absolute; z-index: 2; top: 72px; left: 12px; right: 12px; min-height: 61px; display: grid; grid-template-columns: 48px 1fr 48px; gap: 9px; align-items: center; padding: 9px 11px; border-radius: 17px; color: #143238; background: #fffdf2ed; box-shadow: 0 10px 30px #06171b4f; }
+.lab-brief p { margin: 0; text-align: center; font-size: 10px; line-height: 1.35; font-weight: 750; }
+.lab-brief > div { text-align: center; }
+.lab-brief strong, .lab-brief small { display: block; }
+.lab-brief strong { font-size: 17px; }
+.lab-brief small { font-size: 7px; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; color: #587174; }
+.lab-message { position: absolute; z-index: 2; left: 18px; right: 18px; bottom: 219px; min-height: 45px; display: grid; place-items: center; padding: 8px 13px; border-radius: 14px; background: #07191ed9; border: 1px solid #ffffff4a; text-align: center; color: #d6e5e1; font-size: 10px; font-weight: 750; backdrop-filter: blur(10px); }
+.lab-message.complete { color: #172b31; background: #f6c85ff2; border-color: #fff0b5; }
+.lab-controls { position: absolute; z-index: 2; left: 10px; right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); height: 198px; display: grid; grid-template-columns: minmax(48px, 1fr) 150px minmax(48px, 1fr); gap: 6px; align-items: center; padding: 10px; border-radius: 25px; background: #06171be8; border: 1px solid #ffffff4f; box-shadow: 0 16px 40px #0008; backdrop-filter: blur(12px); }
+.lab-controls > p { grid-column: 1 / -1; align-self: end; margin: 0; text-align: center; color: #a9c6c2; font-size: 8px; font-weight: 800; letter-spacing: .04em; }
+.lab-utility { min-height: 52px; border: 1px solid #ffffff4a; border-radius: 14px; background: #173b40db; color: white; font-size: 9px; font-weight: 900; }
+.lab-utility small { display: block; margin-top: 2px; color: #9fe8dc; font-size: 8px; }
+.lab-utility:disabled { opacity: .38; }
+.lab-dpad { width: 150px; height: 150px; display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 48px); gap: 3px; justify-content: center; align-content: center; }
+.lab-dpad button { border: 1px solid #ffffff72; border-radius: 14px; background: #f7fbf1e8; color: #163238; box-shadow: inset 0 -4px 0 #173b4030; font-size: 25px; font-weight: 900; touch-action: manipulation; }
+.lab-dpad button:active { transform: translateY(2px); box-shadow: inset 0 -1px 0 #173b4030; }
+.lab-dpad .up { grid-column: 2; grid-row: 1; }
+.lab-dpad .left { grid-column: 1; grid-row: 2; }
+.lab-dpad > span { grid-column: 2; grid-row: 2; display: grid; place-items: center; color: #f6c85f; font-size: 16px; }
+.lab-dpad .right { grid-column: 3; grid-row: 2; }
+.lab-dpad .down { grid-column: 2; grid-row: 3; }
 
 .page-screen { background: linear-gradient(#f5f1e8f5, #e9e4d8f8); color: #172b35; padding: 28px 20px; overflow-y: auto; pointer-events: auto; }
 .page-header { display: flex; align-items: center; gap: 14px; }
@@ -188,7 +221,7 @@ h1 { font-family: Georgia, 'Times New Roman', serif; }
 
 .high-contrast .puzzle-panel, .high-contrast .intro-card, .high-contrast .ready-card, .high-contrast .results-card { background: #fff; color: #000; }
 .high-contrast .eyebrow { color: #7b4300; }
-.high-contrast .home-title { left: 18px; right: 18px; padding: 16px; border-radius: 20px; background: #061317d9; border: 1px solid #ffffff8a; text-shadow: 0 2px 5px #000; }
+.high-contrast .home-title { left: 18px; right: 18px; padding: 0; border: 0; background: transparent; text-shadow: 0 3px 5px #000, 0 7px 24px #000; }
 .high-contrast .home-title p { color: #fff; }
 .high-contrast .glass, .high-contrast .game-hud > div, .high-contrast .progress-dots { background: #061317e8 !important; border-color: #ffffff8f !important; }
 .high-contrast .puzzle-heading { padding: 7px 9px; border-radius: 12px; background: #061317c9; }
@@ -203,6 +236,9 @@ h1 { font-family: Georgia, 'Times New Roman', serif; }
   .home-title h1 { font-size: 40px; }
   .home-title p { font-size: 12px; }
   .home-actions { gap: 7px; }
-  .primary-button, .secondary-button, .review-button { min-height: 52px; }
+  .primary-button, .secondary-button, .review-button, .lab-preview-button { min-height: 48px; }
+  .home-actions { bottom: 12px; }
+  .lab-controls { height: 185px; }
+  .lab-message { bottom: 204px; }
   .puzzle-panel { max-height: 480px; padding: 14px; }
 }

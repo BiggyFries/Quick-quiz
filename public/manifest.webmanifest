@@ -1,7 +1,7 @@
 {
-  "name": "The Daily Venture",
+  "name": "Daily Venture",
   "short_name": "Venture",
-  "description": "Survive a new five-room puzzle trail every day.",
+  "description": "Move through a new handcrafted puzzle trail every day.",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#0c1f27",
