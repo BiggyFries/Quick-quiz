@@ -1,4 +1,4 @@
-name: Deploy The Daily Venture to Pages
+name: Deploy Daily Venture to Pages
 
 on:
   push:
