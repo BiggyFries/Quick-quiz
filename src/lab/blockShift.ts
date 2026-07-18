@@ -1,13 +1,17 @@
 export type LabDirection = 'up' | 'down' | 'left' | 'right';
 export type LabStatus = 'playing' | 'complete';
+export type BlockAxis = 'horizontal' | 'vertical' | 'free';
 
 export interface GridPoint { x: number; y: number }
 
 export interface ShiftBlock extends GridPoint {
-  id: 'keystone' | 'amber' | 'jade' | 'azure';
+  id: 'keystone' | 'amber' | 'jade' | 'azure' | 'basalt';
   kind: 'keystone' | 'block';
   label: string;
   color: string;
+  width: number;
+  height: number;
+  axis: BlockAxis;
 }
 
 interface StoredBlockShiftState {
@@ -17,19 +21,17 @@ interface StoredBlockShiftState {
   pushes: number;
   status: LabStatus;
   message: string;
+  facing: LabDirection;
+  lastAction: 'idle' | 'walk' | 'push' | 'blocked' | 'undo';
 }
 
 export interface BlockShiftState extends StoredBlockShiftState {
   history: StoredBlockShiftState[];
 }
 
-export const BLOCK_SHIFT_WIDTH = 7;
-export const BLOCK_SHIFT_HEIGHT = 7;
-export const BLOCK_SHIFT_GOAL: GridPoint = { x: 6, y: 3 };
-export const BLOCK_SHIFT_WALLS: GridPoint[] = [
-  ...Array.from({ length: BLOCK_SHIFT_WIDTH }, (_, x) => ({ x, y: 0 })),
-  ...Array.from({ length: BLOCK_SHIFT_WIDTH }, (_, x) => ({ x, y: BLOCK_SHIFT_HEIGHT - 1 })),
-];
+export const BLOCK_SHIFT_WIDTH = 9;
+export const BLOCK_SHIFT_HEIGHT = 8;
+export const BLOCK_SHIFT_GOAL: GridPoint = { x: 7, y: 3 };
 
 const DIRECTIONS: Record<LabDirection, GridPoint> = {
   up: { x: 0, y: -1 },
@@ -46,28 +48,36 @@ function store(state: BlockShiftState): StoredBlockShiftState {
   return {
     player: { ...state.player }, blocks: cloneBlocks(state.blocks), moves: state.moves,
     pushes: state.pushes, status: state.status, message: state.message,
+    facing: state.facing, lastAction: state.lastAction,
   };
 }
 
 export function initialBlockShiftState(): BlockShiftState {
   return {
-    player: { x: 1, y: 4 },
+    player: { x: 0, y: 5 },
     blocks: [
-      { id: 'keystone', kind: 'keystone', label: 'Keystone', color: '#f6c85f', x: 1, y: 3 },
-      { id: 'amber', kind: 'block', label: 'Amber block', color: '#df8350', x: 2, y: 3 },
-      { id: 'jade', kind: 'block', label: 'Jade block', color: '#55b7a5', x: 3, y: 3 },
-      { id: 'azure', kind: 'block', label: 'Azure block', color: '#6e91cb', x: 4, y: 3 },
+      { id: 'keystone', kind: 'keystone', label: 'Keystone sled', color: '#f6c85f', x: 1, y: 3, width: 2, height: 1, axis: 'horizontal' },
+      { id: 'amber', kind: 'block', label: 'Amber pillar', color: '#df8350', x: 3, y: 3, width: 1, height: 2, axis: 'vertical' },
+      { id: 'jade', kind: 'block', label: 'Jade vault', color: '#55b7a5', x: 4, y: 2, width: 2, height: 2, axis: 'free' },
+      { id: 'azure', kind: 'block', label: 'Azure column', color: '#6e91cb', x: 6, y: 2, width: 1, height: 3, axis: 'vertical' },
+      { id: 'basalt', kind: 'block', label: 'Basalt beam', color: '#70777d', x: 3, y: 6, width: 3, height: 1, axis: 'horizontal' },
     ],
     moves: 0,
     pushes: 0,
     status: 'playing',
-    message: 'Clear the center lane, then push the keystone into the glowing door.',
+    message: 'Clear every shape from the gold lane, then push the keystone sled into the door.',
+    facing: 'right',
+    lastAction: 'idle',
     history: [],
   };
 }
 
-function isWall(point: GridPoint) {
-  return BLOCK_SHIFT_WALLS.some((wall) => wall.x === point.x && wall.y === point.y);
+export function blockCells(block: ShiftBlock, at: GridPoint = block) {
+  const cells: GridPoint[] = [];
+  for (let y = 0; y < block.height; y += 1) {
+    for (let x = 0; x < block.width; x += 1) cells.push({ x: at.x + x, y: at.y + y });
+  }
+  return cells;
 }
 
 function isInside(point: GridPoint) {
@@ -75,38 +85,46 @@ function isInside(point: GridPoint) {
 }
 
 function blockAt(blocks: ShiftBlock[], point: GridPoint) {
-  return blocks.find((block) => block.x === point.x && block.y === point.y);
+  return blocks.find((block) => blockCells(block).some((cell) => cell.x === point.x && cell.y === point.y));
 }
 
-function isGoal(point: GridPoint) {
-  return point.x === BLOCK_SHIFT_GOAL.x && point.y === BLOCK_SHIFT_GOAL.y;
+function isGoal(block: ShiftBlock) {
+  return block.id === 'keystone' && block.x === BLOCK_SHIFT_GOAL.x && block.y === BLOCK_SHIFT_GOAL.y;
+}
+
+function axisAllows(block: ShiftBlock, direction: LabDirection) {
+  if (block.axis === 'free') return true;
+  if (block.axis === 'horizontal') return direction === 'left' || direction === 'right';
+  return direction === 'up' || direction === 'down';
 }
 
 export function moveBlockShift(state: BlockShiftState, direction: LabDirection): BlockShiftState {
-  if (state.status === 'complete') return { ...state, message: 'The door is open. Undo or reset to keep testing.' };
+  if (state.status === 'complete') return { ...state, facing: direction, lastAction: 'blocked', message: 'The door is open. Undo or reset to keep testing.' };
   const delta = DIRECTIONS[direction];
   const destination = { x: state.player.x + delta.x, y: state.player.y + delta.y };
-  if (!isInside(destination) || isWall(destination)) return { ...state, message: 'The explorer cannot cross the room wall.' };
+  if (!isInside(destination)) return { ...state, facing: direction, lastAction: 'blocked', message: 'The explorer cannot step beyond the platform.' };
 
   const pushed = blockAt(state.blocks, destination);
   if (!pushed) {
     return {
-      ...state, player: destination, moves: state.moves + 1,
-      message: `Moved ${direction}.`, history: [...state.history, store(state)].slice(-100),
+      ...state, player: destination, moves: state.moves + 1, facing: direction, lastAction: 'walk',
+      message: `Moved ${direction}.`, history: [...state.history, store(state)].slice(-150),
     };
   }
 
-  const blockDestination = { x: pushed.x + delta.x, y: pushed.y + delta.y };
-  const keystoneOffRail = pushed.kind === 'keystone' && delta.y !== 0;
-  const blocked = keystoneOffRail
-    || !isInside(blockDestination)
-    || isWall(blockDestination)
-    || Boolean(blockAt(state.blocks, blockDestination))
-    || (isGoal(blockDestination) && pushed.kind !== 'keystone');
-  if (blocked) return { ...state, message: keystoneOffRail ? 'The keystone is locked to the center rail.' : `${pushed.label} cannot move ${direction}. Find another side.` };
+  if (!axisAllows(pushed, direction)) {
+    const constraint = pushed.axis === 'horizontal' ? 'sideways' : 'up and down';
+    return { ...state, facing: direction, lastAction: 'blocked', message: `${pushed.label} only slides ${constraint}.` };
+  }
 
-  const blocks = state.blocks.map((block) => block.id === pushed.id ? { ...block, ...blockDestination } : block);
-  const complete = pushed.kind === 'keystone' && isGoal(blockDestination);
+  const nextAnchor = { x: pushed.x + delta.x, y: pushed.y + delta.y };
+  const occupiedByOther = state.blocks.filter((block) => block.id !== pushed.id);
+  const blocked = blockCells(pushed, nextAnchor).some((cell) => !isInside(cell) || Boolean(blockAt(occupiedByOther, cell)));
+  if (blocked) return { ...state, facing: direction, lastAction: 'blocked', message: `${pushed.label} is blocked. Reach another side or move a different piece.` };
+
+  const blocks = state.blocks.map((block) => block.id === pushed.id ? { ...block, ...nextAnchor } : block);
+  const shifted = blocks.find((block) => block.id === pushed.id)!;
+  const complete = isGoal(shifted);
   return {
     ...state,
     player: destination,
@@ -114,15 +132,20 @@ export function moveBlockShift(state: BlockShiftState, direction: LabDirection):
     moves: state.moves + 1,
     pushes: state.pushes + 1,
     status: complete ? 'complete' : 'playing',
+    facing: direction,
+    lastAction: 'push',
     message: complete ? 'Door unlocked. The route to the next room is open.' : `Pushed ${pushed.label} ${direction}.`,
-    history: [...state.history, store(state)].slice(-100),
+    history: [...state.history, store(state)].slice(-150),
   };
 }
 
 export function undoBlockShift(state: BlockShiftState): BlockShiftState {
   const previous = state.history.at(-1);
-  if (!previous) return { ...state, message: 'Nothing to undo yet.' };
-  return { ...previous, player: { ...previous.player }, blocks: cloneBlocks(previous.blocks), history: state.history.slice(0, -1) };
+  if (!previous) return { ...state, lastAction: 'blocked', message: 'Nothing to undo yet.' };
+  return {
+    ...previous, player: { ...previous.player }, blocks: cloneBlocks(previous.blocks),
+    lastAction: 'undo', message: 'Last move undone.', history: state.history.slice(0, -1),
+  };
 }
 
 export function blockShiftSnapshot(state: BlockShiftState) {
@@ -130,10 +153,11 @@ export function blockShiftSnapshot(state: BlockShiftState) {
   return {
     mode: 'puzzle-lab',
     puzzle: 'block-shift-01',
-    coordinateSystem: '7x7 grid; origin top-left; x right; y down; rows 0 and 6 are walls',
-    objective: 'Push the keystone from the left side into the door at (6,3).',
+    coordinateSystem: '9x8 grid; origin top-left; x right; y down',
+    objective: 'Clear row 3 and push the 2x1 keystone sled to anchor (7,3).',
     player: state.player,
-    blocks: state.blocks.map(({ id, kind, x, y }) => ({ id, kind, x, y })),
+    facing: state.facing,
+    blocks: state.blocks.map(({ id, kind, x, y, width, height, axis }) => ({ id, kind, x, y, width, height, axis })),
     goal: BLOCK_SHIFT_GOAL,
     keystone,
     moves: state.moves,
