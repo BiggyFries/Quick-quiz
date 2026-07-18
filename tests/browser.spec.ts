@@ -125,7 +125,7 @@ test('Block Shift lab supports touch controls, undo, keyboard play, and a comple
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   await page.getByRole('button', { name: /PREVIEW TESTER GAME/i }).click();
-  await expect(page.getByRole('heading', { name: 'Puzzle Labs' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Prototype Corridor' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Block Shift/i })).toBeVisible();
   await expect(page.getByRole('button', { name: /Mine Trail/i })).toBeVisible();
   await page.screenshot({ path: path.join(captures, 'puzzle-lab-hub.png') });
@@ -165,7 +165,7 @@ test('Block Shift lab supports touch controls, undo, keyboard play, and a comple
   await expect(page.getByText(/Door unlocked/i)).toBeVisible();
   await page.screenshot({ path: path.join(captures, 'block-shift-complete.png') });
   await page.getByRole('button', { name: 'Back to puzzle labs' }).click();
-  await expect(page.getByRole('heading', { name: 'Puzzle Labs' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Prototype Corridor' })).toBeVisible();
 });
 
 test('Mine Trail uses character movement and an action reveal for safe, failed, and cleared routes', async ({ page }) => {

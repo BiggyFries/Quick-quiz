@@ -45,6 +45,10 @@
 .core-lab-hub-note { display: flex; gap: 10px; margin-top: 19px; padding: 13px 15px; border: 1px solid #17343a24; border-radius: 15px; background: #fff9; color: #405b5d; font-size: 10px; }
 .core-lab-hub-note strong { color: #9b5a21; font-size: 9px; letter-spacing: .08em; }
 
+/* Labs 03–09 extend the original two-room shell with game-specific control grids. */
+.classic-controls { display: grid; grid-template-columns: minmax(74px, 1fr) 138px minmax(74px, 1fr); gap: 7px; align-items: center; }
+.classic-controls .lab-utility small { display: block; margin: 3px 0 0; }
+
 @media (max-height: 720px) {
   .lab-controls { height: 168px; }
   .lab-message { bottom: 186px; }

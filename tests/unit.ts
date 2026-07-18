@@ -3,6 +3,7 @@ import { WEEK_ONE } from '../src/content/week1';
 import { countLogicSolutions, dailyAdventureSchema, satisfiesLogicClues } from '../src/game/schema';
 import type { AttemptRecord } from '../src/game/types';
 import { blockShiftSnapshot, initialBlockShiftState, moveBlockShift, undoBlockShift } from '../src/lab/blockShift';
+import { CLASSIC_LABS, classicLabSnapshot, initialClassicLabState, updateClassicLab, type ClassicLabState } from '../src/lab/classicLabs';
 import { adjacentMineCount, initialMineTrailState, isMine, mineTrailSnapshot, moveMineTrail, revealMineTrail } from '../src/lab/mineTrail';
 import { calculateAchievements } from '../src/services/achievements';
 import { addDays, localDateKey } from '../src/services/date';
@@ -131,6 +132,52 @@ for (let y = 0; y < 5; y += 1) {
 assert.equal(completedMineTrail.status, 'complete');
 assert.equal(mineTrailSnapshot(completedMineTrail).safeTilesRemaining, 0);
 
+assert.deepEqual(CLASSIC_LABS.map((lab) => lab.id), [3, 4, 5, 6, 7, 8, 9]);
+for (const lab of CLASSIC_LABS) {
+  const initial = initialClassicLabState(lab.id);
+  assert.equal(initial.status, 'playing');
+  assert.equal(classicLabSnapshot(initial).puzzle, `classic-lab-${String(lab.id).padStart(2, '0')}`);
+}
+
+const relicInitial = initialClassicLabState(3);
+const relicWalk = updateClassicLab(relicInitial, { type: 'move', direction: 'right' });
+assert.deepEqual(relicWalk.player, { x: 2, y: 13 });
+assert.equal(relicWalk.score, 1);
+const relicClear = updateClassicLab({ ...relicInitial, player: { x: 10, y: 1 }, score: 14 } as ClassicLabState, { type: 'move', direction: 'right' });
+assert.equal(relicClear.status, 'complete');
+
+const stackInitial = initialClassicLabState(4);
+const stackShift = updateClassicLab(stackInitial, { type: 'move', direction: 'left' });
+assert.equal(stackShift.active.x, 3);
+const stackDropped = updateClassicLab(stackShift, { type: 'hard-drop' });
+assert.equal(stackDropped.pieces, 1);
+const stackClear = updateClassicLab(stackInitial, { type: 'tick', ms: 60000 });
+assert.equal(stackClear.status, 'complete'); assert.equal(stackClear.remainingMs, 0);
+
+const riverInitial = initialClassicLabState(5);
+const riverHop = updateClassicLab(riverInitial, { type: 'move', direction: 'up' });
+assert.equal(riverHop.player.y, 9);
+const riverClear = updateClassicLab({ ...riverInitial, player: { x: 4, y: 1 } } as ClassicLabState, { type: 'move', direction: 'up' });
+assert.equal(riverClear.status, 'complete');
+
+const coilInitial = initialClassicLabState(6);
+const coilClear = updateClassicLab({ ...coilInitial, score: 7, orb: { x: 7, y: 12 } } as ClassicLabState, { type: 'tick', ms: 260 });
+assert.equal(coilClear.status, 'complete'); assert.equal(coilClear.score, 8);
+
+const prismInitial = initialClassicLabState(7);
+const prismShift = updateClassicLab(prismInitial, { type: 'move', direction: 'left' });
+assert.ok(prismShift.paddleX < prismInitial.paddleX);
+const prismClear = updateClassicLab({ ...prismInitial, ball: { x: 195, y: 500, vx: 0, vy: -172 }, seals: [{ id: 99, x: 195, y: 492, color: 1 }] } as ClassicLabState, { type: 'tick', ms: 32 });
+assert.equal(prismClear.status, 'complete');
+
+const mergeInitial = initialClassicLabState(8);
+const mergeClear = updateClassicLab({ ...mergeInitial, board: [[32, 32, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], highest: 32 } as ClassicLabState, { type: 'move', direction: 'left' });
+assert.equal(mergeClear.status, 'complete'); assert.equal(mergeClear.highest, 64);
+
+let lanternComplete = initialClassicLabState(9);
+for (const index of [0, 6, 18, 24]) lanternComplete = updateClassicLab(lanternComplete, { type: 'activate', index });
+assert.equal(lanternComplete.status, 'complete'); assert.equal(lanternComplete.lit, 25); assert.equal(lanternComplete.moves, 4);
+
 const { createVentureService, DEFAULT_SETTINGS } = await import('../src/services/ventureService');
 assert.equal(DEFAULT_SETTINGS.highContrast, true);
 const guestService = createVentureService();
@@ -163,4 +210,4 @@ localStorage.setItem('dailyVentureLocalReviewerProfile', JSON.stringify({
 const migratedService = createVentureService();
 assert.equal((await migratedService.getProfile())?.settings.highContrast, true);
 
-console.log('unit: 7 schemas, two Puzzle Labs, timezone gating, attempts, archive rules, idempotency, and achievement thresholds passed');
+console.log('unit: 7 schemas, nine Puzzle Labs, timezone gating, attempts, archive rules, idempotency, and achievement thresholds passed');
