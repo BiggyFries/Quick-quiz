@@ -1,0 +1,376 @@
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  CLASSIC_LABS,
+  RELIC_MAP,
+  classicLabSnapshot,
+  initialClassicLabState,
+  updateClassicLab,
+  type ClassicDirection,
+  type ClassicLabAction,
+  type ClassicLabId,
+  type ClassicLabState,
+  type CoilState,
+  type LabDefinition,
+  type LanternState,
+  type MergeState,
+  type Point,
+  type PrismState,
+  type RelicState,
+  type RiverState,
+  type StackState,
+} from './classicLabs';
+
+const CANVAS_WIDTH = 390;
+const CANVAS_HEIGHT = 844;
+
+function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number, fill: string, stroke?: string) {
+  ctx.beginPath(); ctx.roundRect(x, y, width, height, radius); ctx.fillStyle = fill; ctx.fill();
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
+}
+
+function drawLabBackdrop(ctx: CanvasRenderingContext2D, definition: LabDefinition, time: number) {
+  const gradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+  gradient.addColorStop(0, '#163c42'); gradient.addColorStop(.55, '#2e6768'); gradient.addColorStop(1, '#071c24');
+  ctx.fillStyle = gradient; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  const glow = ctx.createRadialGradient(195, 315, 20, 195, 315, 260);
+  glow.addColorStop(0, `${definition.accent}42`); glow.addColorStop(1, '#0d2a3000');
+  ctx.fillStyle = glow; ctx.fillRect(0, 85, 390, 590);
+  ctx.fillStyle = '#061a214c';
+  ctx.beginPath(); ctx.moveTo(0, 680); ctx.lineTo(0, 150); ctx.quadraticCurveTo(55, 95, 104, 145); ctx.lineTo(86, 680); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(390, 680); ctx.lineTo(390, 150); ctx.quadraticCurveTo(335, 95, 286, 145); ctx.lineTo(304, 680); ctx.fill();
+  const pulse = (Math.sin(time / 600) + 1) / 2;
+  ctx.strokeStyle = `${definition.accent}${Math.round(80 + pulse * 80).toString(16).padStart(2, '0')}`;
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(195, 376, 182, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+  for (let x = 18; x < 390; x += 44) {
+    ctx.fillStyle = '#bfe3d317'; ctx.fillRect(x, 138, 1, 510);
+  }
+}
+
+function drawExplorer(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, time: number, remote = false, facing: ClassicDirection = 'down') {
+  const bob = Math.sin(time / 320) * 1.4 * scale;
+  const direction = facing === 'left' ? -1 : 1;
+  ctx.save(); ctx.translate(x, y + bob); ctx.scale(scale * direction, scale);
+  ctx.fillStyle = '#07171b68'; ctx.beginPath(); ctx.ellipse(0, 21, 18, 6, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#4c3d35'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-6, 8); ctx.lineTo(-8, 23); ctx.moveTo(6, 8); ctx.lineTo(8, 23); ctx.stroke();
+  ctx.strokeStyle = '#25333a'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(-12, 24); ctx.lineTo(-5, 24); ctx.moveTo(5, 24); ctx.lineTo(12, 24); ctx.stroke();
+  ctx.fillStyle = '#c77743'; ctx.beginPath(); ctx.roundRect(-14, -19, 28, 31, 8); ctx.fill();
+  ctx.fillStyle = '#f2b75f'; ctx.beginPath(); ctx.moveTo(-12, -18); ctx.lineTo(10, 10); ctx.lineTo(14, -18); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#c77743'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-11, -11); ctx.lineTo(-20, remote ? 2 : -1); ctx.moveTo(11, -11); ctx.lineTo(20, remote ? 2 : -1); ctx.stroke();
+  if (remote) {
+    ctx.fillStyle = '#183c43'; ctx.strokeStyle = '#81e1d1'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.roundRect(-11, -1, 22, 17, 4); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#f6c85f'; ctx.beginPath(); ctx.arc(-4, 6, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#75d9cc'; ctx.fillRect(2, 4, 5, 4);
+  }
+  ctx.fillStyle = '#d99b72'; ctx.beginPath(); ctx.ellipse(0, -32, 11, 13, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#3e302b'; ctx.beginPath(); ctx.ellipse(-2, -41, 13, 6, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#1b2b30'; ctx.beginPath(); ctx.arc(-4, -33, 1.5, 0, Math.PI * 2); ctx.arc(4, -33, 1.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#7b4e36'; ctx.beginPath(); ctx.roundRect(-17, -50, 34, 6, 3); ctx.fill(); ctx.beginPath(); ctx.roundRect(-9, -57, 20, 9, 4); ctx.fill();
+  ctx.restore();
+}
+
+function drawShade(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, time: number) {
+  const bob = Math.sin(time / 230 + x) * 2;
+  ctx.save(); ctx.translate(x, y + bob);
+  ctx.shadowColor = color; ctx.shadowBlur = 9; ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(0, -6, 8, Math.PI, 0); ctx.lineTo(9, 9); ctx.lineTo(4, 6); ctx.lineTo(0, 10); ctx.lineTo(-4, 6); ctx.lineTo(-9, 9); ctx.closePath(); ctx.fill();
+  ctx.shadowBlur = 0; ctx.fillStyle = '#f8fbdf'; ctx.beginPath(); ctx.arc(-3, -6, 1.5, 0, Math.PI * 2); ctx.arc(3, -6, 1.5, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function drawRelic(ctx: CanvasRenderingContext2D, state: RelicState, time: number) {
+  const cellW = 25; const cellH = 27; const left = 32; const top = 158;
+  roundedRect(ctx, 22, 146, 346, 430, 22, '#071a20da', '#d7fff238');
+  RELIC_MAP.forEach((row, y) => [...row].forEach((cell, x) => {
+    const px = left + x * cellW; const py = top + y * cellH;
+    if (cell === '#') {
+      ctx.fillStyle = '#173b3e'; ctx.fillRect(px, py + 4, cellW - 1, cellH - 2);
+      ctx.fillStyle = '#5d8880'; ctx.fillRect(px, py, cellW - 1, cellH - 7);
+      ctx.strokeStyle = '#b5d8c440'; ctx.strokeRect(px + .5, py + .5, cellW - 2, cellH - 8);
+    } else {
+      ctx.fillStyle = (x + y) % 2 ? '#254c4e' : '#2b5554'; ctx.fillRect(px, py, cellW - 1, cellH - 1);
+    }
+  }));
+  const exitX = left + state.exit.x * cellW + cellW / 2; const exitY = top + state.exit.y * cellH + cellH / 2;
+  ctx.save(); ctx.shadowColor = state.score >= state.target ? '#f6c85f' : '#496b6b'; ctx.shadowBlur = state.score >= state.target ? 17 : 4;
+  ctx.fillStyle = state.score >= state.target ? '#f6c85f' : '#4d6767'; ctx.beginPath(); ctx.arc(exitX, exitY, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#142b2f'; ctx.beginPath(); ctx.arc(exitX, exitY, 5, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  state.pellets.forEach((key) => {
+    const [x, y] = key.split(',').map(Number); const pulse = 1 + Math.sin(time / 180 + x + y) * .2;
+    ctx.fillStyle = '#ffe58b'; ctx.beginPath(); ctx.arc(left + x * cellW + cellW / 2, top + y * cellH + cellH / 2, 2.7 * pulse, 0, Math.PI * 2); ctx.fill();
+  });
+  state.enemies.forEach((enemy, index) => drawShade(ctx, left + enemy.x * cellW + cellW / 2, top + enemy.y * cellH + cellH / 2 + 4, index ? '#ca7eaa' : '#72c9d4', time));
+  drawExplorer(ctx, left + state.player.x * cellW + cellW / 2, top + state.player.y * cellH + cellH / 2 + 2, .38, time, false);
+}
+
+const STACK_COLORS = ['#0000', '#e5bd58', '#5dc6bd', '#dc8159', '#846fc5', '#5e98cf'];
+
+function drawStack(ctx: CanvasRenderingContext2D, state: StackState, time: number) {
+  roundedRect(ctx, 87, 146, 216, 428, 24, '#07171ddf', '#b9fff25c');
+  roundedRect(ctx, 101, 157, 188, 372, 12, '#10262d', '#ffffff35');
+  const cellW = 18; const cellH = 20; const left = 105; const top = 163;
+  ctx.fillStyle = '#f07d7166'; ctx.fillRect(left, top + cellH * 3, 180, 2);
+  for (let y = 0; y < 18; y += 1) for (let x = 0; x < 10; x += 1) {
+    ctx.fillStyle = '#ffffff08'; ctx.fillRect(left + x * cellW + 1, top + y * cellH + 1, cellW - 2, cellH - 2);
+    const cell = state.board[y][x]; if (!cell) continue;
+    ctx.fillStyle = STACK_COLORS[cell]; ctx.fillRect(left + x * cellW + 1, top + y * cellH + 1, cellW - 2, cellH - 2);
+    ctx.fillStyle = '#ffffff45'; ctx.fillRect(left + x * cellW + 3, top + y * cellH + 3, cellW - 6, 3);
+  }
+  state.active.shape.forEach((cell) => {
+    const x = state.active.x + cell.x; const y = state.active.y + cell.y; if (y < 0) return;
+    ctx.fillStyle = STACK_COLORS[state.active.color]; ctx.fillRect(left + x * cellW + 1, top + y * cellH + 1, cellW - 2, cellH - 2);
+    ctx.strokeStyle = '#fff9'; ctx.strokeRect(left + x * cellW + 2, top + y * cellH + 2, cellW - 4, cellH - 4);
+  });
+  ctx.fillStyle = '#b6e5db'; ctx.font = '800 9px Inter, system-ui'; ctx.textAlign = 'center';
+  ctx.fillText(`AIRLOCK · ${Math.ceil(state.remainingMs / 1000)}s`, 195, 548);
+  drawExplorer(ctx, 195, 572, .76, time, true);
+}
+
+function riverX(x: number) { return 45 + x * 37.5; }
+
+function drawRiver(ctx: CanvasRenderingContext2D, state: RiverState, time: number) {
+  roundedRect(ctx, 23, 148, 344, 438, 22, '#0a2228d9', '#c6fff33d');
+  const top = 164; const rowH = 36; const left = 29; const width = 332;
+  for (let row = 0; row <= 10; row += 1) {
+    const y = top + row * rowH;
+    const fill = row === 0 ? '#856c3f' : row === 5 || row === 10 ? '#557951' : row <= 4 ? '#256d77' : '#26383b';
+    ctx.fillStyle = fill; ctx.fillRect(left, y, width, rowH - 2);
+    if (row >= 1 && row <= 4) {
+      ctx.strokeStyle = '#a2eef222'; ctx.beginPath(); ctx.moveTo(left, y + 12); ctx.lineTo(left + width, y + 12); ctx.moveTo(left, y + 25); ctx.lineTo(left + width, y + 25); ctx.stroke();
+    }
+    if (row >= 6 && row <= 9) {
+      ctx.setLineDash([12, 10]); ctx.strokeStyle = '#e7d98d58'; ctx.beginPath(); ctx.moveTo(left, y + rowH / 2); ctx.lineTo(left + width, y + rowH / 2); ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+  ctx.fillStyle = '#f6c85f'; ctx.beginPath(); ctx.roundRect(163, top + 5, 64, 24, 12); ctx.fill();
+  ctx.fillStyle = '#173033'; ctx.font = '900 8px Inter, system-ui'; ctx.textAlign = 'center'; ctx.fillText('FAR GATE', 195, top + 20);
+  state.movers.forEach((mover) => {
+    const x = riverX(mover.x); const y = top + mover.row * rowH + rowH / 2;
+    if (mover.kind === 'raft') {
+      ctx.fillStyle = '#8c774c'; ctx.beginPath(); ctx.roundRect(x - mover.width * 18.5, y - 9, mover.width * 37, 18, 7); ctx.fill();
+      ctx.fillStyle = '#b7a56c'; ctx.fillRect(x - mover.width * 13, y - 7, mover.width * 26, 4);
+    } else {
+      ctx.fillStyle = mover.speed > 0 ? '#da754e' : '#78a9c4'; ctx.beginPath(); ctx.ellipse(x, y, mover.width * 17, 11, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#263336'; ctx.beginPath(); ctx.arc(x + Math.sign(mover.speed) * mover.width * 12, y, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#132124'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 10, y - 7); ctx.lineTo(x - 15, y - 13); ctx.moveTo(x + 3, y - 8); ctx.lineTo(x + 6, y - 14); ctx.stroke();
+    }
+  });
+  drawExplorer(ctx, riverX(state.player.x), top + state.player.y * rowH + 21, .52, time, false, 'up');
+}
+
+function drawCoil(ctx: CanvasRenderingContext2D, state: CoilState, time: number) {
+  roundedRect(ctx, 31, 151, 328, 404, 22, '#071a20dc', '#e8a95b59');
+  const left = 45; const top = 169; const cell = 20;
+  for (let y = 0; y < 16; y += 1) for (let x = 0; x < 15; x += 1) {
+    ctx.fillStyle = (x + y) % 2 ? '#26484a' : '#2c5050'; ctx.fillRect(left + x * cell, top + y * cell, cell - 1, cell - 1);
+  }
+  ctx.strokeStyle = '#e8a95b'; ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); state.trail.slice().reverse().forEach((point, index) => {
+    const x = left + point.x * cell + cell / 2; const y = top + point.y * cell + cell / 2;
+    if (index) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+  }); ctx.stroke();
+  state.trail.slice(1).forEach((point, index) => {
+    ctx.fillStyle = `rgba(246, 200, 95, ${Math.max(.2, 1 - index / state.trail.length)})`; ctx.beginPath(); ctx.arc(left + point.x * cell + 10, top + point.y * cell + 10, 4, 0, Math.PI * 2); ctx.fill();
+  });
+  const pulse = 7 + Math.sin(time / 150) * 2;
+  ctx.save(); ctx.shadowColor = '#8bf5e1'; ctx.shadowBlur = 15; ctx.fillStyle = '#9af5df'; ctx.beginPath(); ctx.arc(left + state.orb.x * cell + 10, top + state.orb.y * cell + 10, pulse, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  const head = state.trail[0];
+  drawExplorer(ctx, left + head.x * cell + 10, top + head.y * cell + 13, .32, time, false, state.direction);
+}
+
+function drawPrism(ctx: CanvasRenderingContext2D, state: PrismState, time: number) {
+  roundedRect(ctx, 21, 145, 348, 490, 24, '#07171dde', '#ffbdb45c');
+  const sky = ctx.createLinearGradient(0, 155, 0, 625); sky.addColorStop(0, '#253b50'); sky.addColorStop(1, '#12282f');
+  ctx.fillStyle = sky; ctx.fillRect(29, 157, 332, 466);
+  state.seals.forEach((seal) => {
+    ctx.fillStyle = STACK_COLORS[seal.color]; ctx.beginPath(); ctx.roundRect(seal.x - 24, seal.y - 12, 48, 24, 6); ctx.fill();
+    ctx.fillStyle = '#ffffff4f'; ctx.fillRect(seal.x - 18, seal.y - 8, 29, 3);
+  });
+  ctx.save(); ctx.shadowColor = '#fff0a6'; ctx.shadowBlur = 15; ctx.fillStyle = '#fff0a6'; ctx.beginPath(); ctx.arc(state.ball.x, state.ball.y, 7, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.shadowColor = '#71e3d0'; ctx.shadowBlur = 12; ctx.fillStyle = '#71e3d0'; ctx.beginPath(); ctx.roundRect(state.paddleX - 46, 560, 92, 13, 7); ctx.fill(); ctx.restore();
+  drawExplorer(ctx, 195, 530, .68, time, true);
+}
+
+const MERGE_COLORS: Record<number, string> = { 2: '#5d8e88', 4: '#55a99c', 8: '#d6a351', 16: '#d37b51', 32: '#a76fb9', 64: '#f6c85f', 128: '#ef8378' };
+
+function drawMerge(ctx: CanvasRenderingContext2D, state: MergeState, time: number) {
+  roundedRect(ctx, 48, 151, 294, 382, 26, '#07171ddd', '#d8b7ff59');
+  roundedRect(ctx, 63, 167, 264, 264, 18, '#203d43');
+  const left = 70; const top = 174; const cell = 61;
+  state.board.forEach((row, y) => row.forEach((value, x) => {
+    const px = left + x * cell; const py = top + y * cell;
+    roundedRect(ctx, px, py, 55, 55, 12, value ? MERGE_COLORS[value] ?? '#e2746d' : '#ffffff0d', value ? '#ffffff52' : '#ffffff15');
+    if (value) {
+      ctx.fillStyle = value >= 64 ? '#1f2a2b' : '#fff'; ctx.font = `900 ${value >= 100 ? 15 : 20}px Inter, system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(value), px + 27.5, py + 28);
+    }
+  }));
+  ctx.fillStyle = '#d7c6ec'; ctx.font = '800 10px Inter, system-ui'; ctx.textAlign = 'center'; ctx.fillText('WAYFINDER RUNE FORGE', 195, 458);
+  drawExplorer(ctx, 195, 552, .84, time, true);
+}
+
+function drawLantern(ctx: CanvasRenderingContext2D, state: LanternState, time: number) {
+  roundedRect(ctx, 40, 151, 310, 424, 25, '#07171ddd', '#9bd8ff5c');
+  const left = 55; const top = 171; const cell = 56;
+  ctx.strokeStyle = '#70b9e846'; ctx.lineWidth = 5;
+  for (let y = 0; y < 5; y += 1) {
+    ctx.beginPath(); ctx.moveTo(left + 28, top + y * cell + 28); ctx.lineTo(left + 4 * cell + 28, top + y * cell + 28); ctx.stroke();
+  }
+  for (let x = 0; x < 5; x += 1) {
+    ctx.beginPath(); ctx.moveTo(left + x * cell + 28, top + 28); ctx.lineTo(left + x * cell + 28, top + 4 * cell + 28); ctx.stroke();
+  }
+  state.lights.forEach((lit, index) => {
+    const x = index % 5; const y = Math.floor(index / 5); const px = left + x * cell; const py = top + y * cell;
+    ctx.save();
+    if (lit) { ctx.shadowColor = '#f6c85f'; ctx.shadowBlur = 13 + Math.sin(time / 220 + index) * 3; }
+    roundedRect(ctx, px + 3, py + 3, 50, 50, 13, lit ? '#f6c85f' : '#31565b', lit ? '#fff2b2' : '#6d9291');
+    ctx.shadowBlur = 0; ctx.translate(px + 28, py + 28); ctx.rotate(Math.PI / 4);
+    ctx.strokeStyle = lit ? '#6c5423' : '#9ab9b5'; ctx.lineWidth = 3; ctx.strokeRect(-8, -8, 16, 16);
+    ctx.restore();
+  });
+  ctx.fillStyle = '#b7d6da'; ctx.font = '800 9px Inter, system-ui'; ctx.textAlign = 'center'; ctx.fillText('WAYFINDER LANTERN CIRCUIT', 195, 473);
+  drawExplorer(ctx, 195, 548, .76, time, true);
+}
+
+function drawStatusOverlay(ctx: CanvasRenderingContext2D, state: ClassicLabState, definition: LabDefinition) {
+  if (state.status === 'playing') return;
+  roundedRect(ctx, 53, 332, 284, 108, 22, '#06171bef', state.status === 'complete' ? '#ffe596' : '#ff9b8e');
+  ctx.fillStyle = state.status === 'complete' ? definition.accent : '#ff8e82'; ctx.font = '900 11px Inter, system-ui'; ctx.textAlign = 'center';
+  ctx.fillText(state.status === 'complete' ? 'LAB CLEARED' : 'SIGNAL LOST', 195, 365);
+  ctx.fillStyle = '#fff'; ctx.font = '800 17px Inter, system-ui'; ctx.fillText(state.status === 'complete' ? 'The next portal is open' : 'Reset to run it again', 195, 396);
+  ctx.fillStyle = '#b7d4d0'; ctx.font = '700 10px Inter, system-ui'; ctx.fillText(`${definition.title} · Lab ${String(definition.id).padStart(2, '0')}`, 195, 420);
+}
+
+function drawClassicLab(ctx: CanvasRenderingContext2D, state: ClassicLabState, definition: LabDefinition, time: number) {
+  drawLabBackdrop(ctx, definition, time);
+  if (state.id === 3) drawRelic(ctx, state, time);
+  else if (state.id === 4) drawStack(ctx, state, time);
+  else if (state.id === 5) drawRiver(ctx, state, time);
+  else if (state.id === 6) drawCoil(ctx, state, time);
+  else if (state.id === 7) drawPrism(ctx, state, time);
+  else if (state.id === 8) drawMerge(ctx, state, time);
+  else drawLantern(ctx, state, time);
+  drawStatusOverlay(ctx, state, definition);
+}
+
+function labStats(state: ClassicLabState) {
+  if (state.id === 3) return [{ value: `${Math.min(state.score, state.target)}/${state.target}`, label: 'sparks' }, { value: state.lives, label: 'lives' }];
+  if (state.id === 4) return [{ value: Math.ceil(state.remainingMs / 1000), label: 'seconds' }, { value: state.lines, label: 'lines' }];
+  if (state.id === 5) return [{ value: state.lives, label: 'lives' }, { value: 10 - state.bestRow, label: 'lanes' }];
+  if (state.id === 6) return [{ value: `${state.score}/${state.target}`, label: 'signals' }, { value: state.trail.length, label: 'trail' }];
+  if (state.id === 7) return [{ value: state.seals.length, label: 'seals' }, { value: state.lives, label: 'lives' }];
+  if (state.id === 8) return [{ value: state.highest, label: 'highest' }, { value: state.moves, label: 'moves' }];
+  return [{ value: `${state.lit}/25`, label: 'lit' }, { value: state.moves, label: 'moves' }];
+}
+
+function DirectionPad({ move, center, disabled }: { move: (direction: ClassicDirection) => void; center?: ReactNode; disabled?: boolean }) {
+  return <div className="lab-dpad compact-dpad">
+    <button className="up" disabled={disabled} onClick={() => move('up')} aria-label="Move up">↑</button>
+    <button className="left" disabled={disabled} onClick={() => move('left')} aria-label="Move left">←</button>
+    <span aria-hidden="true">{center ?? '◆'}</span>
+    <button className="right" disabled={disabled} onClick={() => move('right')} aria-label="Move right">→</button>
+    <button className="down" disabled={disabled} onClick={() => move('down')} aria-label="Move down">↓</button>
+  </div>;
+}
+
+export function ClassicLab({ id, onExit }: { id: ClassicLabId; onExit: () => void }) {
+  const definition = CLASSIC_LABS.find((lab) => lab.id === id)!;
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [state, setState] = useState<ClassicLabState>(() => initialClassicLabState(id));
+  const stateRef = useRef<ClassicLabState>(state);
+  const manualTime = useRef(false);
+  const drawNowRef = useRef<(() => void) | null>(null);
+
+  const commit = useCallback((action: ClassicLabAction) => {
+    const current = stateRef.current;
+    const next = updateClassicLab(current, action);
+    const statusChanged = next.status !== current.status;
+    stateRef.current = next; setState(next); drawNowRef.current?.();
+    if (statusChanged || action.type !== 'tick') navigator.vibrate?.(next.status === 'complete' ? [30, 40, 60] : 10);
+  }, []);
+
+  const move = useCallback((direction: ClassicDirection) => commit({ type: 'move', direction }), [commit]);
+  const reset = useCallback(() => {
+    const next = initialClassicLabState(id); stateRef.current = next; setState(next); drawNowRef.current?.();
+  }, [id]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current; const ctx = canvas?.getContext('2d'); if (!canvas || !ctx) return;
+    let frame = 0;
+    const draw = () => { drawClassicLab(ctx, stateRef.current, definition, performance.now()); frame = requestAnimationFrame(draw); };
+    drawNowRef.current = () => drawClassicLab(ctx, stateRef.current, definition, performance.now()); draw();
+    return () => { cancelAnimationFrame(frame); drawNowRef.current = null; };
+  }, [definition]);
+
+  useEffect(() => {
+    if (id > 7) return;
+    const interval = window.setInterval(() => { if (!manualTime.current) commit({ type: 'tick', ms: 50 }); }, 50);
+    return () => window.clearInterval(interval);
+  }, [commit, id]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      const key = event.key.toLowerCase();
+      const direction = key === 'arrowup' || key === 'w' ? 'up'
+        : key === 'arrowdown' || key === 's' ? 'down'
+          : key === 'arrowleft' || key === 'a' ? 'left'
+            : key === 'arrowright' || key === 'd' ? 'right' : null;
+      if (direction) { event.preventDefault(); move(direction); }
+      else if (key === ' ' && id === 4) { event.preventDefault(); commit({ type: 'hard-drop' }); }
+      else if ((key === 'q' || key === 'x') && id === 4) { event.preventDefault(); commit({ type: 'rotate' }); }
+      else if (key === 'r') { event.preventDefault(); reset(); }
+    };
+    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
+  }, [commit, id, move, reset]);
+
+  useEffect(() => {
+    const bridge = window as typeof window & { advanceTime?: (ms: number) => void; render_game_to_text?: () => string };
+    bridge.advanceTime = (ms: number) => { manualTime.current = true; commit({ type: 'tick', ms }); };
+    bridge.render_game_to_text = () => JSON.stringify(classicLabSnapshot(stateRef.current));
+    return () => { delete bridge.advanceTime; delete bridge.render_game_to_text; };
+  }, [commit]);
+
+  const stats = labStats(state);
+  const controlsDisabled = state.status !== 'playing';
+
+  return <section className="lab-screen classic-lab-screen" aria-label={`${definition.title} puzzle lab`}>
+    <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} aria-label={`${definition.title} game world`} />
+    <header className="lab-header">
+      <button className="icon-button glass" onClick={onExit} aria-label="Back to Lab corridor">←</button>
+      <div><span>PROTOTYPE CORRIDOR · LAB {String(id).padStart(2, '0')}</span><h1>{definition.title} · {definition.shortTitle}</h1></div>
+      <button className="lab-small-button glass" onClick={reset}>RESET</button>
+    </header>
+    <div className="lab-brief">
+      <div><strong>{stats[0].value}</strong><small>{stats[0].label}</small></div>
+      <p>{definition.objective}</p>
+      <div><strong>{stats[1].value}</strong><small>{stats[1].label}</small></div>
+    </div>
+    {state.id === 9 && <div className="lantern-hit-grid" aria-label="Lantern grid">
+      {state.lights.map((lit, index) => <button key={index} disabled={state.status !== 'playing'} onClick={() => commit({ type: 'activate', index })} aria-label={`Lantern rune ${Math.floor(index / 5) + 1}, ${index % 5 + 1}, ${lit ? 'lit' : 'dark'}`} />)}
+    </div>}
+    <div className={`lab-message classic-message ${state.status}`} aria-live="polite">{state.message}</div>
+    <div className={`lab-controls classic-controls lab-controls-${state.id}`} aria-label={`${definition.title} controls`}>
+      {state.id === 4 ? <>
+        <button className="lab-utility" disabled={controlsDisabled} onClick={() => commit({ type: 'rotate' })}>ROTATE <small>Q / ↑</small></button>
+        <DirectionPad move={move} center="▦" disabled={controlsDisabled} />
+        <button className="lab-utility" disabled={controlsDisabled} onClick={() => commit({ type: 'hard-drop' })}>DROP <small>SPACE</small></button>
+      </> : state.id === 7 ? <>
+        <button className="lab-action-key" disabled={controlsDisabled} onClick={() => move('left')} aria-label="Move light bar left">←</button>
+        <div className="remote-center"><span>◆</span><small>REMOTE LINK</small></div>
+        <button className="lab-action-key" disabled={controlsDisabled} onClick={() => move('right')} aria-label="Move light bar right">→</button>
+      </> : state.id === 9 ? <>
+        <button className="lab-mode-key active" disabled>GOAL <small>Light all 25</small></button>
+        <div className="remote-center"><span>✺</span><small>LANTERN REMOTE</small></div>
+        <button className="lab-mode-key" onClick={reset}>RESET <small>New circuit</small></button>
+      </> : <>
+        <button className="lab-utility side-note" disabled>{state.id === 8 ? 'MERGE' : state.id === 6 ? 'TRAIL' : state.id === 5 ? 'HOP' : 'RUN'}<small>{stats[0].value}</small></button>
+        <DirectionPad move={move} center={definition.icon} disabled={controlsDisabled} />
+        <button className="lab-utility" onClick={reset}>RESET <small>R</small></button>
+      </>}
+      <p>{definition.controlHint} · Arrow keys or WASD · R resets</p>
+    </div>
+  </section>;
+}
