@@ -4,12 +4,14 @@ import { VentureCanvas, type CanvasView } from './game/VentureCanvas';
 import { currentPuzzleConfig, initialSessionState, sessionReducer, sessionSnapshot } from './game/session';
 import type { DailyAdventure, FinaleConfig, LogicConfig, MemoryConfig, PuzzleConfig, RhythmConfig, Settings, TriviaConfig } from './game/types';
 import { BlockShiftLab } from './lab/BlockShiftLab';
+import { CoreLabHub } from './lab/CoreLabHub';
+import { MineTrailLab } from './lab/MineTrailLab';
 import { calculateAchievements, newlyUnlocked } from './services/achievements';
 import { formatDate, localDateKey } from './services/date';
 import { createVentureService, DEFAULT_SETTINGS, type CalendarDay } from './services/ventureService';
 
 type Modal = 'help' | 'login' | 'achievements' | 'settings' | 'rooms' | null;
-type HomePage = 'home' | 'archive' | 'review' | 'lab';
+type HomePage = 'home' | 'archive' | 'review' | 'lab' | 'lab-block' | 'lab-mine';
 
 function formatDuration(ms: number) {
   const total = Math.max(0, Math.round(ms / 1000));
@@ -118,7 +120,11 @@ export function App() {
   const [profile, setProfile] = useState<Awaited<ReturnType<typeof service.getProfile>>>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [session, dispatch] = useReducer(sessionReducer, initialSessionState);
-  const [page, setPage] = useState<HomePage>('home');
+  const [page, setPage] = useState<HomePage>(() => {
+    const requestedLab = new URLSearchParams(window.location.search).get('lab');
+    return requestedLab === 'block-shift' ? 'lab-block'
+      : requestedLab === 'mine-trail' ? 'lab-mine' : 'home';
+  });
   const [modal, setModal] = useState<Modal>(null);
   const [calendar, setCalendar] = useState<CalendarDay[]>([]);
   const [reviewAdventures, setReviewAdventures] = useState<DailyAdventure[]>([]);
@@ -156,7 +162,7 @@ export function App() {
   useEffect(() => () => { ambientNodes.current?.oscillators.forEach((oscillator) => oscillator.stop()); void audioContext.current?.close(); }, []);
 
   useEffect(() => {
-    if (page === 'lab') return;
+    if (page.startsWith('lab')) return;
     const bridge = window as typeof window & { advanceTime?: (ms: number) => void; render_game_to_text?: () => string };
     bridge.advanceTime = (ms: number) => { manualTime.current = true; if (modal === null) dispatch({ type: 'TICK', ms }); };
     bridge.render_game_to_text = () => JSON.stringify(sessionSnapshot(session));
@@ -344,9 +350,11 @@ export function App() {
 
   return <main className={`app ${settings.highContrast ? 'high-contrast' : ''} ${settings.reducedMotion ? 'reduced-motion' : ''}`}>
     <div className="phone-stage">
-      {!(session.mode === 'home' && page === 'lab') && <VentureCanvas view={session.mode === 'home' ? homeCanvasView : canvasView} />}
+      {!(session.mode === 'home' && page.startsWith('lab')) && <VentureCanvas view={session.mode === 'home' ? homeCanvasView : canvasView} />}
 
-      {session.mode === 'home' && page === 'lab' && <BlockShiftLab onExit={() => setPage('home')} />}
+      {session.mode === 'home' && page === 'lab' && <CoreLabHub onExit={() => setPage('home')} openBlockShift={() => setPage('lab-block')} openMineTrail={() => setPage('lab-mine')} />}
+      {session.mode === 'home' && page === 'lab-block' && <BlockShiftLab onExit={() => setPage('lab')} />}
+      {session.mode === 'home' && page === 'lab-mine' && <MineTrailLab onExit={() => setPage('lab')} />}
 
       {session.mode === 'home' && page === 'home' && <section className="screen-overlay home-screen">
         <header className="home-toolbar">
@@ -358,7 +366,7 @@ export function App() {
         <div className="home-actions">
           <button className="primary-button" onClick={playToday} disabled={!todayAdventure}>VENTURE <small>{todayAdventure ? todayAdventure.title : 'Awaiting launch date'}</small></button>
           <button className="secondary-button" onClick={openArchive}>PAST VENTURES</button>
-          <button className="lab-preview-button" onClick={() => setPage('lab')}>PREVIEW TESTER GAME <span>Block Shift · Lab 01</span></button>
+          <button className="lab-preview-button" onClick={() => setPage('lab')}>PREVIEW TESTER GAME <span>2 experimental puzzle labs</span></button>
           <button className="review-button" onClick={enterReview}>PREVIEW WEEK 1 <span>Reviewer build</span></button>
         </div>
       </section>}

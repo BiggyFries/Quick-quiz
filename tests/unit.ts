@@ -3,6 +3,7 @@ import { WEEK_ONE } from '../src/content/week1';
 import { countLogicSolutions, dailyAdventureSchema, satisfiesLogicClues } from '../src/game/schema';
 import type { AttemptRecord } from '../src/game/types';
 import { blockShiftSnapshot, initialBlockShiftState, moveBlockShift, undoBlockShift } from '../src/lab/blockShift';
+import { adjacentMineCount, initialMineTrailState, isMine, mineTrailSnapshot, moveMineTrail, revealMineTrail } from '../src/lab/mineTrail';
 import { calculateAchievements } from '../src/services/achievements';
 import { addDays, localDateKey } from '../src/services/date';
 
@@ -72,40 +73,63 @@ assert.equal(calculateAchievements(uniqueVictories).find((item) => item.code ===
 const initialLab = initialBlockShiftState();
 assert.equal(initialLab.status, 'playing');
 assert.deepEqual(initialLab.blocks.find((block) => block.id === 'keystone'), {
-  id: 'keystone', kind: 'keystone', label: 'Keystone', color: '#f6c85f', x: 1, y: 3,
+  id: 'keystone', kind: 'keystone', label: 'Keystone sled', color: '#f6c85f',
+  x: 1, y: 3, width: 2, height: 1, axis: 'horizontal',
 });
-const blockedRailMove = moveBlockShift(initialLab, 'up');
+const blockedRailMove = moveBlockShift({ ...initialLab, player: { x: 1, y: 4 } }, 'up');
 assert.equal(blockedRailMove.moves, 0);
-assert.match(blockedRailMove.message, /center rail/i);
+assert.match(blockedRailMove.message, /sideways/i);
 
-const labStep = moveBlockShift(moveBlockShift(initialLab, 'right'), 'up');
+const labStep = ['right', 'right', 'right', 'up'].reduce(moveBlockShift, initialLab);
 assert.deepEqual(
   (({ x, y }) => ({ x, y }))(labStep.blocks.find((block) => block.id === 'amber')!),
-  { x: 2, y: 2 },
+  { x: 3, y: 2 },
 );
 assert.equal(labStep.pushes, 1);
 const undoneLabStep = undoBlockShift(labStep);
 assert.deepEqual(
   (({ x, y }) => ({ x, y }))(undoneLabStep.blocks.find((block) => block.id === 'amber')!),
-  { x: 2, y: 3 },
+  { x: 3, y: 3 },
 );
-assert.deepEqual(undoneLabStep.player, { x: 2, y: 4 });
-assert.equal(undoneLabStep.moves, 1);
+assert.deepEqual(undoneLabStep.player, { x: 3, y: 5 });
+assert.equal(undoneLabStep.moves, 3);
 
 const labSolution = [
-  'right', 'up', 'up', 'right', 'down', 'up', 'right', 'down', 'up',
-  'left', 'left', 'left', 'left', 'down',
-  'right', 'right', 'right', 'right', 'right',
+  'right', 'right', 'right', 'right', 'right', 'right', 'up', 'up', 'down', 'left',
+  'up', 'up', 'left', 'left', 'down', 'up', 'left', 'left', 'left', 'down',
+  'right', 'right', 'right', 'right', 'right', 'right',
 ] as const;
 const completedLab = labSolution.reduce(moveBlockShift, initialBlockShiftState());
 assert.equal(completedLab.status, 'complete');
 assert.deepEqual(completedLab.blocks.find((block) => block.id === 'keystone'), {
-  id: 'keystone', kind: 'keystone', label: 'Keystone', color: '#f6c85f', x: 6, y: 3,
+  id: 'keystone', kind: 'keystone', label: 'Keystone sled', color: '#f6c85f',
+  x: 7, y: 3, width: 2, height: 1, axis: 'horizontal',
 });
-assert.equal(completedLab.moves, 19);
-assert.equal(completedLab.pushes, 9);
-assert.equal(moveBlockShift(completedLab, 'left').moves, 19);
+assert.equal(completedLab.moves, 26);
+assert.equal(completedLab.pushes, 11);
+assert.equal(moveBlockShift(completedLab, 'left').moves, 26);
 assert.equal(blockShiftSnapshot(completedLab).status, 'complete');
+
+const initialMineTrail = initialMineTrailState();
+assert.equal(adjacentMineCount({ x: 0, y: 0 }), 1);
+assert.ok(mineTrailSnapshot(initialMineTrail).cells.every((cell) => cell.state === 'covered' && cell.clue === null));
+const firstReveal = revealMineTrail(initialMineTrail);
+assert.equal(firstReveal.status, 'playing');
+assert.equal(firstReveal.revealed.length, 6);
+assert.equal(mineTrailSnapshot(firstReveal).safeTilesRemaining, 14);
+let failedMineTrail = initialMineTrailState();
+for (const direction of ['right', 'up', 'up', 'up'] as const) failedMineTrail = moveMineTrail(failedMineTrail, direction);
+failedMineTrail = revealMineTrail(failedMineTrail);
+assert.equal(failedMineTrail.status, 'failed');
+assert.deepEqual(failedMineTrail.detonated, { x: 1, y: 1 });
+let completedMineTrail = initialMineTrailState();
+for (let y = 0; y < 5; y += 1) {
+  for (let x = 0; x < 5; x += 1) {
+    if (!isMine({ x, y })) completedMineTrail = revealMineTrail({ ...completedMineTrail, player: { x, y } });
+  }
+}
+assert.equal(completedMineTrail.status, 'complete');
+assert.equal(mineTrailSnapshot(completedMineTrail).safeTilesRemaining, 0);
 
 const { createVentureService, DEFAULT_SETTINGS } = await import('../src/services/ventureService');
 assert.equal(DEFAULT_SETTINGS.highContrast, true);
@@ -139,4 +163,4 @@ localStorage.setItem('dailyVentureLocalReviewerProfile', JSON.stringify({
 const migratedService = createVentureService();
 assert.equal((await migratedService.getProfile())?.settings.highContrast, true);
 
-console.log('unit: 7 schemas, Block Shift movement, timezone gating, attempts, archive rules, idempotency, and achievement thresholds passed');
+console.log('unit: 7 schemas, two Puzzle Labs, timezone gating, attempts, archive rules, idempotency, and achievement thresholds passed');
