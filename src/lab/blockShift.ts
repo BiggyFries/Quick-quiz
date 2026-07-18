@@ -5,7 +5,7 @@ export type BlockAxis = 'horizontal' | 'vertical' | 'free';
 export interface GridPoint { x: number; y: number }
 
 export interface ShiftBlock extends GridPoint {
-  id: 'keystone' | 'amber' | 'jade' | 'azure' | 'basalt';
+  id: 'keystone' | 'amber' | 'jade' | 'azure' | 'basalt' | 'crimson';
   kind: 'keystone' | 'block';
   label: string;
   color: string;
@@ -61,6 +61,7 @@ export function initialBlockShiftState(): BlockShiftState {
       { id: 'jade', kind: 'block', label: 'Jade vault', color: '#55b7a5', x: 4, y: 2, width: 2, height: 2, axis: 'free' },
       { id: 'azure', kind: 'block', label: 'Azure column', color: '#6e91cb', x: 6, y: 2, width: 1, height: 3, axis: 'vertical' },
       { id: 'basalt', kind: 'block', label: 'Basalt beam', color: '#70777d', x: 3, y: 6, width: 3, height: 1, axis: 'horizontal' },
+      { id: 'crimson', kind: 'block', label: 'Crimson lock', color: '#bf5d58', x: 7, y: 2, width: 1, height: 2, axis: 'vertical' },
     ],
     moves: 0,
     pushes: 0,

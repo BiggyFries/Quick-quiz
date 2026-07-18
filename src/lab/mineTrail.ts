@@ -22,6 +22,7 @@ export const MINE_TRAIL_MINES: GridPoint[] = [
   { x: 4, y: 2 },
   { x: 2, y: 3 },
   { x: 4, y: 4 },
+  { x: 0, y: 2 },
 ];
 
 const DIRECTIONS: Record<LabDirection, GridPoint> = {

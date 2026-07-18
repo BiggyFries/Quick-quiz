@@ -1,4 +1,4 @@
-export type ClassicLabId = 3 | 4 | 5 | 6 | 7 | 8 | 9;
+export type ClassicLabId = 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
 export type ClassicDirection = 'up' | 'down' | 'left' | 'right';
 export type ClassicLabStatus = 'playing' | 'complete' | 'failed';
 
@@ -14,13 +14,18 @@ export interface LabDefinition {
 }
 
 export const CLASSIC_LABS: LabDefinition[] = [
-  { id: 3, title: 'Relic Run', shortTitle: 'Maze chase', inspiration: 'Inspired by Pac-Man', objective: 'Collect 14 sun sparks, evade the temple shades, then reach the portal.', controlHint: 'Move the explorer', accent: '#f6c85f', icon: '☀' },
-  { id: 4, title: 'Sky Stack', shortTitle: 'Falling blocks', inspiration: 'Inspired by Tetris', objective: 'Use the explorer’s remote to keep the airlock clear for 60 seconds.', controlHint: 'Move, rotate and drop', accent: '#66d6cb', icon: '▦' },
+  { id: 3, title: 'Relic Run', shortTitle: 'Maze chase', inspiration: 'Inspired by Pac-Man', objective: 'Collect 18 sun sparks, evade three temple shades, then reach the portal.', controlHint: 'Move one tile precisely', accent: '#f6c85f', icon: '☀' },
+  { id: 4, title: 'Sky Stack', shortTitle: 'Falling blocks', inspiration: 'Inspired by Tetris', objective: 'Use the explorer’s remote to keep the airlock clear for 75 seconds.', controlHint: 'Move, rotate and drop', accent: '#66d6cb', icon: '▦' },
   { id: 5, title: 'River Relay', shortTitle: 'Crossing lanes', inspiration: 'Inspired by Frogger', objective: 'Guide the explorer over beetle roads and floating ruins to the far gate.', controlHint: 'Hop one space', accent: '#72d08f', icon: '≋' },
-  { id: 6, title: 'Trail Coil', shortTitle: 'Growing trail', inspiration: 'Inspired by Snake', objective: 'Collect eight signal orbs without crossing the explorer’s light trail.', controlHint: 'Steer the explorer', accent: '#e8a95b', icon: '◇' },
+  { id: 6, title: 'Trail Coil', shortTitle: 'Growing trail', inspiration: 'Inspired by Snake', objective: 'Collect ten signal orbs without crossing the explorer’s faster light trail.', controlHint: 'Queue one precise turn', accent: '#e8a95b', icon: '◇' },
   { id: 7, title: 'Prism Break', shortTitle: 'Ricochet puzzle', inspiration: 'Inspired by Breakout', objective: 'Aim the remote-guided light bar and shatter every suspended seal.', controlHint: 'Slide the light bar', accent: '#e97f78', icon: '◆' },
-  { id: 8, title: 'Rune Merge', shortTitle: 'Number merge', inspiration: 'Inspired by 2048', objective: 'Shift matching runes together until the explorer forges a level-64 rune.', controlHint: 'Shift the rune board', accent: '#ba91ec', icon: '✦' },
+  { id: 8, title: 'Rune Merge', shortTitle: 'Number merge', inspiration: 'Inspired by 2048', objective: 'Shift matching runes together until the explorer forges a level-128 rune.', controlHint: 'Shift the rune board', accent: '#ba91ec', icon: '✦' },
   { id: 9, title: 'Lantern Grid', shortTitle: 'Light-toggle logic', inspiration: 'Inspired by Lights Out', objective: 'Tap a rune to flip it and its neighbors. Light all 25 lanterns.', controlHint: 'Tap rune tiles', accent: '#70b9e8', icon: '✺' },
+  { id: 10, title: 'Icebound Route', shortTitle: 'Momentum maze', inspiration: 'Ice-slide pathfinding', objective: 'Slide until a wall stops you, gather four frost sigils, then enter the north gate.', controlHint: 'Choose a slide direction', accent: '#8ed9ef', icon: '❄' },
+  { id: 11, title: 'Crate Circuit', shortTitle: 'Push-box logic', inspiration: 'Inspired by Sokoban', objective: 'Push three power crates onto the matching circuit plates without trapping one.', controlHint: 'Walk and push one tile', accent: '#e8a461', icon: '▣' },
+  { id: 12, title: 'Echo Sequence', shortTitle: 'Pattern memory', inspiration: 'Inspired by Simon', objective: 'Watch and repeat three increasingly long four-pad signal sequences.', controlHint: 'Tap the glowing pads', accent: '#d58be6', icon: '◈' },
+  { id: 13, title: 'Gear Links', shortTitle: 'Circuit rotation', inspiration: 'Rotating pipe logic', objective: 'Rotate all sixteen gear links to match the etched circuit blueprint.', controlHint: 'Tap a link to rotate it', accent: '#74cfa0', icon: '⚙' },
+  { id: 14, title: 'Orbit Pulse', shortTitle: 'One-button timing', inspiration: 'Precision timing challenge', objective: 'Pulse inside six moving target windows before three mistimed signals overload the ring.', controlHint: 'Tap PULSE at the target', accent: '#f08c78', icon: '◎' },
 ];
 
 export interface Point { x: number; y: number }
@@ -118,7 +123,25 @@ export interface LanternState extends BaseLabState {
   lit: number;
 }
 
-export type ClassicLabState = RelicState | StackState | RiverState | CoilState | PrismState | MergeState | LanternState;
+export const ICE_MAP = [
+  '#########', '#..#...G#', '#..#.#..#', '#.......#', '###.#...#', '#...#...#', '#.#...#.#', '#...#...#', '#.#...#.#', '#P......#', '#########',
+];
+export interface IceState extends BaseLabState { id: 10; player: Point; sigils: Point[]; collected: string[]; moves: number; exit: Point }
+
+export const CRATE_MAP = [
+  '########', '#......#', '#.G.GG.#', '#......#', '#......#', '#......#', '#P.....#', '########',
+];
+export interface CrateState extends BaseLabState { id: 11; player: Point; crates: Point[]; goals: Point[]; pushes: number; moves: number }
+
+export interface EchoState extends BaseLabState {
+  id: 12; sequence: number[]; round: number; revealIndex: number; revealClock: number; acceptingInput: boolean; inputIndex: number; strikes: number;
+}
+
+export interface GearState extends BaseLabState { id: 13; rotations: number[]; target: number[]; moves: number; aligned: number }
+
+export interface OrbitState extends BaseLabState { id: 14; angle: number; targetAngle: number; targetWidth: number; gate: number; misses: number; speed: number }
+
+export type ClassicLabState = RelicState | StackState | RiverState | CoilState | PrismState | MergeState | LanternState | IceState | CrateState | EchoState | GearState | OrbitState;
 
 export type ClassicLabAction =
   | { type: 'move'; direction: ClassicDirection }
@@ -138,9 +161,9 @@ function initialRelicState(): RelicState {
   RELIC_MAP.forEach((row, y) => [...row].forEach((cell, x) => { if (cell === '.' && !(x === 11 && y === 1)) pellets.push(pointKey({ x, y })); }));
   return {
     id: 3, status: 'playing', elapsedMs: 0, score: 0,
-    message: 'Gather 14 sun sparks. The portal opens when it has enough light.',
-    player: { x: 1, y: 13 }, enemies: [{ id: 0, x: 6, y: 7 }, { id: 1, x: 7, y: 7 }],
-    pellets, lives: 3, enemyClock: 0, target: 14, exit: { x: 11, y: 1 },
+    message: 'Gather 18 sun sparks. Three shades now patrol the maze.',
+    player: { x: 1, y: 13 }, enemies: [{ id: 0, x: 6, y: 7 }, { id: 1, x: 7, y: 7 }, { id: 2, x: 5, y: 7 }],
+    pellets, lives: 3, enemyClock: 0, target: 18, exit: { x: 11, y: 1 },
   };
 }
 
@@ -162,20 +185,20 @@ function initialStackState(): StackState {
     id: 4, status: 'playing', elapsedMs: 0, score: 0,
     message: 'Airlock stable. Keep the falling cargo below the warning line.',
     board: Array.from({ length: 18 }, () => Array<StackCell>(10).fill(0)), active: stackPiece(0),
-    fallClock: 0, lines: 0, pieces: 0, remainingMs: 60000,
+    fallClock: 0, lines: 0, pieces: 0, remainingMs: 75000,
   };
 }
 
 function initialRiverState(): RiverState {
   const specs: Array<[number, number, number, number, RiverMover['kind']]> = [
-    [9, 1, 1.1, 1.4, 'beetle'], [9, 6, 1.1, 1.4, 'beetle'],
-    [8, 3, -1.35, 1.6, 'beetle'], [8, 8, -1.35, 1.6, 'beetle'],
-    [7, 0, 1.65, 1.25, 'beetle'], [7, 4, 1.65, 1.25, 'beetle'], [7, 8, 1.65, 1.25, 'beetle'],
-    [6, 2, -1.05, 2.1, 'beetle'], [6, 8, -1.05, 2.1, 'beetle'],
-    [4, 1, .78, 2.5, 'raft'], [4, 6, .78, 2.5, 'raft'],
-    [3, 3, -.92, 3, 'raft'], [3, 9, -.92, 3, 'raft'],
-    [2, 0, 1.08, 2.2, 'raft'], [2, 5, 1.08, 2.2, 'raft'],
-    [1, 2, -.7, 3.2, 'raft'], [1, 8, -.7, 3.2, 'raft'],
+    [9, 1, 1.23, 1.4, 'beetle'], [9, 6, 1.23, 1.4, 'beetle'],
+    [8, 3, -1.5, 1.6, 'beetle'], [8, 8, -1.5, 1.6, 'beetle'],
+    [7, 0, 1.83, 1.25, 'beetle'], [7, 4, 1.83, 1.25, 'beetle'], [7, 8, 1.83, 1.25, 'beetle'],
+    [6, 2, -1.18, 2.1, 'beetle'], [6, 8, -1.18, 2.1, 'beetle'],
+    [4, 1, .88, 2.35, 'raft'], [4, 6, .88, 2.35, 'raft'],
+    [3, 3, -1.04, 2.8, 'raft'], [3, 9, -1.04, 2.8, 'raft'],
+    [2, 0, 1.21, 2.05, 'raft'], [2, 5, 1.21, 2.05, 'raft'],
+    [1, 2, -.8, 3, 'raft'], [1, 8, -.8, 3, 'raft'],
   ];
   return {
     id: 5, status: 'playing', elapsedMs: 0, score: 0,
@@ -195,20 +218,20 @@ function initialCoilState(): CoilState {
     id: 6, status: 'playing', elapsedMs: 0, score: 0,
     message: 'Follow the signal orbs. Never cross your own glowing trail.',
     trail: [{ x: 7, y: 13 }, { x: 7, y: 14 }, { x: 7, y: 15 }], direction: 'up', pendingDirection: 'up',
-    orb: { ...ORB_SEQUENCE[0] }, moveClock: 0, target: 8,
+    orb: { ...ORB_SEQUENCE[0] }, moveClock: 0, target: 10,
   };
 }
 
 function initialPrismState(): PrismState {
   const colors = [1, 2, 3, 4, 5];
   const seals: Seal[] = [];
-  for (let row = 0; row < 4; row += 1) {
+  for (let row = 0; row < 5; row += 1) {
     for (let col = 0; col < 6; col += 1) seals.push({ id: row * 6 + col, x: 50 + col * 58, y: 190 + row * 32, color: colors[(row + col) % colors.length] });
   }
   return {
     id: 7, status: 'playing', elapsedMs: 0, score: 0,
     message: 'Keep the prism in flight. Slide the light bar beneath it.',
-    paddleX: 195, ball: { x: 195, y: 500, vx: 118, vy: -172 }, seals, lives: 3, combo: 0,
+    paddleX: 195, ball: { x: 195, y: 500, vx: 138, vy: -190 }, seals, lives: 3, combo: 0,
   };
 }
 
@@ -217,7 +240,7 @@ function initialMergeState(): MergeState {
   board[1][1] = 2; board[2][2] = 2;
   return {
     id: 8, status: 'playing', elapsedMs: 0, score: 0,
-    message: 'Matching runes fuse when they collide. Forge a level-64 rune.',
+    message: 'Matching runes fuse when they collide. Forge a level-128 rune.',
     board, moves: 0, turn: 0, highest: 2,
   };
 }
@@ -237,12 +260,46 @@ function toggleLanterns(lights: boolean[], index: number) {
 
 function initialLanternState(): LanternState {
   let lights = Array<boolean>(25).fill(true);
-  for (const index of [0, 6, 18, 24]) lights = toggleLanterns(lights, index);
+  for (const index of [0, 2, 6, 10, 12, 14, 18, 22, 24]) lights = toggleLanterns(lights, index);
   return {
     id: 9, status: 'playing', elapsedMs: 0, score: 0,
     message: 'The remote is linked. Each rune flips itself and its four direct neighbors.',
     lights, moves: 0, lit: lights.filter(Boolean).length,
   };
+}
+
+function initialIceState(): IceState {
+  return {
+    id: 10, status: 'playing', elapsedMs: 0, score: 0, message: 'Each move slides until stone stops you. Gather every frost sigil before the north gate.',
+    player: { x: 1, y: 9 }, sigils: [{ x: 7, y: 9 }, { x: 7, y: 5 }, { x: 3, y: 3 }, { x: 1, y: 1 }], collected: [], moves: 0, exit: { x: 7, y: 1 },
+  };
+}
+
+function initialCrateState(): CrateState {
+  return {
+    id: 11, status: 'playing', elapsedMs: 0, score: 0, message: 'Stand behind a crate to push it. A crate against the wrong wall cannot be pulled back.',
+    player: { x: 1, y: 6 }, crates: [{ x: 2, y: 4 }, { x: 4, y: 4 }, { x: 5, y: 5 }], goals: [{ x: 2, y: 2 }, { x: 4, y: 2 }, { x: 5, y: 2 }], pushes: 0, moves: 0,
+  };
+}
+
+const ECHO_SEQUENCE = [0, 2, 1, 3, 2, 0, 3, 1];
+function echoRoundLength(round: number) { return 4 + round * 2; }
+function initialEchoState(): EchoState {
+  return {
+    id: 12, status: 'playing', elapsedMs: 0, score: 0, message: 'Watch the four pads. Input unlocks when the whole pattern has played.',
+    sequence: ECHO_SEQUENCE, round: 0, revealIndex: 0, revealClock: 0, acceptingInput: false, inputIndex: 0, strikes: 0,
+  };
+}
+
+const GEAR_TARGET = [0, 1, 2, 3, 1, 2, 3, 0, 2, 3, 0, 1, 3, 0, 1, 2];
+function initialGearState(): GearState {
+  const rotations = GEAR_TARGET.map((target, index) => (target + 1 + index % 3) % 4);
+  return { id: 13, status: 'playing', elapsedMs: 0, score: 0, message: 'Tap a link to rotate it clockwise. Match every etched corner mark.', rotations, target: [...GEAR_TARGET], moves: 0, aligned: 0 };
+}
+
+const ORBIT_TARGETS = [.55, 2.2, 4.55, 1.2, 3.4, 5.7];
+function initialOrbitState(): OrbitState {
+  return { id: 14, status: 'playing', elapsedMs: 0, score: 0, message: 'Pulse only when the orbiting spark crosses the highlighted window.', angle: 0, targetAngle: ORBIT_TARGETS[0], targetWidth: .34, gate: 0, misses: 0, speed: 1.9 };
 }
 
 export function initialClassicLabState(id: ClassicLabId): ClassicLabState {
@@ -252,7 +309,12 @@ export function initialClassicLabState(id: ClassicLabId): ClassicLabState {
   if (id === 6) return initialCoilState();
   if (id === 7) return initialPrismState();
   if (id === 8) return initialMergeState();
-  return initialLanternState();
+  if (id === 9) return initialLanternState();
+  if (id === 10) return initialIceState();
+  if (id === 11) return initialCrateState();
+  if (id === 12) return initialEchoState();
+  if (id === 13) return initialGearState();
+  return initialOrbitState();
 }
 
 function relicWalkable(point: Point) {
@@ -262,7 +324,7 @@ function relicWalkable(point: Point) {
 function loseRelicLife(state: RelicState): RelicState {
   const lives = state.lives - 1;
   return {
-    ...state, lives, player: { x: 1, y: 13 }, enemies: [{ id: 0, x: 6, y: 7 }, { id: 1, x: 7, y: 7 }],
+    ...state, lives, player: { x: 1, y: 13 }, enemies: [{ id: 0, x: 6, y: 7 }, { id: 1, x: 7, y: 7 }, { id: 2, x: 5, y: 7 }],
     status: lives <= 0 ? 'failed' : 'playing',
     message: lives <= 0 ? 'The temple shades caught the explorer. Reset the lab to try again.' : `A shade found you. ${lives} lantern ${lives === 1 ? 'charge' : 'charges'} remain.`,
   };
@@ -302,8 +364,8 @@ function tickRelic(state: RelicState, ms: number): RelicState {
   if (state.status !== 'playing') return state;
   let next = { ...state, elapsedMs: state.elapsedMs + ms, enemyClock: state.enemyClock + ms };
   let steps = 0;
-  while (next.enemyClock >= 620 && steps < 12) {
-    next.enemyClock -= 620;
+  while (next.enemyClock >= 520 && steps < 12) {
+    next.enemyClock -= 520;
     const enemies: RelicState['enemies'] = [];
     for (const enemy of next.enemies) enemies.push(chaseStep(enemy, next.player, [...enemies, ...next.enemies.slice(enemies.length)]));
     next = { ...next, enemies };
@@ -373,11 +435,11 @@ function hardDropStack(state: StackState): StackState {
 
 function tickStack(state: StackState, ms: number): StackState {
   if (state.status !== 'playing') return state;
-  const elapsedMs = Math.min(60000, state.elapsedMs + ms);
-  if (elapsedMs >= 60000) return { ...state, elapsedMs, remainingMs: 0, status: 'complete', score: state.score + 600, message: 'Sixty seconds survived. The airlock portal is open!' };
-  let next = { ...state, elapsedMs, remainingMs: 60000 - elapsedMs, fallClock: state.fallClock + ms };
+  const elapsedMs = Math.min(75000, state.elapsedMs + ms);
+  if (elapsedMs >= 75000) return { ...state, elapsedMs, remainingMs: 0, status: 'complete', score: state.score + 750, message: 'Seventy-five seconds survived. The airlock portal is open!' };
+  let next = { ...state, elapsedMs, remainingMs: 75000 - elapsedMs, fallClock: state.fallClock + ms };
   let steps = 0;
-  const interval = Math.max(180, 820 - Math.floor(elapsedMs / 10000) * 105);
+  const interval = Math.max(155, 760 - Math.floor(elapsedMs / 10000) * 92);
   while (next.fallClock >= interval && next.status === 'playing' && steps < 30) {
     next = { ...moveStack(next, 'down'), fallClock: next.fallClock - interval };
     steps += 1;
@@ -457,7 +519,7 @@ function stepCoil(state: CoilState): CoilState {
   return {
     ...state, trail, direction, score, status: complete ? 'complete' : 'playing',
     orb: complete ? state.orb : { ...ORB_SEQUENCE[score % ORB_SEQUENCE.length] },
-    message: complete ? 'Eight signals linked. Trail Coil is clear!' : collected ? `Signal linked. ${state.target - score} remain.` : 'The light trail is growing behind you.',
+    message: complete ? 'Ten signals linked. Trail Coil is clear!' : collected ? `Signal linked. ${state.target - score} remain.` : 'The light trail is growing behind you.',
   };
 }
 
@@ -465,7 +527,7 @@ function tickCoil(state: CoilState, ms: number): CoilState {
   if (state.status !== 'playing') return state;
   let next = { ...state, elapsedMs: state.elapsedMs + ms, moveClock: state.moveClock + ms };
   let steps = 0;
-  const interval = Math.max(105, 260 - state.score * 14);
+  const interval = Math.max(90, 235 - state.score * 12);
   while (next.moveClock >= interval && next.status === 'playing' && steps < 40) {
     next = { ...stepCoil(next), moveClock: next.moveClock - interval };
     steps += 1;
@@ -503,7 +565,7 @@ function tickPrism(state: PrismState, ms: number): PrismState {
     if (ball.y > 630) {
       const lives = next.lives - 1;
       if (lives <= 0) return { ...next, lives: 0, ball, status: 'failed', message: 'The prism fell beyond recovery. Reset the lab to try again.' };
-      ball = { x: next.paddleX, y: 500, vx: next.lives % 2 ? 118 : -118, vy: -172 };
+      ball = { x: next.paddleX, y: 500, vx: next.lives % 2 ? 138 : -138, vy: -190 };
       next = { ...next, lives, combo: 0, message: `Prism recovered. ${lives} light ${lives === 1 ? 'charge' : 'charges'} remain.` };
     }
     next = { ...next, ball };
@@ -561,12 +623,12 @@ function moveMerge(state: MergeState, direction: ClassicDirection): MergeState {
     board[spawn.y][spawn.x] = turn % 5 === 0 ? 4 : 2;
   }
   const highest = Math.max(...board.flat());
-  const complete = highest >= 64;
+  const complete = highest >= 128;
   const failed = !complete && !canMergeBoard(board);
   return {
     ...state, board, turn, moves: state.moves + 1, score: state.score + gain, highest,
     status: complete ? 'complete' : failed ? 'failed' : 'playing',
-    message: complete ? 'Level-64 rune forged. Rune Merge is clear!' : failed ? 'The rune board is locked. Reset and try a new merge path.' : gain ? `Runes fused for ${gain} energy.` : 'Rune board shifted.',
+    message: complete ? 'Level-128 rune forged. Rune Merge is clear!' : failed ? 'The rune board is locked. Reset and try a new merge path.' : gain ? `Runes fused for ${gain} energy.` : 'Rune board shifted.',
   };
 }
 
@@ -581,6 +643,99 @@ function activateLantern(state: LanternState, index: number): LanternState {
   };
 }
 
+function iceWalkable(point: Point) {
+  return point.y >= 0 && point.y < ICE_MAP.length && point.x >= 0 && point.x < ICE_MAP[0].length && ICE_MAP[point.y][point.x] !== '#';
+}
+
+function moveIce(state: IceState, direction: ClassicDirection): IceState {
+  if (state.status !== 'playing') return state;
+  const delta = directionDelta[direction]; let player = { ...state.player }; const crossed: Point[] = [];
+  while (iceWalkable({ x: player.x + delta.x, y: player.y + delta.y })) {
+    player = { x: player.x + delta.x, y: player.y + delta.y }; crossed.push(player);
+  }
+  if (!crossed.length) return { ...state, message: 'Stone blocks that slide. Choose a different direction.' };
+  const collected = [...state.collected];
+  for (const sigil of state.sigils) if (crossed.some((point) => pointEqual(point, sigil)) && !collected.includes(pointKey(sigil))) collected.push(pointKey(sigil));
+  const score = collected.length; const atExit = pointEqual(player, state.exit); const complete = atExit && score === state.sigils.length;
+  return {
+    ...state, player, collected, score, moves: state.moves + 1, status: complete ? 'complete' : 'playing',
+    message: complete ? 'All frost sigils carried through the north gate. Icebound Route is clear!'
+      : atExit ? `${state.sigils.length - score} frost sigils are still missing. Slide away and circle back.`
+        : score > state.score ? `Frost sigil gathered. ${state.sigils.length - score} remain.` : `Slide ended at ${player.x}, ${player.y}.`,
+  };
+}
+
+function crateWalkable(point: Point) {
+  return point.y >= 0 && point.y < CRATE_MAP.length && point.x >= 0 && point.x < CRATE_MAP[0].length && CRATE_MAP[point.y][point.x] !== '#';
+}
+
+function moveCrate(state: CrateState, direction: ClassicDirection): CrateState {
+  if (state.status !== 'playing') return state;
+  const delta = directionDelta[direction]; const destination = { x: state.player.x + delta.x, y: state.player.y + delta.y };
+  if (!crateWalkable(destination)) return { ...state, message: 'The workshop wall blocks that step.' };
+  const crateIndex = state.crates.findIndex((crate) => pointEqual(crate, destination));
+  if (crateIndex < 0) return { ...state, player: destination, moves: state.moves + 1, message: 'Position set. Line up behind a power crate.' };
+  const crateDestination = { x: destination.x + delta.x, y: destination.y + delta.y };
+  if (!crateWalkable(crateDestination) || state.crates.some((crate, index) => index !== crateIndex && pointEqual(crate, crateDestination))) return { ...state, message: 'That crate cannot move. Reposition before pushing again.' };
+  const crates = state.crates.map((crate, index) => index === crateIndex ? crateDestination : crate);
+  const aligned = crates.filter((crate) => state.goals.some((goal) => pointEqual(crate, goal))).length; const complete = aligned === state.goals.length;
+  return {
+    ...state, player: destination, crates, pushes: state.pushes + 1, moves: state.moves + 1, score: aligned, status: complete ? 'complete' : 'playing',
+    message: complete ? 'Every power crate is linked. Crate Circuit is clear!' : aligned ? `${aligned} of ${state.goals.length} circuit plates are powered.` : 'Crate pushed. Avoid sealing it against an unpowered wall.',
+  };
+}
+
+function tickEcho(state: EchoState, ms: number): EchoState {
+  if (state.status !== 'playing' || state.acceptingInput) return state.status === 'playing' ? { ...state, elapsedMs: state.elapsedMs + ms } : state;
+  let revealClock = state.revealClock + ms; let revealIndex = state.revealIndex; const length = echoRoundLength(state.round); let steps = 0;
+  while (revealClock >= 520 && steps < 30) { revealClock -= 520; revealIndex += 1; steps += 1; }
+  if (revealIndex >= length) return { ...state, elapsedMs: state.elapsedMs + ms, revealClock: 0, revealIndex: length, acceptingInput: true, inputIndex: 0, message: `Your turn. Repeat all ${length} signals.` };
+  return { ...state, elapsedMs: state.elapsedMs + ms, revealClock, revealIndex };
+}
+
+function activateEcho(state: EchoState, index: number): EchoState {
+  if (state.status !== 'playing' || index < 0 || index > 3) return state;
+  if (!state.acceptingInput) return { ...state, message: 'Watch first—the input pads unlock after the final signal.' };
+  const length = echoRoundLength(state.round); const correct = state.sequence[state.inputIndex] === index;
+  if (!correct) {
+    const strikes = state.strikes + 1; const failed = strikes >= 2;
+    return { ...state, strikes, acceptingInput: false, inputIndex: 0, revealIndex: 0, revealClock: 0, status: failed ? 'failed' : 'playing', message: failed ? 'Two pattern errors overloaded the echo console. Reset to try again.' : 'Pattern mismatch. Watch this round once more.' };
+  }
+  const inputIndex = state.inputIndex + 1;
+  if (inputIndex < length) return { ...state, inputIndex, score: state.score + 1, message: `${length - inputIndex} signals remain in this echo.` };
+  if (state.round >= 2) return { ...state, inputIndex, score: state.score + 1, status: 'complete', message: 'All three echo sequences restored. Echo Sequence is clear!' };
+  return { ...state, round: state.round + 1, inputIndex: 0, score: state.score + 1, acceptingInput: false, revealIndex: 0, revealClock: 0, message: `Round ${state.round + 2} is longer. Watch closely.` };
+}
+
+function activateGear(state: GearState, index: number): GearState {
+  if (state.status !== 'playing' || index < 0 || index >= state.rotations.length) return state;
+  const rotations = [...state.rotations]; rotations[index] = (rotations[index] + 1) % 4;
+  const aligned = rotations.filter((rotation, tile) => rotation === state.target[tile]).length; const complete = aligned === rotations.length;
+  return { ...state, rotations, moves: state.moves + 1, aligned, score: aligned, status: complete ? 'complete' : 'playing', message: complete ? 'All sixteen links match the blueprint. Gear Links is clear!' : `${aligned} of 16 gear links aligned.` };
+}
+
+function angleDistance(a: number, b: number) {
+  const full = Math.PI * 2; const difference = Math.abs(((a - b + Math.PI) % full + full) % full - Math.PI); return difference;
+}
+
+function tickOrbit(state: OrbitState, ms: number): OrbitState {
+  if (state.status !== 'playing') return state;
+  const angle = (state.angle + state.speed * ms / 1000) % (Math.PI * 2);
+  return { ...state, angle, elapsedMs: state.elapsedMs + ms };
+}
+
+function activateOrbit(state: OrbitState): OrbitState {
+  if (state.status !== 'playing') return state;
+  const hit = angleDistance(state.angle, state.targetAngle) <= state.targetWidth;
+  if (!hit) {
+    const misses = state.misses + 1; const failed = misses >= 3;
+    return { ...state, misses, status: failed ? 'failed' : 'playing', message: failed ? 'Three mistimed pulses overloaded the orbit. Reset to try again.' : `Pulse missed. ${3 - misses} timing ${3 - misses === 1 ? 'charge' : 'charges'} remain.` };
+  }
+  const gate = state.gate + 1;
+  if (gate >= ORBIT_TARGETS.length) return { ...state, gate, score: gate, status: 'complete', message: 'Six orbit gates synchronized. Orbit Pulse is clear!' };
+  return { ...state, gate, score: gate, targetAngle: ORBIT_TARGETS[gate], targetWidth: Math.max(.19, state.targetWidth - .025), speed: state.speed + .22, message: `Gate ${gate} locked. The next orbit is faster and tighter.` };
+}
+
 export function updateClassicLab(state: ClassicLabState, action: ClassicLabAction): ClassicLabState {
   if (action.type === 'tick') {
     if (state.id === 3) return tickRelic(state, action.ms);
@@ -588,6 +743,8 @@ export function updateClassicLab(state: ClassicLabState, action: ClassicLabActio
     if (state.id === 5) return tickRiver(state, action.ms);
     if (state.id === 6) return tickCoil(state, action.ms);
     if (state.id === 7) return tickPrism(state, action.ms);
+    if (state.id === 12) return tickEcho(state, action.ms);
+    if (state.id === 14) return tickOrbit(state, action.ms);
     return state.status === 'playing' ? { ...state, elapsedMs: state.elapsedMs + action.ms } : state;
   }
   if (action.type === 'move') {
@@ -597,11 +754,16 @@ export function updateClassicLab(state: ClassicLabState, action: ClassicLabActio
     if (state.id === 6) return steerCoil(state, action.direction);
     if (state.id === 7) return movePrism(state, action.direction);
     if (state.id === 8) return moveMerge(state, action.direction);
+    if (state.id === 10) return moveIce(state, action.direction);
+    if (state.id === 11) return moveCrate(state, action.direction);
     return state;
   }
   if (action.type === 'rotate' && state.id === 4) return rotateStack(state);
   if (action.type === 'hard-drop' && state.id === 4) return hardDropStack(state);
   if (action.type === 'activate' && state.id === 9) return activateLantern(state, action.index);
+  if (action.type === 'activate' && state.id === 12) return activateEcho(state, action.index);
+  if (action.type === 'activate' && state.id === 13) return activateGear(state, action.index);
+  if (action.type === 'activate' && state.id === 14) return activateOrbit(state);
   return state;
 }
 
@@ -611,10 +773,15 @@ export function classicLabSnapshot(state: ClassicLabState) {
     status: state.status, elapsedMs: Math.round(state.elapsedMs), score: state.score, message: state.message,
   };
   if (state.id === 3) return { ...base, coordinateSystem: '13x15 maze; origin top-left; x right; y down', objective: `Collect ${state.target} sparks and reach exit`, player: state.player, enemies: state.enemies, visibleSparks: state.pellets, collected: state.score, target: state.target, lives: state.lives, exit: state.exit, portalOpen: state.score >= state.target };
-  if (state.id === 4) return { ...base, coordinateSystem: '10x18 stack grid; origin top-left; x right; y down', objective: 'Survive 60 seconds', board: state.board, active: state.active, remainingMs: state.remainingMs, lines: state.lines, pieces: state.pieces };
+  if (state.id === 4) return { ...base, coordinateSystem: '10x18 stack grid; origin top-left; x right; y down', objective: 'Survive 75 seconds', board: state.board, active: state.active, remainingMs: state.remainingMs, lines: state.lines, pieces: state.pieces };
   if (state.id === 5) return { ...base, coordinateSystem: '9x11 crossing grid; origin at far-left gate; x right; y toward explorer', objective: 'Reach row 0', player: state.player, movers: state.movers.map(({ id, row, x, width, kind }) => ({ id, row, x: Number(x.toFixed(2)), width, kind })), lives: state.lives, hops: state.hops };
   if (state.id === 6) return { ...base, coordinateSystem: '15x16 trail grid; origin top-left; x right; y down', objective: `Collect ${state.target} signal orbs`, explorer: state.trail[0], direction: state.direction, pendingDirection: state.pendingDirection, trail: state.trail, orb: state.orb, collected: state.score, target: state.target };
   if (state.id === 7) return { ...base, coordinateSystem: '390x844 canvas pixels; origin top-left; x right; y down', objective: 'Break all prism seals', paddleX: Math.round(state.paddleX), ball: { x: Math.round(state.ball.x), y: Math.round(state.ball.y), vx: Math.round(state.ball.vx), vy: Math.round(state.ball.vy) }, seals: state.seals, lives: state.lives, combo: state.combo };
-  if (state.id === 8) return { ...base, coordinateSystem: '4x4 merge grid; origin top-left; x right; y down', objective: 'Forge a level-64 rune', board: state.board, moves: state.moves, highest: state.highest };
-  return { ...base, coordinateSystem: '5x5 light grid; index=y*5+x; origin top-left', objective: 'Turn all 25 lanterns on; activating a tile toggles itself and its direct neighbors', lights: state.lights, lit: state.lit, moves: state.moves, dark: 25 - state.lit };
+  if (state.id === 8) return { ...base, coordinateSystem: '4x4 merge grid; origin top-left; x right; y down', objective: 'Forge a level-128 rune', board: state.board, moves: state.moves, highest: state.highest };
+  if (state.id === 9) return { ...base, coordinateSystem: '5x5 light grid; index=y*5+x; origin top-left', objective: 'Turn all 25 lanterns on; activating a tile toggles itself and its direct neighbors', lights: state.lights, lit: state.lit, moves: state.moves, dark: 25 - state.lit };
+  if (state.id === 10) return { ...base, coordinateSystem: '9x11 ice grid; origin top-left; x right; y down', objective: 'Collect four frost sigils and stop on the north gate', map: ICE_MAP, player: state.player, sigils: state.sigils, collected: state.collected, moves: state.moves, exit: state.exit };
+  if (state.id === 11) return { ...base, coordinateSystem: '8x8 crate grid; origin top-left; x right; y down', objective: 'Push all three crates onto circuit goals', map: CRATE_MAP, player: state.player, crates: state.crates, goals: state.goals, pushes: state.pushes, moves: state.moves };
+  if (state.id === 12) return { ...base, coordinateSystem: 'four pads indexed 0 top, 1 right, 2 bottom, 3 left', objective: 'Repeat three sequences of lengths 4, 6, and 8', round: state.round + 1, sequenceLength: echoRoundLength(state.round), activePad: state.acceptingInput ? null : state.sequence[Math.min(state.revealIndex, echoRoundLength(state.round) - 1)], acceptingInput: state.acceptingInput, inputIndex: state.inputIndex, strikes: state.strikes };
+  if (state.id === 13) return { ...base, coordinateSystem: '4x4 gear grid; index=y*4+x; origin top-left', objective: 'Rotate all sixteen links to their target orientations', rotations: state.rotations, target: state.target, aligned: state.aligned, moves: state.moves };
+  return { ...base, coordinateSystem: 'circular orbit in radians; zero points right; angles increase clockwise', objective: 'Pulse inside six target windows before three misses', angle: Number(state.angle.toFixed(3)), targetAngle: state.targetAngle, targetWidth: state.targetWidth, gate: state.gate, misses: state.misses, speed: state.speed };
 }

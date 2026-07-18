@@ -43,7 +43,7 @@ function drawHub(canvas: HTMLCanvasElement, time: number, character: CharacterCu
 export function LabHub({ onExit, openBlockShift, openMineTrail, character }: { onExit: () => void; openBlockShift: () => void; openMineTrail: () => void; character: CharacterCustomization }) {
   const [selected, setSelected] = useState<LabSelection>(() => {
     const requested = Number(new URLSearchParams(window.location.search).get('lab'));
-    return requested >= 3 && requested <= 9 ? requested as ClassicLabId : null;
+    return requested >= 3 && requested <= 14 ? requested as ClassicLabId : null;
   });
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -75,7 +75,7 @@ export function LabHub({ onExit, openBlockShift, openMineTrail, character }: { o
     <header className="lab-hub-header">
       <button className="icon-button glass" onClick={onExit} aria-label="Back to home">←</button>
       <div><span>DAILY VENTURE · TEST WING</span><h1>Prototype Corridor</h1></div>
-      <div className="lab-count"><strong>9</strong><small>PLAYABLE</small></div>
+      <div className="lab-count"><strong>14</strong><small>PLAYABLE</small></div>
     </header>
     <div className="lab-hub-intro">
       <strong>Choose the next field test</strong>
@@ -88,7 +88,7 @@ export function LabHub({ onExit, openBlockShift, openMineTrail, character }: { o
       <button className="lab-card lab-card-mine" onClick={openMineTrail}>
         <span className="lab-card-number">02</span><span className="lab-card-copy"><strong>Mine Trail</strong><small>Original hidden-tile path · 2.5D explorer</small></span><b>PLAY ›</b>
       </button>
-      <div className="lab-list-divider"><span>CLASSIC MECHANIC STUDIES</span></div>
+      <div className="lab-list-divider"><span>MECHANIC STUDIES · TUNED CHALLENGE</span></div>
       {CLASSIC_LABS.map((lab) => <button key={lab.id} className="lab-card" style={{ '--lab-accent': lab.accent } as CSSProperties} onClick={() => setSelected(lab.id)}>
         <span className="lab-card-number">{String(lab.id).padStart(2, '0')}</span>
         <span className="lab-card-icon" aria-hidden="true">{lab.icon}</span>

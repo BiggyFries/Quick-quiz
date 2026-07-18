@@ -111,6 +111,7 @@ test('mobile home remains usable across the supported phone range', async ({ pag
     await expect(page.getByRole('heading', { name: /DAILY VENTURE/i })).toBeVisible();
     await expect(page.getByRole('button', { name: 'About Daily Venture' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Achievements' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: /PREVIEW TESTER GAMES/i })).toContainText('14 playable labs');
     const characterButton = await page.getByRole('button', { name: /^Customize character,/ }).boundingBox();
     expect(characterButton).not.toBeNull();
     expect(characterButton!.width).toBeGreaterThanOrEqual(44);
@@ -131,6 +132,15 @@ test('character creator saves appearance and name for the toolbar, profile, and 
   await page.goto('/');
   await page.getByRole('button', { name: 'Customize character, Ari' }).click();
   await expect(page.getByRole('dialog', { name: 'Customize character' })).toBeVisible();
+  await page.getByRole('button', { name: /Matt.*Triangular/i }).click();
+  await expect(page.getByLabel('Character name')).toHaveValue('Matt');
+  await page.getByRole('button', { name: /Ian.*Sturdy/i }).click();
+  await expect(page.getByLabel('Character name')).toHaveValue('Ian');
+  await page.getByRole('button', { name: /Myles.*Tall/i }).click();
+  await expect(page.getByLabel('Character name')).toHaveValue('Myles');
+  await page.getByLabel('Character name').fill('Keepsake');
+  await page.getByRole('button', { name: /RANDOMIZE LOOK/i }).click();
+  await expect(page.getByLabel('Character name')).toHaveValue('Keepsake');
   await page.getByLabel('Character name').fill('Nova Vale');
   await page.getByRole('button', { name: 'Angular', exact: true }).click();
   await page.getByRole('button', { name: 'Storm coat', exact: true }).click();
@@ -209,8 +219,9 @@ test('Block Shift lab supports touch controls, undo, keyboard play, and a comple
 
   const solution = [
     'ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowRight',
-    'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'ArrowUp', 'ArrowLeft',
-    'ArrowLeft', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowLeft', 'ArrowLeft', 'ArrowDown',
+    'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'ArrowLeft',
+    'ArrowLeft', 'ArrowUp', 'ArrowUp', 'ArrowLeft', 'ArrowLeft', 'ArrowDown', 'ArrowUp',
+    'ArrowLeft', 'ArrowLeft', 'ArrowLeft', 'ArrowDown',
     'ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowRight',
   ];
   for (const key of solution) {
@@ -239,8 +250,8 @@ test('Mine Trail uses character movement and an action reveal for safe, failed, 
   let state = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
   expect(state.player).toEqual({ x: 0, y: 4 });
   expect(state.actions).toBe(1);
-  expect(state.safeTilesRemaining).toBe(14);
-  expect(state.cells.filter((cell: { state: string }) => cell.state === 'safe')).toHaveLength(6);
+  expect(state.safeTilesRemaining).toBe(15);
+  expect(state.cells.filter((cell: { state: string }) => cell.state === 'safe')).toHaveLength(4);
 
   await page.getByRole('button', { name: /RESET/i }).click();
   for (const key of ['ArrowRight', 'ArrowUp', 'ArrowUp', 'ArrowUp']) await page.keyboard.press(key);
@@ -252,7 +263,7 @@ test('Mine Trail uses character movement and an action reveal for safe, failed, 
   await page.screenshot({ path: path.join(captures, 'mine-trail-failed.png') });
 
   await page.getByRole('button', { name: /RESET/i }).click();
-  const mines = new Set(['4,4', '2,3', '4,2', '1,1', '3,0']);
+  const mines = new Set(['4,4', '2,3', '0,2', '4,2', '1,1', '3,0']);
   let current = { x: 0, y: 4 };
   for (let y = 4; y >= 0; y -= 1) {
     const xs = (4 - y) % 2 === 0 ? [0, 1, 2, 3, 4] : [4, 3, 2, 1, 0];
