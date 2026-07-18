@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { CharacterCustomizer, CharacterPortrait } from './character/CharacterCustomizer';
+import { loadCharacterCustomization, normalizeCharacterCustomization, saveCharacterCustomization, type CharacterCustomization } from './character/character';
 import { WEEK_ONE } from './content/week1';
 import { VentureCanvas, type CanvasView } from './game/VentureCanvas';
 import { currentPuzzleConfig, initialSessionState, sessionReducer, sessionSnapshot } from './game/session';
@@ -10,7 +12,7 @@ import { calculateAchievements, newlyUnlocked } from './services/achievements';
 import { formatDate, localDateKey } from './services/date';
 import { createVentureService, DEFAULT_SETTINGS, type CalendarDay } from './services/ventureService';
 
-type Modal = 'help' | 'login' | 'achievements' | 'settings' | 'rooms' | null;
+type Modal = 'help' | 'login' | 'achievements' | 'settings' | 'rooms' | 'customize' | null;
 type HomePage = 'home' | 'archive' | 'review' | 'lab' | 'lab-block' | 'lab-mine';
 
 function formatDuration(ms: number) {
@@ -119,6 +121,7 @@ export function App() {
   const service = useMemo(() => createVentureService(), []);
   const [profile, setProfile] = useState<Awaited<ReturnType<typeof service.getProfile>>>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [character, setCharacter] = useState<CharacterCustomization>(loadCharacterCustomization);
   const [session, dispatch] = useReducer(sessionReducer, initialSessionState);
   const [page, setPage] = useState<HomePage>(() => {
     const requestedLab = new URLSearchParams(window.location.search).get('lab');
@@ -147,7 +150,11 @@ export function App() {
   useEffect(() => {
     service.getProfile().then((current) => {
       setProfile(current);
-      if (current) setSettings(current.settings);
+      if (current) {
+        setSettings(current.settings);
+        const savedCharacter = saveCharacterCustomization(normalizeCharacterCustomization(current.character ?? loadCharacterCustomization()));
+        setCharacter(savedCharacter);
+      }
     }).catch(() => undefined);
   }, [service]);
 
@@ -166,8 +173,8 @@ export function App() {
     if (page.startsWith('lab')) return;
     const bridge = window as typeof window & { advanceTime?: (ms: number) => void; render_game_to_text?: () => string };
     bridge.advanceTime = (ms: number) => { manualTime.current = true; if (modal === null) dispatch({ type: 'TICK', ms }); };
-    bridge.render_game_to_text = () => JSON.stringify(sessionSnapshot(session));
-  }, [modal, page, session]);
+    bridge.render_game_to_text = () => JSON.stringify({ ...sessionSnapshot(session), character });
+  }, [character, modal, page, session]);
 
   useEffect(() => {
     if (session.mode !== 'results' || session.isTesting || !profile || !session.attemptId || finalizedAttempt.current === session.attemptId || !session.finalOutcome) return;
@@ -262,6 +269,7 @@ export function App() {
       current = await service.enterLocalReview();
       setProfile(current);
       setSettings(current.settings);
+      if (current.character) { const savedCharacter = saveCharacterCustomization(current.character); setCharacter(savedCharacter); }
     }
     const items = await service.listReviewAdventures();
     setReviewAdventures(items);
@@ -283,7 +291,7 @@ export function App() {
     event.preventDefault();
     try {
       const result = await service.signIn(loginEmail);
-      if (result.profile) { setProfile(result.profile); setSettings(result.profile.settings); setLoginMessage('Local reviewer profile is ready.'); setModal(null); }
+      if (result.profile) { setProfile(result.profile); setSettings(result.profile.settings); if (result.profile.character) setCharacter(saveCharacterCustomization(result.profile.character)); setLoginMessage('Local reviewer profile is ready.'); setModal(null); }
       else setLoginMessage('Check your email for the secure sign-in link.');
     } catch (error) { setLoginMessage(String(error)); }
   };
@@ -297,6 +305,14 @@ export function App() {
     setSettings(next);
     if (key === 'music') { if (next.music && session.adventure) startAmbient(session.adventure.weekIndex, true); else stopAmbient(); }
     if (profile) { await service.updateSettings(next); setProfile({ ...profile, settings: next }); }
+  };
+
+  const saveCharacter = async (nextCharacter: CharacterCustomization) => {
+    const saved = saveCharacterCustomization(nextCharacter); setCharacter(saved);
+    if (profile) {
+      await service.updateCharacter(saved);
+      setProfile({ ...profile, character: saved });
+    }
   };
 
   const schedule = async () => {
@@ -344,6 +360,7 @@ export function App() {
     resolutionOutcome: session.resolutionOutcome,
     resolutionElapsedMs: session.resolutionElapsedMs,
     reducedMotion: session.reducedMotion,
+    character,
   };
 
   const homeCanvasView: CanvasView = { ...canvasView, adventure: null, mode: 'home' };
@@ -353,14 +370,15 @@ export function App() {
     <div className="phone-stage">
       {!(session.mode === 'home' && page.startsWith('lab')) && <VentureCanvas view={session.mode === 'home' ? homeCanvasView : canvasView} />}
 
-      {session.mode === 'home' && page === 'lab' && <CoreLabHub onExit={() => setPage('home')} openBlockShift={() => setPage('lab-block')} openMineTrail={() => setPage('lab-mine')} />}
-      {session.mode === 'home' && page === 'lab-block' && <BlockShiftLab onExit={() => setPage('lab')} />}
-      {session.mode === 'home' && page === 'lab-mine' && <MineTrailLab onExit={() => setPage('lab')} />}
+      {session.mode === 'home' && page === 'lab' && <CoreLabHub character={character} onExit={() => setPage('home')} openBlockShift={() => setPage('lab-block')} openMineTrail={() => setPage('lab-mine')} />}
+      {session.mode === 'home' && page === 'lab-block' && <BlockShiftLab character={character} onExit={() => setPage('lab')} />}
+      {session.mode === 'home' && page === 'lab-mine' && <MineTrailLab character={character} onExit={() => setPage('lab')} />}
 
       {session.mode === 'home' && page === 'home' && <section className="screen-overlay home-screen">
         <header className="home-toolbar">
           <button className="icon-button glass" onClick={() => setModal('help')} aria-label="About Daily Venture"><AppIcon>?</AppIcon></button>
           <button className="icon-button glass" onClick={() => setModal('achievements')} aria-label="Achievements"><AppIcon>♜</AppIcon></button>
+          <button className="character-button glass" onClick={() => setModal('customize')} aria-label={`Customize character, ${character.name}`}><CharacterPortrait character={character} /></button>
           <button className="account-button glass" onClick={() => setModal(profile ? 'settings' : 'login')}>{profile ? 'PROFILE' : 'LOG IN'}</button>
         </header>
         <div className="home-title"><div className="eyebrow">ONE TRAIL · EVERY DAY</div><h1>DAILY<br />VENTURE</h1><p>Move through handcrafted puzzle worlds. One new venture every day.</p></div>
@@ -407,7 +425,7 @@ export function App() {
         {config.type === 'finale' && session.puzzle.kind === 'finale' && <FinalePuzzle config={config as FinaleConfig} puzzle={session.puzzle} choose={(value) => dispatch({ type: 'CHOOSE', value })} confirm={() => dispatch({ type: 'CONFIRM' })} replay={() => dispatch({ type: 'MEMORY_REPLAY' })} tapRhythm={feedbackPulse} />}
       </section>}
 
-      {session.mode === 'resolution' && config && <section className="screen-overlay resolution-screen"><div className="resolution-card"><div className="eyebrow">{session.resolutionOutcome === 'success' ? 'TRAIL CLEARED' : 'RUN ENDED'}</div><h1>{session.resolutionOutcome === 'success' ? `${session.adventure?.art.artifact} recovered` : 'The Venture claims you'}</h1><p>{session.resolutionOutcome === 'success' ? 'The explorer crosses the obstacle and carries the relic onward.' : 'A stylized defeat closes this trail. Your result is waiting.'}</p><div className="resolution-meter"><span style={{ width: `${Math.min(100, session.resolutionElapsedMs / (session.reducedMotion ? 1200 : 4800) * 100)}%` }} /></div></div></section>}
+      {session.mode === 'resolution' && config && <section className="screen-overlay resolution-screen"><div className="resolution-card"><div className="eyebrow">{session.resolutionOutcome === 'success' ? 'TRAIL CLEARED' : 'RUN ENDED'}</div><h1>{session.resolutionOutcome === 'success' ? `${session.adventure?.art.artifact} recovered` : 'The Venture claims you'}</h1><p>{session.resolutionOutcome === 'success' ? `${character.name} crosses the obstacle and carries the relic onward.` : `${character.name}'s trail closes here. Your result is waiting.`}</p><div className="resolution-meter"><span style={{ width: `${Math.min(100, session.resolutionElapsedMs / (session.reducedMotion ? 1200 : 4800) * 100)}%` }} /></div></div></section>}
 
       {session.mode === 'results' && session.adventure && <section className="screen-overlay results-screen"><div className="results-card"><div className="eyebrow">{session.finalOutcome === 'survived' ? 'VENTURE SURVIVED' : 'EXPEDITION ENDED'}</div><h1>{session.finalOutcome === 'survived' ? 'The trail opens' : `Room ${session.results.length} stopped you`}</h1><h2>{session.adventure.title}</h2><div className="result-tiles">{Array.from({ length: 5 }, (_, index) => <span key={index} className={session.results[index]?.success ? 'success' : session.results[index] ? 'failed' : ''}>{session.results[index]?.success ? '✓' : session.results[index] ? '×' : '·'}</span>)}</div><div className="result-stats"><div><strong>{session.results.filter((item) => item.success).length}/5</strong><small>cleared</small></div><div><strong>{formatDuration(session.activeMs)}</strong><small>active time</small></div><div><strong>{session.attemptNumber}</strong><small>attempt</small></div></div>{session.newlyUnlocked.length > 0 && <p className="achievement-toast">Achievement unlocked · {session.newlyUnlocked.join(', ')}</p>}<button className="primary-button" onClick={retry}>RETRY FULL TRAIL</button><button className="secondary-button" disabled={!profile || !session.authenticated} onClick={share}>{profile && session.authenticated ? 'SHARE RESULT' : 'LOG IN BEFORE PLAYING TO SHARE'}</button>{!session.authenticated && <p className="guest-note">Guest results are never saved or made shareable. Logging in now only applies to your next run.</p>}{shareMessage && <p className="share-message">{shareMessage}</p>}<button className="text-button" onClick={goHome}>Return home</button></div></section>}
 
@@ -419,7 +437,9 @@ export function App() {
 
       {modal === 'achievements' && <ModalFrame title="Achievements" onClose={() => setModal(null)}>{!profile && <p className="modal-note">Achievement goals are visible to everyone. Log in before a Venture to save progress.</p>}<div className="achievement-list">{achievements.map((item) => <div key={item.code} className={item.unlocked ? 'unlocked' : ''}><span>{item.unlocked ? '◆' : '◇'}</span><p><strong>{item.title}</strong><small>{item.description}</small></p><b>{item.current}/{item.target}</b></div>)}</div></ModalFrame>}
 
-      {modal === 'settings' && <ModalFrame title={profile ? 'Profile & settings' : 'Run settings'} onClose={() => setModal(null)}>{profile && <div className="profile-summary"><span>{profile.email.slice(0, 1).toUpperCase()}</span><p><strong>{profile.email}</strong><small>{profile.role} · {profile.attempts.length} attempts</small></p></div>}<div className="settings-list">{([['sound', 'Sound effects'], ['music', 'Ambient music'], ['vibration', 'Touch vibration'], ['reducedMotion', 'Reduced motion'], ['highContrast', 'High contrast']] as Array<[keyof Settings, string]>).map(([key, label]) => <button key={key} onClick={() => changeSetting(key)}><span>{label}</span><b className={settings[key] ? 'on' : ''}>{settings[key] ? 'ON' : 'OFF'}</b></button>)}</div>{profile ? <button className="danger-button" onClick={signOut}>SIGN OUT</button> : <button className="primary-button" onClick={() => setModal('login')}>LOG IN</button>}</ModalFrame>}
+      {modal === 'customize' && <ModalFrame title="Customize character" onClose={() => setModal(null)}><CharacterCustomizer character={character} onSave={saveCharacter} /></ModalFrame>}
+
+      {modal === 'settings' && <ModalFrame title={profile ? 'Profile & settings' : 'Run settings'} onClose={() => setModal(null)}>{profile && <div className="profile-summary"><CharacterPortrait character={character} /><p><strong>{character.name}</strong><small>{profile.email} · {profile.role} · {profile.attempts.length} attempts</small></p></div>}<div className="settings-list">{([['sound', 'Sound effects'], ['music', 'Ambient music'], ['vibration', 'Touch vibration'], ['reducedMotion', 'Reduced motion'], ['highContrast', 'High contrast']] as Array<[keyof Settings, string]>).map(([key, label]) => <button key={key} onClick={() => changeSetting(key)}><span>{label}</span><b className={settings[key] ? 'on' : ''}>{settings[key] ? 'ON' : 'OFF'}</b></button>)}</div>{profile ? <button className="danger-button" onClick={signOut}>SIGN OUT</button> : <button className="primary-button" onClick={() => setModal('login')}>LOG IN</button>}</ModalFrame>}
     </div>
   </main>;
 }

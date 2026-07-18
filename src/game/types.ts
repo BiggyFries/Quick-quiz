@@ -1,3 +1,5 @@
+import type { CharacterCustomization } from '../character/character';
+
 export type PuzzleType = 'trivia' | 'logic' | 'rhythm' | 'memory' | 'finale';
 export type AdventureStatus = 'draft' | 'approved' | 'scheduled' | 'published';
 
@@ -175,6 +177,7 @@ export interface PlayerProfile {
   id: string;
   email: string;
   role: 'player' | 'reviewer';
+  character: CharacterCustomization;
   settings: Settings;
   attempts: AttemptRecord[];
 }

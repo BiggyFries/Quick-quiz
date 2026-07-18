@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { drawCharacterCanvas, type CharacterCustomization } from '../character/character';
 import {
   CLASSIC_LABS,
   RELIC_MAP,
@@ -72,6 +73,10 @@ function drawExplorer(ctx: CanvasRenderingContext2D, x: number, y: number, scale
   ctx.restore();
 }
 
+function drawCustomizedExplorer(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, time: number, character: CharacterCustomization, remote = false, facing: ClassicDirection = 'down') {
+  drawCharacterCanvas(ctx, character, { x, groundY: y + 24 * scale, scale: scale * .82, time, pose: 'idle', remote, facing });
+}
+
 function drawShade(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, time: number) {
   const bob = Math.sin(time / 230 + x) * 2;
   ctx.save(); ctx.translate(x, y + bob);
@@ -81,7 +86,7 @@ function drawShade(ctx: CanvasRenderingContext2D, x: number, y: number, color: s
   ctx.restore();
 }
 
-function drawRelic(ctx: CanvasRenderingContext2D, state: RelicState, time: number) {
+function drawRelic(ctx: CanvasRenderingContext2D, state: RelicState, time: number, character: CharacterCustomization) {
   const cellW = 25; const cellH = 27; const left = 32; const top = 158;
   roundedRect(ctx, 22, 146, 346, 430, 22, '#071a20da', '#d7fff238');
   RELIC_MAP.forEach((row, y) => [...row].forEach((cell, x) => {
@@ -103,12 +108,12 @@ function drawRelic(ctx: CanvasRenderingContext2D, state: RelicState, time: numbe
     ctx.fillStyle = '#ffe58b'; ctx.beginPath(); ctx.arc(left + x * cellW + cellW / 2, top + y * cellH + cellH / 2, 2.7 * pulse, 0, Math.PI * 2); ctx.fill();
   });
   state.enemies.forEach((enemy, index) => drawShade(ctx, left + enemy.x * cellW + cellW / 2, top + enemy.y * cellH + cellH / 2 + 4, index ? '#ca7eaa' : '#72c9d4', time));
-  drawExplorer(ctx, left + state.player.x * cellW + cellW / 2, top + state.player.y * cellH + cellH / 2 + 2, .38, time, false);
+  drawCustomizedExplorer(ctx, left + state.player.x * cellW + cellW / 2, top + state.player.y * cellH + cellH / 2 + 2, .38, time, character, false);
 }
 
 const STACK_COLORS = ['#0000', '#e5bd58', '#5dc6bd', '#dc8159', '#846fc5', '#5e98cf'];
 
-function drawStack(ctx: CanvasRenderingContext2D, state: StackState, time: number) {
+function drawStack(ctx: CanvasRenderingContext2D, state: StackState, time: number, character: CharacterCustomization) {
   roundedRect(ctx, 87, 146, 216, 428, 24, '#07171ddf', '#b9fff25c');
   roundedRect(ctx, 101, 157, 188, 372, 12, '#10262d', '#ffffff35');
   const cellW = 18; const cellH = 20; const left = 105; const top = 163;
@@ -126,12 +131,12 @@ function drawStack(ctx: CanvasRenderingContext2D, state: StackState, time: numbe
   });
   ctx.fillStyle = '#b6e5db'; ctx.font = '800 9px Inter, system-ui'; ctx.textAlign = 'center';
   ctx.fillText(`AIRLOCK · ${Math.ceil(state.remainingMs / 1000)}s`, 195, 548);
-  drawExplorer(ctx, 195, 572, .76, time, true);
+  drawCustomizedExplorer(ctx, 195, 572, .76, time, character, true);
 }
 
 function riverX(x: number) { return 45 + x * 37.5; }
 
-function drawRiver(ctx: CanvasRenderingContext2D, state: RiverState, time: number) {
+function drawRiver(ctx: CanvasRenderingContext2D, state: RiverState, time: number, character: CharacterCustomization) {
   roundedRect(ctx, 23, 148, 344, 438, 22, '#0a2228d9', '#c6fff33d');
   const top = 164; const rowH = 36; const left = 29; const width = 332;
   for (let row = 0; row <= 10; row += 1) {
@@ -158,10 +163,10 @@ function drawRiver(ctx: CanvasRenderingContext2D, state: RiverState, time: numbe
       ctx.strokeStyle = '#132124'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 10, y - 7); ctx.lineTo(x - 15, y - 13); ctx.moveTo(x + 3, y - 8); ctx.lineTo(x + 6, y - 14); ctx.stroke();
     }
   });
-  drawExplorer(ctx, riverX(state.player.x), top + state.player.y * rowH + 21, .52, time, false, 'up');
+  drawCustomizedExplorer(ctx, riverX(state.player.x), top + state.player.y * rowH + 21, .52, time, character, false, 'up');
 }
 
-function drawCoil(ctx: CanvasRenderingContext2D, state: CoilState, time: number) {
+function drawCoil(ctx: CanvasRenderingContext2D, state: CoilState, time: number, character: CharacterCustomization) {
   roundedRect(ctx, 31, 151, 328, 404, 22, '#071a20dc', '#e8a95b59');
   const left = 45; const top = 169; const cell = 20;
   for (let y = 0; y < 16; y += 1) for (let x = 0; x < 15; x += 1) {
@@ -178,10 +183,10 @@ function drawCoil(ctx: CanvasRenderingContext2D, state: CoilState, time: number)
   const pulse = 7 + Math.sin(time / 150) * 2;
   ctx.save(); ctx.shadowColor = '#8bf5e1'; ctx.shadowBlur = 15; ctx.fillStyle = '#9af5df'; ctx.beginPath(); ctx.arc(left + state.orb.x * cell + 10, top + state.orb.y * cell + 10, pulse, 0, Math.PI * 2); ctx.fill(); ctx.restore();
   const head = state.trail[0];
-  drawExplorer(ctx, left + head.x * cell + 10, top + head.y * cell + 13, .32, time, false, state.direction);
+  drawCustomizedExplorer(ctx, left + head.x * cell + 10, top + head.y * cell + 13, .32, time, character, false, state.direction);
 }
 
-function drawPrism(ctx: CanvasRenderingContext2D, state: PrismState, time: number) {
+function drawPrism(ctx: CanvasRenderingContext2D, state: PrismState, time: number, character: CharacterCustomization) {
   roundedRect(ctx, 21, 145, 348, 490, 24, '#07171dde', '#ffbdb45c');
   const sky = ctx.createLinearGradient(0, 155, 0, 625); sky.addColorStop(0, '#253b50'); sky.addColorStop(1, '#12282f');
   ctx.fillStyle = sky; ctx.fillRect(29, 157, 332, 466);
@@ -191,12 +196,12 @@ function drawPrism(ctx: CanvasRenderingContext2D, state: PrismState, time: numbe
   });
   ctx.save(); ctx.shadowColor = '#fff0a6'; ctx.shadowBlur = 15; ctx.fillStyle = '#fff0a6'; ctx.beginPath(); ctx.arc(state.ball.x, state.ball.y, 7, 0, Math.PI * 2); ctx.fill(); ctx.restore();
   ctx.save(); ctx.shadowColor = '#71e3d0'; ctx.shadowBlur = 12; ctx.fillStyle = '#71e3d0'; ctx.beginPath(); ctx.roundRect(state.paddleX - 46, 560, 92, 13, 7); ctx.fill(); ctx.restore();
-  drawExplorer(ctx, 195, 530, .68, time, true);
+  drawCustomizedExplorer(ctx, 195, 530, .68, time, character, true);
 }
 
 const MERGE_COLORS: Record<number, string> = { 2: '#5d8e88', 4: '#55a99c', 8: '#d6a351', 16: '#d37b51', 32: '#a76fb9', 64: '#f6c85f', 128: '#ef8378' };
 
-function drawMerge(ctx: CanvasRenderingContext2D, state: MergeState, time: number) {
+function drawMerge(ctx: CanvasRenderingContext2D, state: MergeState, time: number, character: CharacterCustomization) {
   roundedRect(ctx, 48, 151, 294, 382, 26, '#07171ddd', '#d8b7ff59');
   roundedRect(ctx, 63, 167, 264, 264, 18, '#203d43');
   const left = 70; const top = 174; const cell = 61;
@@ -208,10 +213,10 @@ function drawMerge(ctx: CanvasRenderingContext2D, state: MergeState, time: numbe
     }
   }));
   ctx.fillStyle = '#d7c6ec'; ctx.font = '800 10px Inter, system-ui'; ctx.textAlign = 'center'; ctx.fillText('WAYFINDER RUNE FORGE', 195, 458);
-  drawExplorer(ctx, 195, 552, .84, time, true);
+  drawCustomizedExplorer(ctx, 195, 552, .84, time, character, true);
 }
 
-function drawLantern(ctx: CanvasRenderingContext2D, state: LanternState, time: number) {
+function drawLantern(ctx: CanvasRenderingContext2D, state: LanternState, time: number, character: CharacterCustomization) {
   roundedRect(ctx, 40, 151, 310, 424, 25, '#07171ddd', '#9bd8ff5c');
   const left = 55; const top = 171; const cell = 56;
   ctx.strokeStyle = '#70b9e846'; ctx.lineWidth = 5;
@@ -231,7 +236,7 @@ function drawLantern(ctx: CanvasRenderingContext2D, state: LanternState, time: n
     ctx.restore();
   });
   ctx.fillStyle = '#b7d6da'; ctx.font = '800 9px Inter, system-ui'; ctx.textAlign = 'center'; ctx.fillText('WAYFINDER LANTERN CIRCUIT', 195, 473);
-  drawExplorer(ctx, 195, 548, .76, time, true);
+  drawCustomizedExplorer(ctx, 195, 548, .76, time, character, true);
 }
 
 function drawStatusOverlay(ctx: CanvasRenderingContext2D, state: ClassicLabState, definition: LabDefinition) {
@@ -243,15 +248,15 @@ function drawStatusOverlay(ctx: CanvasRenderingContext2D, state: ClassicLabState
   ctx.fillStyle = '#b7d4d0'; ctx.font = '700 10px Inter, system-ui'; ctx.fillText(`${definition.title} · Lab ${String(definition.id).padStart(2, '0')}`, 195, 420);
 }
 
-function drawClassicLab(ctx: CanvasRenderingContext2D, state: ClassicLabState, definition: LabDefinition, time: number) {
+function drawClassicLab(ctx: CanvasRenderingContext2D, state: ClassicLabState, definition: LabDefinition, time: number, character: CharacterCustomization) {
   drawLabBackdrop(ctx, definition, time);
-  if (state.id === 3) drawRelic(ctx, state, time);
-  else if (state.id === 4) drawStack(ctx, state, time);
-  else if (state.id === 5) drawRiver(ctx, state, time);
-  else if (state.id === 6) drawCoil(ctx, state, time);
-  else if (state.id === 7) drawPrism(ctx, state, time);
-  else if (state.id === 8) drawMerge(ctx, state, time);
-  else drawLantern(ctx, state, time);
+  if (state.id === 3) drawRelic(ctx, state, time, character);
+  else if (state.id === 4) drawStack(ctx, state, time, character);
+  else if (state.id === 5) drawRiver(ctx, state, time, character);
+  else if (state.id === 6) drawCoil(ctx, state, time, character);
+  else if (state.id === 7) drawPrism(ctx, state, time, character);
+  else if (state.id === 8) drawMerge(ctx, state, time, character);
+  else drawLantern(ctx, state, time, character);
   drawStatusOverlay(ctx, state, definition);
 }
 
@@ -275,7 +280,7 @@ function DirectionPad({ move, center, disabled }: { move: (direction: ClassicDir
   </div>;
 }
 
-export function ClassicLab({ id, onExit }: { id: ClassicLabId; onExit: () => void }) {
+export function ClassicLab({ id, onExit, character }: { id: ClassicLabId; onExit: () => void; character: CharacterCustomization }) {
   const definition = CLASSIC_LABS.find((lab) => lab.id === id)!;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [state, setState] = useState<ClassicLabState>(() => initialClassicLabState(id));
@@ -299,10 +304,10 @@ export function ClassicLab({ id, onExit }: { id: ClassicLabId; onExit: () => voi
   useEffect(() => {
     const canvas = canvasRef.current; const ctx = canvas?.getContext('2d'); if (!canvas || !ctx) return;
     let frame = 0;
-    const draw = () => { drawClassicLab(ctx, stateRef.current, definition, performance.now()); frame = requestAnimationFrame(draw); };
-    drawNowRef.current = () => drawClassicLab(ctx, stateRef.current, definition, performance.now()); draw();
+    const draw = () => { drawClassicLab(ctx, stateRef.current, definition, performance.now(), character); frame = requestAnimationFrame(draw); };
+    drawNowRef.current = () => drawClassicLab(ctx, stateRef.current, definition, performance.now(), character); draw();
     return () => { cancelAnimationFrame(frame); drawNowRef.current = null; };
-  }, [definition]);
+  }, [character, definition]);
 
   useEffect(() => {
     if (id > 7) return;
@@ -329,9 +334,9 @@ export function ClassicLab({ id, onExit }: { id: ClassicLabId; onExit: () => voi
   useEffect(() => {
     const bridge = window as typeof window & { advanceTime?: (ms: number) => void; render_game_to_text?: () => string };
     bridge.advanceTime = (ms: number) => { manualTime.current = true; commit({ type: 'tick', ms }); };
-    bridge.render_game_to_text = () => JSON.stringify(classicLabSnapshot(stateRef.current));
+    bridge.render_game_to_text = () => JSON.stringify({ ...classicLabSnapshot(stateRef.current), character });
     return () => { delete bridge.advanceTime; delete bridge.render_game_to_text; };
-  }, [commit]);
+  }, [character, commit]);
 
   const stats = labStats(state);
   const controlsDisabled = state.status !== 'playing';

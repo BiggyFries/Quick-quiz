@@ -111,6 +111,11 @@ test('mobile home remains usable across the supported phone range', async ({ pag
     await expect(page.getByRole('heading', { name: /DAILY VENTURE/i })).toBeVisible();
     await expect(page.getByRole('button', { name: 'About Daily Venture' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Achievements' })).toBeEnabled();
+    const characterButton = await page.getByRole('button', { name: /^Customize character,/ }).boundingBox();
+    expect(characterButton).not.toBeNull();
+    expect(characterButton!.width).toBeGreaterThanOrEqual(44);
+    expect(characterButton!.height).toBeGreaterThanOrEqual(44);
+    expect(characterButton!.x + characterButton!.width).toBeLessThanOrEqual(viewport.width);
     for (const label of ['VENTURE', 'PAST VENTURES', 'PREVIEW TESTER GAMES?', 'PREVIEW WEEK 1']) {
       const box = await page.getByRole('button', { name: new RegExp(`^${label}(?:\\s|$)`, 'i') }).boundingBox();
       expect(box).not.toBeNull();
@@ -119,6 +124,59 @@ test('mobile home remains usable across the supported phone range', async ({ pag
     }
     await page.screenshot({ path: path.join(captures, `home-${viewport.width}x${viewport.height}.png`) });
   }
+});
+
+test('character creator saves appearance and name for the toolbar, profile, and playable labs', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Customize character, Ari' }).click();
+  await expect(page.getByRole('dialog', { name: 'Customize character' })).toBeVisible();
+  await page.getByLabel('Character name').fill('Nova Vale');
+  await page.getByRole('button', { name: 'Angular', exact: true }).click();
+  await page.getByRole('button', { name: 'Storm coat', exact: true }).click();
+  await page.getByRole('button', { name: 'Climbing gear', exact: true }).click();
+  await page.getByRole('button', { name: 'Mohawk', exact: true }).click();
+  await page.getByRole('button', { name: 'Goggles', exact: true }).click();
+  await page.getByRole('button', { name: 'Skin tone: Deep brown' }).click();
+  await page.getByRole('button', { name: 'Hair color: Violet' }).click();
+  await page.getByRole('button', { name: 'Eye color: Green' }).click();
+  await page.screenshot({ path: path.join(captures, 'character-customizer-nova.png') });
+  await page.getByRole('button', { name: 'SAVE CHARACTER' }).click();
+  await expect(page.getByText(/Nova Vale is ready/i)).toBeVisible();
+  const storedGuest = await page.evaluate(() => JSON.parse(localStorage.getItem('dailyVentureCharacter') ?? '{}'));
+  expect(storedGuest).toMatchObject({ name: 'Nova Vale', head: 'angular', body: 'storm-coat', legs: 'climbing-gear', hairStyle: 'mohawk', accessory: 'goggles' });
+  await page.getByRole('button', { name: 'Close' }).click();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Customize character, Nova Vale' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'LOG IN' }).click();
+  await page.getByLabel('Email address').fill('nova@example.com');
+  await page.getByRole('button', { name: 'CREATE LOCAL REVIEWER' }).click();
+  const storedProfile = await page.evaluate(() => JSON.parse(localStorage.getItem('dailyVentureLocalReviewerProfile') ?? '{}'));
+  expect(storedProfile.character).toMatchObject({ name: 'Nova Vale', eyeColor: '#4f7a4f', hairColor: '#6d4b88' });
+
+  await page.getByRole('button', { name: /PREVIEW WEEK 1/i }).click();
+  await page.locator('.review-list button').filter({ hasText: WEEK_ONE[0].title }).click();
+  await expect(page.getByRole('button', { name: 'ENTER THE TRAIL' })).toBeVisible();
+  const ventureState = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
+  expect(ventureState.character).toMatchObject({ name: 'Nova Vale', body: 'storm-coat', legs: 'climbing-gear' });
+  await page.screenshot({ path: path.join(captures, 'venture-intro-custom-character.png') });
+  await page.getByRole('button', { name: 'ENTER THE TRAIL' }).click();
+  await page.getByRole('button', { name: 'READY', exact: true }).click();
+  await expect(page.locator('.puzzle-panel')).toBeVisible();
+  await page.screenshot({ path: path.join(captures, 'venture-puzzle-custom-character.png') });
+
+  await page.goto('/?lab=block-shift');
+  await expect(page.getByLabel('Block Shift puzzle room')).toBeVisible();
+  const state = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
+  expect(state.character).toMatchObject({ name: 'Nova Vale', head: 'angular', body: 'storm-coat', accessory: 'goggles' });
+  await page.screenshot({ path: path.join(captures, 'block-shift-custom-character.png') });
+
+  await page.goto('/?lab=03');
+  await expect(page.getByLabel('Relic Run game world')).toBeVisible();
+  const classicState = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
+  expect(classicState.character).toMatchObject({ name: 'Nova Vale', hairStyle: 'mohawk', eyeColor: '#4f7a4f' });
+  await page.screenshot({ path: path.join(captures, 'relic-run-custom-character.png') });
 });
 
 test('Block Shift lab supports touch controls, undo, keyboard play, and a complete door unlock', async ({ page }) => {

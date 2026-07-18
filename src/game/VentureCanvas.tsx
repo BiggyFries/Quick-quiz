@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
+import { DEFAULT_CHARACTER, characterPalette, type CharacterCustomization } from '../character/character';
 import type { DailyAdventure, FinaleConfig, PuzzleType } from './types';
 import type { PuzzleState, SessionState } from './session';
 
@@ -12,6 +13,7 @@ export interface CanvasView {
   resolutionOutcome: 'success' | 'failed' | null;
   resolutionElapsedMs: number;
   reducedMotion: boolean;
+  character: CharacterCustomization;
 }
 
 interface VentureScene extends Phaser.Scene {
@@ -19,9 +21,10 @@ interface VentureScene extends Phaser.Scene {
 }
 
 const BACKPLATES = ['home', 'temple', 'airship', 'library', 'forest', 'observatory', 'caravan', 'citadel'];
+const colorNumber = (value: string) => Number.parseInt(value.replace('#', ''), 16);
 
 class DailyVentureScene extends Phaser.Scene implements VentureScene {
-  private view: CanvasView = { adventure: null, mode: 'home', levelIndex: 0, puzzle: { kind: 'none' }, resolutionOutcome: null, resolutionElapsedMs: 0, reducedMotion: false };
+  private view: CanvasView = { adventure: null, mode: 'home', levelIndex: 0, puzzle: { kind: 'none' }, resolutionOutcome: null, resolutionElapsedMs: 0, reducedMotion: false, character: DEFAULT_CHARACTER };
   private art!: Phaser.GameObjects.Container;
   private matterBodies: MatterJS.BodyType[] = [];
   private physicsKind = '';
@@ -51,6 +54,8 @@ class DailyVentureScene extends Phaser.Scene implements VentureScene {
 
   private drawExplorer(x: number, y: number, pose: string) {
     const g = this.add.graphics();
+    const character = this.view.character;
+    const palette = characterPalette(character);
     const failed = pose.startsWith('failed');
     const defeatVariant = failed ? Number(pose.split('-')[1] ?? 0) : 0;
     const time = this.time.now;
@@ -67,30 +72,43 @@ class DailyVentureScene extends Phaser.Scene implements VentureScene {
     const rightKneeX = x + 11 - gait * 8;
     const leftFootX = x - 16 - gait * 11;
     const rightFootX = x + 16 + gait * 11;
-    g.lineStyle(9, 0x684b3d); g.lineBetween(x - 10, y + 7, leftKneeX, y + 23); g.lineBetween(leftKneeX, y + 23, leftFootX, y + 39);
+    const legColor = character.legs === 'scout-pants' ? 0x56665d : character.legs === 'climbing-gear' ? 0x6a526f : 0x684b3d;
+    g.lineStyle(character.legs === 'climbing-gear' ? 10 : 9, legColor); g.lineBetween(x - 10, y + 7, leftKneeX, y + 23); g.lineBetween(leftKneeX, y + 23, leftFootX, y + 39);
     g.lineBetween(x + 10, y + 7, rightKneeX, y + 23); g.lineBetween(rightKneeX, y + 23, rightFootX, y + 39);
-    g.fillStyle(0x26343a); g.fillEllipse(leftFootX - 2, y + 41, 20, 8); g.fillEllipse(rightFootX + 2, y + 41, 20, 8);
+    g.fillStyle(character.legs === 'scout-pants' ? 0x273b36 : 0x26343a); g.fillEllipse(leftFootX - 2, y + 41, 20, 8); g.fillEllipse(rightFootX + 2, y + 41, 20, 8);
 
-    g.fillStyle(0x8b5a3c); g.fillRoundedRect(x - 26, y - 28, 13, 42, 6);
-    g.fillStyle(0xc77a43); g.fillRoundedRect(x - 20, y - 32, 40, 48 + breath, 11);
-    g.fillStyle(0xe4a14f); g.fillTriangle(x - 17, y - 30, x + 13, y + 12, x + 20, y - 27);
+    const bodyWidth = character.body === 'field-vest' ? 36 : character.body === 'storm-coat' ? 44 : 40;
+    g.fillStyle(colorNumber(palette.pack)); g.fillRoundedRect(x - bodyWidth / 2 - 7, y - 28, 13, 42, 6);
+    g.fillStyle(colorNumber(palette.body)); g.fillRoundedRect(x - bodyWidth / 2, y - 32, bodyWidth, 48 + breath, character.body === 'storm-coat' ? 7 : 11);
+    g.fillStyle(colorNumber(palette.accent)); g.fillTriangle(x - bodyWidth / 2 + 3, y - 30, x + 3, y + 12, x + bodyWidth / 2, y - 27);
     g.lineStyle(3, 0x6f4937, 0.8); g.lineBetween(x + 5, y - 28, x + 5, y + 12);
 
     const armSwing = pose === 'walk' ? gait * 14 : pose === 'celebrate' ? 24 : pose === 'study' ? -6 : pose === 'think' ? -15 : 0;
     const leftHandY = pose === 'celebrate' ? y - 61 : pose === 'study' ? y - 4 : y + 8 + armSwing;
     const rightHandY = pose === 'celebrate' ? y - 59 : pose === 'think' ? y - 48 : y + 8 - armSwing;
-    g.lineStyle(8, 0xc77a43); g.lineBetween(x - 16, y - 22, x - 29, leftHandY); g.lineBetween(x + 16, y - 22, x + 29, rightHandY);
-    g.fillStyle(0xb96f4b); g.fillCircle(x - 29, leftHandY, 5); g.fillCircle(x + 29, rightHandY, 5);
+    g.lineStyle(8, colorNumber(palette.body)); g.lineBetween(x - bodyWidth / 2 + 4, y - 22, x - 29, leftHandY); g.lineBetween(x + bodyWidth / 2 - 4, y - 22, x + 29, rightHandY);
+    g.fillStyle(colorNumber(character.skinTone)); g.fillCircle(x - 29, leftHandY, 5); g.fillCircle(x + 29, rightHandY, 5);
 
-    g.fillStyle(0xb96f4b); g.fillRect(x - 6, y - 41, 12, 12);
-    g.fillStyle(0xd49469); g.fillEllipse(x + lean * 50, y - 53, 32, 39);
-    g.fillStyle(0x513a32); g.fillEllipse(x - 4, y - 68, 31, 14); g.fillRoundedRect(x - 20, y - 69, 13, 24, 6);
-    g.fillStyle(0x1a292f); g.fillCircle(x - 5, y - 55, 2.3); g.fillCircle(x + 7, y - 54, 2.3);
+    g.fillStyle(colorNumber(character.skinTone)); g.fillRect(x - 6, y - 41, 12, 12);
+    const headX = x + lean * 50; const headWidth = character.head === 'round' ? 36 : character.head === 'angular' ? 34 : 32; const headHeight = character.head === 'round' ? 36 : character.head === 'angular' ? 40 : 42;
+    g.fillStyle(colorNumber(character.skinTone));
+    if (character.head === 'angular') g.fillTriangle(headX - 17, y - 61, headX + 17, y - 61, headX, y - 32);
+    else g.fillEllipse(headX, y - 53, headWidth, headHeight);
+    g.fillStyle(colorNumber(character.hairColor));
+    if (character.hairStyle !== 'bald') {
+      if (character.hairStyle === 'mohawk') g.fillTriangle(headX - 14, y - 69, headX, y - 91, headX + 14, y - 69);
+      else { g.fillEllipse(headX - 3, y - 69, headWidth, 14); if (character.hairStyle === 'bun') g.fillCircle(headX + 10, y - 78, 9); }
+      if (character.hairStyle === 'braids') { g.fillRoundedRect(headX - 20, y - 69, 6, 32, 3); g.fillRoundedRect(headX + 14, y - 69, 6, 32, 3); }
+    }
+    g.fillStyle(colorNumber(character.eyeColor)); g.fillCircle(headX - 6, y - 55, 2.6); g.fillCircle(headX + 6, y - 54, 2.6);
     g.lineStyle(2, 0x8f5947); g.lineBetween(x + 1, y - 49, x + 7, y - 48);
-    g.fillStyle(0x7b4e36); g.fillRoundedRect(x - 24, y - 80, 49, 9, 4); g.fillRoundedRect(x - 14, y - 90, 29, 14, 5);
+    if (character.accessory === 'trail-hat') { g.fillStyle(0x7b4e36); g.fillRoundedRect(headX - 24, y - 80, 49, 9, 4); g.fillRoundedRect(headX - 14, y - 90, 29, 14, 5); }
+    else if (character.accessory === 'round-glasses' || character.accessory === 'goggles') { g.lineStyle(character.accessory === 'goggles' ? 3 : 2, character.accessory === 'goggles' ? 0xd8c477 : 0x26363a); g.strokeCircle(headX - 7, y - 54, character.accessory === 'goggles' ? 7 : 5); g.strokeCircle(headX + 7, y - 54, character.accessory === 'goggles' ? 7 : 5); g.lineBetween(headX - 2, y - 54, headX + 2, y - 54); }
+    else if (character.accessory === 'bandana') { g.fillStyle(0xd45f51); g.fillRoundedRect(headX - 18, y - 69, 36, 7, 2); g.fillTriangle(headX + 16, y - 66, headX + 31, y - 61, headX + 20, y - 53); }
+    else if (character.accessory === 'flower') { g.fillStyle(0xf6c85f); g.fillCircle(headX - 16, y - 70, 7); g.fillStyle(0xd96f68); g.fillCircle(headX - 16, y - 70, 3); }
 
     const scarfLift = pose === 'walk' ? gait * 4 : pose === 'brace' ? 5 : breath;
-    g.lineStyle(5, 0x4aa69c); g.lineBetween(x - 12, y - 40, x - 29, y - 43 - scarfLift); g.lineBetween(x - 29, y - 43 - scarfLift, x - 38, y - 36 - scarfLift * 1.5);
+    g.lineStyle(5, colorNumber(palette.scarf)); g.lineBetween(x - 12, y - 40, x - 29, y - 43 - scarfLift); g.lineBetween(x - 29, y - 43 - scarfLift, x - 38, y - 36 - scarfLift * 1.5);
     if (failed) {
       const hazardColors = [0xe76f51, 0x7c8cff, 0x56cfe1, 0xb88bd4, 0xf1b45a];
       g.fillStyle(hazardColors[defeatVariant % hazardColors.length], 0.7);

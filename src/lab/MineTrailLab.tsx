@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { drawCharacterCanvas, type CharacterCustomization } from '../character/character';
 import type { GridPoint, LabDirection } from './blockShift';
 import {
   MINE_TRAIL_HEIGHT,
@@ -101,6 +102,12 @@ function drawExplorer(ctx: CanvasRenderingContext2D, point: GridPoint, time: num
   ctx.restore();
 }
 
+function drawCustomizedExplorer(ctx: CanvasRenderingContext2D, point: GridPoint, time: number, transition: MoveTransition | null, actionStartedAt: number, status: MineTrailState['status'], facing: LabDirection, character: CharacterCustomization) {
+  const center = iso(point); const progress = transition ? Math.min(1, Math.max(0, (time - transition.startedAt) / transition.durationMs)) : 1;
+  const moving = Boolean(transition) && progress < 1; const acting = time - actionStartedAt < 520;
+  drawCharacterCanvas(ctx, character, { x: center.x, groundY: center.y, scale: .72, time, pose: status === 'complete' ? 'celebrate' : status === 'failed' ? 'failed' : acting ? 'reveal' : moving ? 'walk' : 'idle', facing });
+}
+
 function drawSmoke(ctx: CanvasRenderingContext2D, point: GridPoint, time: number) {
   const center = iso(point);
   for (let i = 0; i < 6; i += 1) {
@@ -109,7 +116,7 @@ function drawSmoke(ctx: CanvasRenderingContext2D, point: GridPoint, time: number
   }
 }
 
-function drawMineLab(ctx: CanvasRenderingContext2D, state: MineTrailState, transition: MoveTransition | null, actionStartedAt: number, time: number) {
+function drawMineLab(ctx: CanvasRenderingContext2D, state: MineTrailState, transition: MoveTransition | null, actionStartedAt: number, time: number, character: CharacterCustomization) {
   const sky = ctx.createLinearGradient(0, 0, 0, 844); sky.addColorStop(0, '#26394e'); sky.addColorStop(.55, '#47758a'); sky.addColorStop(1, '#162936');
   ctx.fillStyle = sky; ctx.fillRect(0, 0, 390, 844);
   const glow = ctx.createRadialGradient(195, 330, 20, 195, 330, 250); glow.addColorStop(0, '#def2d541'); glow.addColorStop(1, '#15293600'); ctx.fillStyle = glow; ctx.fillRect(0, 120, 390, 480);
@@ -122,7 +129,7 @@ function drawMineLab(ctx: CanvasRenderingContext2D, state: MineTrailState, trans
       const point = { x, y }; drawMineTile(ctx, point, revealed.has(key(point)), state.detonated?.x === x && state.detonated.y === y, time);
     }
   }
-  const player = animatedPlayer(state, transition, time); drawExplorer(ctx, player, time, transition, actionStartedAt, state.status);
+  const player = animatedPlayer(state, transition, time); drawCustomizedExplorer(ctx, player, time, transition, actionStartedAt, state.status, state.facing, character);
   if (state.detonated) drawSmoke(ctx, state.detonated, time);
   if (state.status !== 'playing') {
     ctx.fillStyle = '#071820c7'; ctx.beginPath(); ctx.roundRect(55, 494, 280, 70, 18); ctx.fill();
@@ -132,7 +139,7 @@ function drawMineLab(ctx: CanvasRenderingContext2D, state: MineTrailState, trans
   }
 }
 
-export function MineTrailLab({ onExit }: { onExit: () => void }) {
+export function MineTrailLab({ onExit, character }: { onExit: () => void; character: CharacterCustomization }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [state, setState] = useState(initialMineTrailState);
   const stateRef = useRef(state); const transitionRef = useRef<MoveTransition | null>(null);
@@ -155,10 +162,10 @@ export function MineTrailLab({ onExit }: { onExit: () => void }) {
 
   useEffect(() => {
     const canvas = canvasRef.current; const ctx = canvas?.getContext('2d'); if (!canvas || !ctx) return;
-    let frame = 0; const render = () => { const time = performance.now() + manualTimeOffset.current; drawMineLab(ctx, stateRef.current, transitionRef.current, actionStartedRef.current, time); frame = requestAnimationFrame(render); };
-    drawNowRef.current = () => drawMineLab(ctx, stateRef.current, transitionRef.current, actionStartedRef.current, performance.now() + manualTimeOffset.current);
+    let frame = 0; const render = () => { const time = performance.now() + manualTimeOffset.current; drawMineLab(ctx, stateRef.current, transitionRef.current, actionStartedRef.current, time, character); frame = requestAnimationFrame(render); };
+    drawNowRef.current = () => drawMineLab(ctx, stateRef.current, transitionRef.current, actionStartedRef.current, performance.now() + manualTimeOffset.current, character);
     render(); return () => { cancelAnimationFrame(frame); drawNowRef.current = null; };
-  }, []);
+  }, [character]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -175,9 +182,9 @@ export function MineTrailLab({ onExit }: { onExit: () => void }) {
   useEffect(() => {
     const bridge = window as typeof window & { advanceTime?: (ms: number) => void; render_game_to_text?: () => string };
     bridge.advanceTime = (ms: number) => { manualTimeOffset.current += ms; drawNowRef.current?.(); };
-    bridge.render_game_to_text = () => JSON.stringify(mineTrailSnapshot(stateRef.current));
+    bridge.render_game_to_text = () => JSON.stringify({ ...mineTrailSnapshot(stateRef.current), character });
     return () => { delete bridge.advanceTime; delete bridge.render_game_to_text; };
-  }, []);
+  }, [character]);
 
   const safeRemaining = mineTrailSnapshot(state).safeTilesRemaining;
   return <section className="lab-screen mine-lab-screen" aria-label="Mine Trail tester game">

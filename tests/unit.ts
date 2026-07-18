@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { DEFAULT_CHARACTER, loadCharacterCustomization, normalizeCharacterCustomization, saveCharacterCustomization } from '../src/character/character';
 import { WEEK_ONE } from '../src/content/week1';
 import { countLogicSolutions, dailyAdventureSchema, satisfiesLogicClues } from '../src/game/schema';
 import type { AttemptRecord } from '../src/game/types';
@@ -19,6 +20,16 @@ class MemoryStorage implements Storage {
 }
 
 Object.defineProperty(globalThis, 'localStorage', { value: new MemoryStorage(), configurable: true });
+
+const customExplorer = normalizeCharacterCustomization({
+  ...DEFAULT_CHARACTER, name: '  Nova   Vale  ', head: 'angular', body: 'storm-coat', legs: 'climbing-gear',
+  skinTone: '#8c573f', hairStyle: 'mohawk', hairColor: '#6d4b88', eyeColor: '#4f7a4f', accessory: 'goggles',
+});
+assert.equal(customExplorer.name, 'Nova Vale');
+assert.equal(customExplorer.head, 'angular');
+assert.equal(normalizeCharacterCustomization({ head: 'not-an-option' }).head, DEFAULT_CHARACTER.head);
+saveCharacterCustomization(customExplorer);
+assert.deepEqual(loadCharacterCustomization(), customExplorer);
 
 assert.equal(WEEK_ONE.length, 7);
 for (const [index, adventure] of WEEK_ONE.entries()) {
@@ -209,5 +220,8 @@ localStorage.setItem('dailyVentureLocalReviewerProfile', JSON.stringify({
 }));
 const migratedService = createVentureService();
 assert.equal((await migratedService.getProfile())?.settings.highContrast, true);
+await migratedService.updateCharacter(customExplorer);
+assert.deepEqual((await migratedService.getProfile())?.character, customExplorer);
+assert.deepEqual(JSON.parse(localStorage.getItem('dailyVentureLocalReviewerProfile') ?? '{}').character, customExplorer);
 
-console.log('unit: 7 schemas, nine Puzzle Labs, timezone gating, attempts, archive rules, idempotency, and achievement thresholds passed');
+console.log('unit: character persistence, 7 schemas, nine Puzzle Labs, timezone gating, attempts, archive rules, idempotency, and achievement thresholds passed');
