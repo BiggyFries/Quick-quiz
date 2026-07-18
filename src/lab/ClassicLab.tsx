@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { drawCharacterCanvas, type CharacterCustomization } from '../character/character';
 import {
   CLASSIC_LABS,
+  CRATE_MAP,
+  ICE_MAP,
   RELIC_MAP,
   classicLabSnapshot,
   initialClassicLabState,
@@ -11,9 +13,14 @@ import {
   type ClassicLabId,
   type ClassicLabState,
   type CoilState,
+  type CrateState,
+  type EchoState,
+  type GearState,
+  type IceState,
   type LabDefinition,
   type LanternState,
   type MergeState,
+  type OrbitState,
   type Point,
   type PrismState,
   type RelicState,
@@ -239,6 +246,71 @@ function drawLantern(ctx: CanvasRenderingContext2D, state: LanternState, time: n
   drawCustomizedExplorer(ctx, 195, 548, .76, time, character, true);
 }
 
+function drawIce(ctx: CanvasRenderingContext2D, state: IceState, time: number, character: CharacterCustomization) {
+  roundedRect(ctx, 28, 150, 334, 430, 24, '#071a20dd', '#b9efff66');
+  const cell = 34; const left = 42; const top = 169; const collected = new Set(state.collected);
+  ICE_MAP.forEach((row, y) => [...row].forEach((tile, x) => {
+    const px = left + x * cell; const py = top + y * cell;
+    if (tile === '#') { roundedRect(ctx, px + 1, py + 1, cell - 2, cell - 2, 7, '#28505d', '#83b9c3'); return; }
+    ctx.fillStyle = (x + y) % 2 ? '#72acc0' : '#7db7c8'; ctx.fillRect(px + 1, py + 1, cell - 2, cell - 2);
+    ctx.strokeStyle = '#d8f8ff38'; ctx.beginPath(); ctx.moveTo(px + 5, py + 10); ctx.lineTo(px + 28, py + 4); ctx.moveTo(px + 12, py + 29); ctx.lineTo(px + 30, py + 20); ctx.stroke();
+  }));
+  const exitX = left + state.exit.x * cell + cell / 2; const exitY = top + state.exit.y * cell + cell / 2;
+  ctx.save(); ctx.shadowColor = '#f6c85f'; ctx.shadowBlur = 14; ctx.fillStyle = '#f6c85f'; ctx.beginPath(); ctx.arc(exitX, exitY, 11, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  state.sigils.forEach((sigil, index) => { if (collected.has(`${sigil.x},${sigil.y}`)) return; const x = left + sigil.x * cell + 17; const y = top + sigil.y * cell + 17; ctx.save(); ctx.translate(x, y); ctx.rotate(time / 900 + index); ctx.strokeStyle = '#e7fbff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(8, 0); ctx.moveTo(0, -8); ctx.lineTo(0, 8); ctx.stroke(); ctx.restore(); });
+  drawCustomizedExplorer(ctx, left + state.player.x * cell + 17, top + state.player.y * cell + 23, .45, time, character, false, 'up');
+}
+
+function drawCrate(ctx: CanvasRenderingContext2D, state: CrateState, time: number, character: CharacterCustomization) {
+  roundedRect(ctx, 20, 150, 350, 430, 24, '#071a20dd', '#ffd9a36b');
+  const cell = 42; const left = 27; const top = 169;
+  CRATE_MAP.forEach((row, y) => [...row].forEach((tile, x) => {
+    const px = left + x * cell; const py = top + y * cell;
+    roundedRect(ctx, px + 1, py + 1, cell - 2, cell - 2, 6, tile === '#' ? '#365157' : (x + y) % 2 ? '#486b67' : '#4f736e', tile === '#' ? '#7c9a97' : '#ffffff16');
+  }));
+  state.goals.forEach((goal) => { const x = left + goal.x * cell + 21; const y = top + goal.y * cell + 21; ctx.strokeStyle = '#f6c85f'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x - 7, y); ctx.lineTo(x + 7, y); ctx.moveTo(x, y - 7); ctx.lineTo(x, y + 7); ctx.stroke(); });
+  state.crates.forEach((crate) => { const x = left + crate.x * cell; const y = top + crate.y * cell; const powered = state.goals.some((goal) => goal.x === crate.x && goal.y === crate.y); roundedRect(ctx, x + 5, y + 5, 32, 32, 7, powered ? '#f6c85f' : '#d78250', '#fff6'); ctx.strokeStyle = powered ? '#735820' : '#7c412b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + 11, y + 11); ctx.lineTo(x + 31, y + 31); ctx.moveTo(x + 31, y + 11); ctx.lineTo(x + 11, y + 31); ctx.stroke(); });
+  drawCustomizedExplorer(ctx, left + state.player.x * cell + 21, top + state.player.y * cell + 28, .52, time, character, false);
+}
+
+const ECHO_PAD_POSITIONS = [{ x: 195, y: 215 }, { x: 287, y: 326 }, { x: 195, y: 437 }, { x: 103, y: 326 }];
+function drawEcho(ctx: CanvasRenderingContext2D, state: EchoState, time: number, character: CharacterCustomization) {
+  roundedRect(ctx, 29, 151, 332, 424, 26, '#07171ddd', '#e7b4f562');
+  ctx.strokeStyle = '#d58be64a'; ctx.lineWidth = 7; ctx.beginPath(); ctx.arc(195, 326, 112, 0, Math.PI * 2); ctx.stroke();
+  const length = 4 + state.round * 2; const activePad = state.acceptingInput ? -1 : state.sequence[Math.min(state.revealIndex, length - 1)];
+  ECHO_PAD_POSITIONS.forEach((position, index) => { const active = activePad === index; ctx.save(); if (active) { ctx.shadowColor = '#fff0a6'; ctx.shadowBlur = 24; } roundedRect(ctx, position.x - 38, position.y - 38, 76, 76, 22, active ? '#f6c85f' : ['#7cc6bd', '#d8847d', '#8da8df', '#ca91dc'][index], '#ffffff88'); ctx.fillStyle = active ? '#183238' : '#fff'; ctx.font = '900 20px Inter, system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(index + 1), position.x, position.y); ctx.restore(); });
+  ctx.fillStyle = '#d9cde3'; ctx.font = '800 10px Inter, system-ui'; ctx.textAlign = 'center'; ctx.fillText(state.acceptingInput ? `REPEAT ${length} SIGNALS` : `WATCH · ROUND ${state.round + 1}`, 195, 333);
+  drawCustomizedExplorer(ctx, 195, 563, .74, time, character, true);
+}
+
+function drawGear(ctx: CanvasRenderingContext2D, state: GearState, time: number, character: CharacterCustomization) {
+  roundedRect(ctx, 39, 151, 312, 422, 25, '#07171ddd', '#a8efc16b');
+  const left = 55; const top = 170; const cell = 70;
+  state.rotations.forEach((rotation, index) => {
+    const x = left + index % 4 * cell; const y = top + Math.floor(index / 4) * cell; const aligned = rotation === state.target[index];
+    roundedRect(ctx, x + 4, y + 4, 62, 62, 14, aligned ? '#4f9a73' : '#31585a', aligned ? '#b9f7cf' : '#6d9291');
+    const cx = x + 35; const cy = y + 35; const currentAngle = rotation * Math.PI / 2 - Math.PI / 2; const targetAngle = state.target[index] * Math.PI / 2 - Math.PI / 2;
+    ctx.strokeStyle = aligned ? '#e9ffbd' : '#d7e8e3'; ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(currentAngle) * 22, cy + Math.sin(currentAngle) * 22); ctx.stroke();
+    ctx.fillStyle = '#f6c85f'; ctx.beginPath(); ctx.arc(cx + Math.cos(targetAngle) * 27, cy + Math.sin(targetAngle) * 27, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#17343a'; ctx.beginPath(); ctx.arc(cx, cy, 7 + Math.sin(time / 500 + index) * .5, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.fillStyle = '#b9ddd0'; ctx.font = '800 9px Inter, system-ui'; ctx.textAlign = 'center'; ctx.fillText('WHITE ARM → GOLD BLUEPRINT MARK', 195, 478);
+  drawCustomizedExplorer(ctx, 195, 558, .76, time, character, true);
+}
+
+function drawOrbit(ctx: CanvasRenderingContext2D, state: OrbitState, time: number, character: CharacterCustomization) {
+  roundedRect(ctx, 26, 151, 338, 430, 26, '#07171ddd', '#ffb8aa66');
+  const cx = 195; const cy = 326; const radius = 118;
+  ctx.strokeStyle = '#6b8f91'; ctx.lineWidth = 12; ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = '#f6c85f'; ctx.lineWidth = 16; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(cx, cy, radius, state.targetAngle - state.targetWidth, state.targetAngle + state.targetWidth); ctx.stroke();
+  const sparkX = cx + Math.cos(state.angle) * radius; const sparkY = cy + Math.sin(state.angle) * radius;
+  ctx.save(); ctx.shadowColor = '#fff'; ctx.shadowBlur = 20; ctx.fillStyle = '#fff5bf'; ctx.beginPath(); ctx.arc(sparkX, sparkY, 10, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  ctx.fillStyle = '#203e43'; ctx.beginPath(); ctx.arc(cx, cy, 71, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#f6c85f'; ctx.font = '900 34px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`${state.gate}/6`, cx, cy - 4);
+  ctx.fillStyle = '#acd4ce'; ctx.font = '800 9px Inter, system-ui'; ctx.fillText('ORBIT GATES', cx, cy + 24);
+  drawCustomizedExplorer(ctx, 195, 561, .74, time, character, true);
+}
+
 function drawStatusOverlay(ctx: CanvasRenderingContext2D, state: ClassicLabState, definition: LabDefinition) {
   if (state.status === 'playing') return;
   roundedRect(ctx, 53, 332, 284, 108, 22, '#06171bef', state.status === 'complete' ? '#ffe596' : '#ff9b8e');
@@ -256,7 +328,12 @@ function drawClassicLab(ctx: CanvasRenderingContext2D, state: ClassicLabState, d
   else if (state.id === 6) drawCoil(ctx, state, time, character);
   else if (state.id === 7) drawPrism(ctx, state, time, character);
   else if (state.id === 8) drawMerge(ctx, state, time, character);
-  else drawLantern(ctx, state, time, character);
+  else if (state.id === 9) drawLantern(ctx, state, time, character);
+  else if (state.id === 10) drawIce(ctx, state, time, character);
+  else if (state.id === 11) drawCrate(ctx, state, time, character);
+  else if (state.id === 12) drawEcho(ctx, state, time, character);
+  else if (state.id === 13) drawGear(ctx, state, time, character);
+  else drawOrbit(ctx, state, time, character);
   drawStatusOverlay(ctx, state, definition);
 }
 
@@ -267,7 +344,12 @@ function labStats(state: ClassicLabState) {
   if (state.id === 6) return [{ value: `${state.score}/${state.target}`, label: 'signals' }, { value: state.trail.length, label: 'trail' }];
   if (state.id === 7) return [{ value: state.seals.length, label: 'seals' }, { value: state.lives, label: 'lives' }];
   if (state.id === 8) return [{ value: state.highest, label: 'highest' }, { value: state.moves, label: 'moves' }];
-  return [{ value: `${state.lit}/25`, label: 'lit' }, { value: state.moves, label: 'moves' }];
+  if (state.id === 9) return [{ value: `${state.lit}/25`, label: 'lit' }, { value: state.moves, label: 'moves' }];
+  if (state.id === 10) return [{ value: `${state.collected.length}/4`, label: 'sigils' }, { value: state.moves, label: 'slides' }];
+  if (state.id === 11) return [{ value: `${state.score}/3`, label: 'powered' }, { value: state.pushes, label: 'pushes' }];
+  if (state.id === 12) return [{ value: `${state.round + 1}/3`, label: 'round' }, { value: `${state.strikes}/2`, label: 'errors' }];
+  if (state.id === 13) return [{ value: `${state.aligned}/16`, label: 'aligned' }, { value: state.moves, label: 'turns' }];
+  return [{ value: `${state.gate}/6`, label: 'gates' }, { value: `${state.misses}/3`, label: 'misses' }];
 }
 
 function DirectionPad({ move, center, disabled }: { move: (direction: ClassicDirection) => void; center?: ReactNode; disabled?: boolean }) {
@@ -287,6 +369,7 @@ export function ClassicLab({ id, onExit, character }: { id: ClassicLabId; onExit
   const stateRef = useRef<ClassicLabState>(state);
   const manualTime = useRef(false);
   const drawNowRef = useRef<(() => void) | null>(null);
+  const [gridCursor, setGridCursor] = useState(0);
 
   const commit = useCallback((action: ClassicLabAction) => {
     const current = stateRef.current;
@@ -310,7 +393,7 @@ export function ClassicLab({ id, onExit, character }: { id: ClassicLabId; onExit
   }, [character, definition]);
 
   useEffect(() => {
-    if (id > 7) return;
+    if (![3, 4, 5, 6, 7, 12, 14].includes(id)) return;
     const interval = window.setInterval(() => { if (!manualTime.current) commit({ type: 'tick', ms: 50 }); }, 50);
     return () => window.clearInterval(interval);
   }, [commit, id]);
@@ -323,13 +406,23 @@ export function ClassicLab({ id, onExit, character }: { id: ClassicLabId; onExit
         : key === 'arrowdown' || key === 's' ? 'down'
           : key === 'arrowleft' || key === 'a' ? 'left'
             : key === 'arrowright' || key === 'd' ? 'right' : null;
-      if (direction) { event.preventDefault(); move(direction); }
+      if (direction && id === 12) { event.preventDefault(); commit({ type: 'activate', index: direction === 'up' ? 0 : direction === 'right' ? 1 : direction === 'down' ? 2 : 3 }); }
+      else if (direction && id === 13) {
+        event.preventDefault(); setGridCursor((current) => {
+          const x = current % 4; const y = Math.floor(current / 4);
+          return direction === 'left' ? y * 4 + Math.max(0, x - 1) : direction === 'right' ? y * 4 + Math.min(3, x + 1) : direction === 'up' ? Math.max(0, y - 1) * 4 + x : Math.min(3, y + 1) * 4 + x;
+        });
+      }
+      else if (direction) { event.preventDefault(); move(direction); }
       else if (key === ' ' && id === 4) { event.preventDefault(); commit({ type: 'hard-drop' }); }
       else if ((key === 'q' || key === 'x') && id === 4) { event.preventDefault(); commit({ type: 'rotate' }); }
+      else if ((event.code === 'Space' || key === 'enter') && id === 13) { event.preventDefault(); commit({ type: 'activate', index: gridCursor }); }
+      else if ((event.code === 'Space' || key === 'enter') && id === 14) { event.preventDefault(); commit({ type: 'activate', index: 0 }); }
+      else if (id === 12 && ['1', '2', '3', '4'].includes(key)) { event.preventDefault(); commit({ type: 'activate', index: Number(key) - 1 }); }
       else if (key === 'r') { event.preventDefault(); reset(); }
     };
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
-  }, [commit, id, move, reset]);
+  }, [commit, gridCursor, id, move, reset]);
 
   useEffect(() => {
     const bridge = window as typeof window & { advanceTime?: (ms: number) => void; render_game_to_text?: () => string };
@@ -356,6 +449,12 @@ export function ClassicLab({ id, onExit, character }: { id: ClassicLabId; onExit
     {state.id === 9 && <div className="lantern-hit-grid" aria-label="Lantern grid">
       {state.lights.map((lit, index) => <button key={index} disabled={state.status !== 'playing'} onClick={() => commit({ type: 'activate', index })} aria-label={`Lantern rune ${Math.floor(index / 5) + 1}, ${index % 5 + 1}, ${lit ? 'lit' : 'dark'}`} />)}
     </div>}
+    {state.id === 12 && <div className="echo-hit-grid" aria-label="Echo signal pads">
+      {['north', 'east', 'south', 'west'].map((label, index) => <button key={label} disabled={state.status !== 'playing' || !state.acceptingInput} onClick={() => commit({ type: 'activate', index })} aria-label={`Echo pad ${index + 1}, ${label}`} />)}
+    </div>}
+    {state.id === 13 && <div className="gear-hit-grid" aria-label="Gear link grid">
+      {state.rotations.map((rotation, index) => <button className={gridCursor === index ? 'keyboard-current' : ''} key={index} disabled={state.status !== 'playing'} onClick={() => { setGridCursor(index); commit({ type: 'activate', index }); }} aria-label={`Gear link ${Math.floor(index / 4) + 1}, ${index % 4 + 1}, orientation ${rotation + 1}`} />)}
+    </div>}
     <div className={`lab-message classic-message ${state.status}`} aria-live="polite">{state.message}</div>
     <div className={`lab-controls classic-controls lab-controls-${state.id}`} aria-label={`${definition.title} controls`}>
       {state.id === 4 ? <>
@@ -370,8 +469,20 @@ export function ClassicLab({ id, onExit, character }: { id: ClassicLabId; onExit
         <button className="lab-mode-key active" disabled>GOAL <small>Light all 25</small></button>
         <div className="remote-center"><span>✺</span><small>LANTERN REMOTE</small></div>
         <button className="lab-mode-key" onClick={reset}>RESET <small>New circuit</small></button>
+      </> : state.id === 12 ? <>
+        <button className="lab-mode-key active" disabled>ROUND <small>{state.round + 1} OF 3</small></button>
+        <div className="remote-center"><span>◈</span><small>{state.acceptingInput ? 'YOUR TURN' : 'WATCH SIGNALS'}</small></div>
+        <button className="lab-mode-key" onClick={reset}>RESET <small>Replay pattern</small></button>
+      </> : state.id === 13 ? <>
+        <button className="lab-mode-key active" disabled>LINKS <small>{state.aligned} / 16</small></button>
+        <div className="remote-center"><span>⚙</span><small>ARROWS + ENTER</small></div>
+        <button className="lab-mode-key" onClick={reset}>RESET <small>Scramble gears</small></button>
+      </> : state.id === 14 ? <>
+        <button className="lab-mode-key active" disabled>GATES <small>{state.gate} / 6</small></button>
+        <button className="orbit-pulse-button" disabled={controlsDisabled} onClick={() => commit({ type: 'activate', index: 0 })}>PULSE<small>SPACE</small></button>
+        <button className="lab-mode-key" onClick={reset}>RESET <small>Restart orbit</small></button>
       </> : <>
-        <button className="lab-utility side-note" disabled>{state.id === 8 ? 'MERGE' : state.id === 6 ? 'TRAIL' : state.id === 5 ? 'HOP' : 'RUN'}<small>{stats[0].value}</small></button>
+        <button className="lab-utility side-note" disabled>{state.id === 11 ? 'PUSH' : state.id === 10 ? 'SLIDE' : state.id === 8 ? 'MERGE' : state.id === 6 ? 'TRAIL' : state.id === 5 ? 'HOP' : 'RUN'}<small>{stats[0].value}</small></button>
         <DirectionPad move={move} center={definition.icon} disabled={controlsDisabled} />
         <button className="lab-utility" onClick={reset}>RESET <small>R</small></button>
       </>}

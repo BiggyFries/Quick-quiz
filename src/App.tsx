@@ -127,7 +127,7 @@ export function App() {
     const requestedLab = new URLSearchParams(window.location.search).get('lab');
     return requestedLab === 'block-shift' ? 'lab-block'
       : requestedLab === 'mine-trail' ? 'lab-mine'
-        : requestedLab && /^(?:0?[3-9])$/.test(requestedLab) ? 'lab' : 'home';
+        : requestedLab && /^(?:0?[3-9]|1[0-4])$/.test(requestedLab) ? 'lab' : 'home';
   });
   const [modal, setModal] = useState<Modal>(null);
   const [calendar, setCalendar] = useState<CalendarDay[]>([]);
@@ -385,7 +385,7 @@ export function App() {
         <div className="home-actions">
           <button className="primary-button" onClick={playToday} disabled={!todayAdventure}>VENTURE <small>{todayAdventure ? todayAdventure.title : 'Awaiting launch date'}</small></button>
           <button className="secondary-button" onClick={openArchive}>PAST VENTURES</button>
-          <button className="lab-preview-button" onClick={() => setPage('lab')}>PREVIEW TESTER GAMES <span>Prototype corridor · 9 playable labs</span></button>
+          <button className="lab-preview-button" onClick={() => setPage('lab')}>PREVIEW TESTER GAMES <span>Prototype corridor · 14 playable labs</span></button>
           <button className="review-button" onClick={enterReview}>PREVIEW WEEK 1 <span>Reviewer build</span></button>
         </div>
       </section>}

@@ -9,7 +9,7 @@
 .lab-utility { min-width: 82px; min-height: 44px; padding: 0 12px; border-color: #ffffff61; background: #0b2e35e8; box-shadow: 0 6px 15px #0004; }
 .lab-utility small { display: inline; margin: 0 0 0 5px; }
 .lab-dpad { width: 138px; height: 138px; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px); }
-.mine-controls { display: grid; grid-template-columns: 142px 1fr; gap: 10px; align-items: center; }
+.mine-controls { display: grid; grid-template-columns: 160px 1fr; gap: 10px; align-items: center; }
 .mine-action { justify-self: center; width: 104px; height: 104px; border-radius: 50%; border: 4px solid #fff4c8; background: #f6c85f; color: #172c32; box-shadow: inset 0 -7px 0 #bd8a2c, 0 8px 23px #0007; font-size: 11px; font-weight: 950; letter-spacing: .07em; }
 .mine-action span, .mine-action small { display: block; }
 .mine-action span { font-size: 26px; line-height: 1; margin-bottom: 3px; }
@@ -45,7 +45,7 @@
 .core-lab-hub-note { display: flex; gap: 10px; margin-top: 19px; padding: 13px 15px; border: 1px solid #17343a24; border-radius: 15px; background: #fff9; color: #405b5d; font-size: 10px; }
 .core-lab-hub-note strong { color: #9b5a21; font-size: 9px; letter-spacing: .08em; }
 
-/* Labs 03–09 extend the original two-room shell with game-specific control grids. */
+/* Labs 03–14 extend the original two-room shell with game-specific control grids. */
 .classic-controls { display: grid; grid-template-columns: minmax(74px, 1fr) 138px minmax(74px, 1fr); gap: 7px; align-items: center; }
 .classic-controls .lab-utility small { display: block; margin: 3px 0 0; }
 

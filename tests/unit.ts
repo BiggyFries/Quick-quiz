@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { DEFAULT_CHARACTER, loadCharacterCustomization, normalizeCharacterCustomization, saveCharacterCustomization } from '../src/character/character';
+import { CHARACTER_PRESETS, DEFAULT_CHARACTER, loadCharacterCustomization, normalizeCharacterCustomization, randomizeCharacterCustomization, saveCharacterCustomization } from '../src/character/character';
 import { WEEK_ONE } from '../src/content/week1';
 import { countLogicSolutions, dailyAdventureSchema, satisfiesLogicClues } from '../src/game/schema';
 import type { AttemptRecord } from '../src/game/types';
@@ -30,6 +30,14 @@ assert.equal(customExplorer.head, 'angular');
 assert.equal(normalizeCharacterCustomization({ head: 'not-an-option' }).head, DEFAULT_CHARACTER.head);
 saveCharacterCustomization(customExplorer);
 assert.deepEqual(loadCharacterCustomization(), customExplorer);
+assert.deepEqual(
+  { name: CHARACTER_PRESETS.Matt.name, head: CHARACTER_PRESETS.Matt.head, hairColor: CHARACTER_PRESETS.Matt.hairColor, accessory: CHARACTER_PRESETS.Matt.accessory },
+  { name: 'Matt', head: 'triangular', hairColor: '#d8b56b', accessory: 'aviators' },
+);
+assert.deepEqual({ name: CHARACTER_PRESETS.Myles.name, frame: CHARACTER_PRESETS.Myles.frame, eyeShape: CHARACTER_PRESETS.Myles.eyeShape }, { name: 'Myles', frame: 'tall', eyeShape: 'almond' });
+assert.deepEqual({ name: CHARACTER_PRESETS.Ian.name, frame: CHARACTER_PRESETS.Ian.frame, body: CHARACTER_PRESETS.Ian.body, legs: CHARACTER_PRESETS.Ian.legs }, { name: 'Ian', frame: 'sturdy', body: 'heritage-tee', legs: 'jean-shorts' });
+const randomizedExplorer = randomizeCharacterCustomization(customExplorer, () => 0);
+assert.equal(randomizedExplorer.name, 'Nova Vale'); assert.equal(randomizedExplorer.head, 'round'); assert.equal(randomizedExplorer.accessory, 'none');
 
 assert.equal(WEEK_ONE.length, 7);
 for (const [index, adventure] of WEEK_ONE.entries()) {
@@ -107,8 +115,8 @@ assert.deepEqual(undoneLabStep.player, { x: 3, y: 5 });
 assert.equal(undoneLabStep.moves, 3);
 
 const labSolution = [
-  'right', 'right', 'right', 'right', 'right', 'right', 'up', 'up', 'down', 'left',
-  'up', 'up', 'left', 'left', 'down', 'up', 'left', 'left', 'left', 'down',
+  'right', 'right', 'right', 'right', 'right', 'right', 'up', 'up', 'down', 'right',
+  'up', 'down', 'left', 'left', 'up', 'up', 'left', 'left', 'down', 'up', 'left', 'left', 'left', 'down',
   'right', 'right', 'right', 'right', 'right', 'right',
 ] as const;
 const completedLab = labSolution.reduce(moveBlockShift, initialBlockShiftState());
@@ -117,9 +125,9 @@ assert.deepEqual(completedLab.blocks.find((block) => block.id === 'keystone'), {
   id: 'keystone', kind: 'keystone', label: 'Keystone sled', color: '#f6c85f',
   x: 7, y: 3, width: 2, height: 1, axis: 'horizontal',
 });
-assert.equal(completedLab.moves, 26);
-assert.equal(completedLab.pushes, 11);
-assert.equal(moveBlockShift(completedLab, 'left').moves, 26);
+assert.equal(completedLab.moves, 30);
+assert.equal(completedLab.pushes, 12);
+assert.equal(moveBlockShift(completedLab, 'left').moves, 30);
 assert.equal(blockShiftSnapshot(completedLab).status, 'complete');
 
 const initialMineTrail = initialMineTrailState();
@@ -127,8 +135,8 @@ assert.equal(adjacentMineCount({ x: 0, y: 0 }), 1);
 assert.ok(mineTrailSnapshot(initialMineTrail).cells.every((cell) => cell.state === 'covered' && cell.clue === null));
 const firstReveal = revealMineTrail(initialMineTrail);
 assert.equal(firstReveal.status, 'playing');
-assert.equal(firstReveal.revealed.length, 6);
-assert.equal(mineTrailSnapshot(firstReveal).safeTilesRemaining, 14);
+assert.equal(firstReveal.revealed.length, 4);
+assert.equal(mineTrailSnapshot(firstReveal).safeTilesRemaining, 15);
 let failedMineTrail = initialMineTrailState();
 for (const direction of ['right', 'up', 'up', 'up'] as const) failedMineTrail = moveMineTrail(failedMineTrail, direction);
 failedMineTrail = revealMineTrail(failedMineTrail);
@@ -143,7 +151,7 @@ for (let y = 0; y < 5; y += 1) {
 assert.equal(completedMineTrail.status, 'complete');
 assert.equal(mineTrailSnapshot(completedMineTrail).safeTilesRemaining, 0);
 
-assert.deepEqual(CLASSIC_LABS.map((lab) => lab.id), [3, 4, 5, 6, 7, 8, 9]);
+assert.deepEqual(CLASSIC_LABS.map((lab) => lab.id), [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
 for (const lab of CLASSIC_LABS) {
   const initial = initialClassicLabState(lab.id);
   assert.equal(initial.status, 'playing');
@@ -154,7 +162,7 @@ const relicInitial = initialClassicLabState(3);
 const relicWalk = updateClassicLab(relicInitial, { type: 'move', direction: 'right' });
 assert.deepEqual(relicWalk.player, { x: 2, y: 13 });
 assert.equal(relicWalk.score, 1);
-const relicClear = updateClassicLab({ ...relicInitial, player: { x: 10, y: 1 }, score: 14 } as ClassicLabState, { type: 'move', direction: 'right' });
+const relicClear = updateClassicLab({ ...relicInitial, player: { x: 10, y: 1 }, score: 18 } as ClassicLabState, { type: 'move', direction: 'right' });
 assert.equal(relicClear.status, 'complete');
 
 const stackInitial = initialClassicLabState(4);
@@ -162,7 +170,7 @@ const stackShift = updateClassicLab(stackInitial, { type: 'move', direction: 'le
 assert.equal(stackShift.active.x, 3);
 const stackDropped = updateClassicLab(stackShift, { type: 'hard-drop' });
 assert.equal(stackDropped.pieces, 1);
-const stackClear = updateClassicLab(stackInitial, { type: 'tick', ms: 60000 });
+const stackClear = updateClassicLab(stackInitial, { type: 'tick', ms: 75000 });
 assert.equal(stackClear.status, 'complete'); assert.equal(stackClear.remainingMs, 0);
 
 const riverInitial = initialClassicLabState(5);
@@ -172,8 +180,8 @@ const riverClear = updateClassicLab({ ...riverInitial, player: { x: 4, y: 1 } } 
 assert.equal(riverClear.status, 'complete');
 
 const coilInitial = initialClassicLabState(6);
-const coilClear = updateClassicLab({ ...coilInitial, score: 7, orb: { x: 7, y: 12 } } as ClassicLabState, { type: 'tick', ms: 260 });
-assert.equal(coilClear.status, 'complete'); assert.equal(coilClear.score, 8);
+const coilClear = updateClassicLab({ ...coilInitial, score: 9, orb: { x: 7, y: 12 } } as ClassicLabState, { type: 'tick', ms: 260 });
+assert.equal(coilClear.status, 'complete'); assert.equal(coilClear.score, 10);
 
 const prismInitial = initialClassicLabState(7);
 const prismShift = updateClassicLab(prismInitial, { type: 'move', direction: 'left' });
@@ -182,12 +190,35 @@ const prismClear = updateClassicLab({ ...prismInitial, ball: { x: 195, y: 500, v
 assert.equal(prismClear.status, 'complete');
 
 const mergeInitial = initialClassicLabState(8);
-const mergeClear = updateClassicLab({ ...mergeInitial, board: [[32, 32, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], highest: 32 } as ClassicLabState, { type: 'move', direction: 'left' });
-assert.equal(mergeClear.status, 'complete'); assert.equal(mergeClear.highest, 64);
+const mergeClear = updateClassicLab({ ...mergeInitial, board: [[64, 64, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], highest: 64 } as ClassicLabState, { type: 'move', direction: 'left' });
+assert.equal(mergeClear.status, 'complete'); assert.equal(mergeClear.highest, 128);
 
 let lanternComplete = initialClassicLabState(9);
-for (const index of [0, 6, 18, 24]) lanternComplete = updateClassicLab(lanternComplete, { type: 'activate', index });
-assert.equal(lanternComplete.status, 'complete'); assert.equal(lanternComplete.lit, 25); assert.equal(lanternComplete.moves, 4);
+for (const index of [0, 2, 6, 10, 12, 14, 18, 22, 24]) lanternComplete = updateClassicLab(lanternComplete, { type: 'activate', index });
+assert.equal(lanternComplete.status, 'complete'); assert.equal(lanternComplete.lit, 25); assert.equal(lanternComplete.moves, 9);
+
+let iceComplete = initialClassicLabState(10);
+for (const direction of ['up', 'right', 'up', 'left', 'up', 'down', 'right', 'down', 'up'] as const) iceComplete = updateClassicLab(iceComplete, { type: 'move', direction });
+assert.equal(iceComplete.status, 'complete'); assert.equal(iceComplete.score, 4);
+
+let crateComplete = initialClassicLabState(11);
+for (const direction of ['up', 'right', 'up', 'up', 'down', 'down', 'right', 'right', 'up', 'up', 'down', 'down', 'down', 'right', 'up', 'up', 'up'] as const) crateComplete = updateClassicLab(crateComplete, { type: 'move', direction });
+assert.equal(crateComplete.status, 'complete'); assert.equal(crateComplete.score, 3);
+
+let echoComplete = initialClassicLabState(12);
+for (let round = 0; round < 3; round += 1) {
+  echoComplete = updateClassicLab(echoComplete, { type: 'tick', ms: (4 + round * 2) * 520 });
+  for (const pad of [0, 2, 1, 3, 2, 0, 3, 1].slice(0, 4 + round * 2)) echoComplete = updateClassicLab(echoComplete, { type: 'activate', index: pad });
+}
+assert.equal(echoComplete.status, 'complete'); assert.equal(echoComplete.score, 18);
+
+let gearComplete = initialClassicLabState(13);
+for (let index = 0; index < gearComplete.rotations.length; index += 1) while (gearComplete.rotations[index] !== gearComplete.target[index]) gearComplete = updateClassicLab(gearComplete, { type: 'activate', index });
+assert.equal(gearComplete.status, 'complete'); assert.equal(gearComplete.aligned, 16);
+
+let orbitComplete = initialClassicLabState(14);
+for (let gate = 0; gate < 6; gate += 1) orbitComplete = updateClassicLab({ ...orbitComplete, angle: orbitComplete.targetAngle } as ClassicLabState, { type: 'activate', index: 0 });
+assert.equal(orbitComplete.status, 'complete'); assert.equal(orbitComplete.score, 6);
 
 const { createVentureService, DEFAULT_SETTINGS } = await import('../src/services/ventureService');
 assert.equal(DEFAULT_SETTINGS.highContrast, true);
@@ -224,4 +255,4 @@ await migratedService.updateCharacter(customExplorer);
 assert.deepEqual((await migratedService.getProfile())?.character, customExplorer);
 assert.deepEqual(JSON.parse(localStorage.getItem('dailyVentureLocalReviewerProfile') ?? '{}').character, customExplorer);
 
-console.log('unit: character persistence, 7 schemas, nine Puzzle Labs, timezone gating, attempts, archive rules, idempotency, and achievement thresholds passed');
+console.log('unit: character persistence, 7 schemas, fourteen Puzzle Labs, timezone gating, attempts, archive rules, idempotency, and achievement thresholds passed');

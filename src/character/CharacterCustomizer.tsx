@@ -2,8 +2,11 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import {
   ACCESSORY_OPTIONS,
   BODY_OPTIONS,
+  CHARACTER_PRESETS,
   DEFAULT_CHARACTER,
   EYE_COLORS,
+  EYE_SHAPE_OPTIONS,
+  FRAME_OPTIONS,
   HAIR_COLORS,
   HAIR_OPTIONS,
   HEAD_OPTIONS,
@@ -11,6 +14,7 @@ import {
   SKIN_TONES,
   drawCharacterCanvas,
   normalizeCharacterCustomization,
+  randomizeCharacterCustomization,
   type CharacterCustomization,
 } from './character';
 
@@ -74,13 +78,19 @@ export function CharacterCustomizer({ character, onSave }: { character: Characte
       <div><span>YOUR EXPLORER</span><strong>{draft.name.trim() || 'Unnamed explorer'}</strong><small>Used in labs, Ventures, and future dialogue.</small></div>
     </div>
 
+    <fieldset className="character-fieldset character-presets"><legend>Quick presets</legend><div className="character-preset-row">
+      {Object.entries(CHARACTER_PRESETS).map(([name, preset]) => <button type="button" key={name} onClick={() => { setDraft({ ...preset }); setMessage(`${name} preset loaded in the preview.`); }}><strong>{name}</strong><small>{name === 'Matt' ? 'Triangular · blonde · aviators' : name === 'Myles' ? 'Tall · almond eyes · field vest' : 'Sturdy · heritage tee · jean shorts'}</small></button>)}
+    </div><button type="button" className="character-randomize-button" onClick={() => { setDraft((current) => randomizeCharacterCustomization(current)); setMessage('A new randomized look is ready in the preview.'); }}>✦ RANDOMIZE LOOK</button></fieldset>
+
     <label className="character-name-field" htmlFor="character-name">Character name<input id="character-name" maxLength={20} value={draft.name} onChange={(event) => update('name', event.target.value)} placeholder="Name your explorer" /></label>
     <ChoiceRow label="Head shape" value={draft.head} options={HEAD_OPTIONS} onChange={(value) => update('head', value)} />
+    <ChoiceRow label="Build" value={draft.frame} options={FRAME_OPTIONS} onChange={(value) => update('frame', value)} />
     <ColorRow label="Skin tone" value={draft.skinTone} colors={SKIN_TONES} onChange={(value) => update('skinTone', value)} />
     <ChoiceRow label="Body" value={draft.body} options={BODY_OPTIONS} onChange={(value) => update('body', value)} />
     <ChoiceRow label="Legs" value={draft.legs} options={LEG_OPTIONS} onChange={(value) => update('legs', value)} />
     <ChoiceRow label="Hair style" value={draft.hairStyle} options={HAIR_OPTIONS} onChange={(value) => update('hairStyle', value)} />
     <ColorRow label="Hair color" value={draft.hairColor} colors={HAIR_COLORS} onChange={(value) => update('hairColor', value)} />
+    <ChoiceRow label="Eye shape" value={draft.eyeShape} options={EYE_SHAPE_OPTIONS} onChange={(value) => update('eyeShape', value)} />
     <ColorRow label="Eye color" value={draft.eyeColor} colors={EYE_COLORS} onChange={(value) => update('eyeColor', value)} />
     <ChoiceRow label="Accessory" value={draft.accessory} options={ACCESSORY_OPTIONS} onChange={(value) => update('accessory', value)} />
 
