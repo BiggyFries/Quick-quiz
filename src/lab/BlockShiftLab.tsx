@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { drawCharacterCanvas, type CharacterCustomization } from '../character/character';
 import {
   BLOCK_SHIFT_GOAL,
   BLOCK_SHIFT_HEIGHT,
@@ -144,7 +145,12 @@ function drawExplorer(ctx: CanvasRenderingContext2D, point: GridPoint, time: num
   ctx.restore();
 }
 
-function drawLab(ctx: CanvasRenderingContext2D, state: BlockShiftState, transition: VisualTransition | null, time: number) {
+function drawCustomizedExplorer(ctx: CanvasRenderingContext2D, point: GridPoint, time: number, transition: VisualTransition | null, complete: boolean, facing: LabDirection, character: CharacterCustomization) {
+  const center = iso(point); const progress = transitionProgress(transition, time); const moving = Boolean(transition) && progress < 1;
+  drawCharacterCanvas(ctx, character, { x: center.x, groundY: center.y + 14, scale: .72, time, pose: complete ? 'celebrate' : moving && transition?.pushed ? 'push' : moving ? 'walk' : 'idle', facing });
+}
+
+function drawLab(ctx: CanvasRenderingContext2D, state: BlockShiftState, transition: VisualTransition | null, time: number, character: CharacterCustomization) {
   const sky = ctx.createLinearGradient(0, 0, 0, 844);
   sky.addColorStop(0, '#173f46'); sky.addColorStop(.55, '#34767a'); sky.addColorStop(1, '#102b32');
   ctx.fillStyle = sky; ctx.fillRect(0, 0, 390, 844);
@@ -174,7 +180,7 @@ function drawLab(ctx: CanvasRenderingContext2D, state: BlockShiftState, transiti
     return { depth: point.x + block.width + point.y + block.height, draw: () => drawPrism(ctx, block, point, pulse) };
   });
   const playerPoint = animatedPoint(transition, 'player', state.player, time);
-  entities.push({ depth: playerPoint.x + playerPoint.y + 1.4, draw: () => drawExplorer(ctx, playerPoint, time, transition, state.status === 'complete') });
+  entities.push({ depth: playerPoint.x + playerPoint.y + 1.4, draw: () => drawCustomizedExplorer(ctx, playerPoint, time, transition, state.status === 'complete', state.facing, character) });
   entities.sort((a, b) => a.depth - b.depth).forEach((entity) => entity.draw());
 
   if (state.status === 'complete') {
@@ -184,7 +190,7 @@ function drawLab(ctx: CanvasRenderingContext2D, state: BlockShiftState, transiti
   }
 }
 
-export function BlockShiftLab({ onExit }: { onExit: () => void }) {
+export function BlockShiftLab({ onExit, character }: { onExit: () => void; character: CharacterCustomization }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [state, setState] = useState(initialBlockShiftState);
   const stateRef = useRef(state);
@@ -217,10 +223,10 @@ export function BlockShiftLab({ onExit }: { onExit: () => void }) {
   useEffect(() => {
     const canvas = canvasRef.current; const ctx = canvas?.getContext('2d'); if (!canvas || !ctx) return;
     let frame = 0;
-    const render = () => { const time = performance.now() + manualTimeOffset.current; drawLab(ctx, stateRef.current, transitionRef.current, time); frame = requestAnimationFrame(render); };
-    drawNowRef.current = () => drawLab(ctx, stateRef.current, transitionRef.current, performance.now() + manualTimeOffset.current);
+    const render = () => { const time = performance.now() + manualTimeOffset.current; drawLab(ctx, stateRef.current, transitionRef.current, time, character); frame = requestAnimationFrame(render); };
+    drawNowRef.current = () => drawLab(ctx, stateRef.current, transitionRef.current, performance.now() + manualTimeOffset.current, character);
     render(); return () => { cancelAnimationFrame(frame); drawNowRef.current = null; };
-  }, []);
+  }, [character]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -237,9 +243,9 @@ export function BlockShiftLab({ onExit }: { onExit: () => void }) {
   useEffect(() => {
     const bridge = window as typeof window & { advanceTime?: (ms: number) => void; render_game_to_text?: () => string };
     bridge.advanceTime = (ms: number) => { manualTimeOffset.current += ms; drawNowRef.current?.(); };
-    bridge.render_game_to_text = () => JSON.stringify(blockShiftSnapshot(stateRef.current));
+    bridge.render_game_to_text = () => JSON.stringify({ ...blockShiftSnapshot(stateRef.current), character });
     return () => { delete bridge.advanceTime; delete bridge.render_game_to_text; };
-  }, []);
+  }, [character]);
 
   return <section className="lab-screen" aria-label="Block Shift tester game">
     <canvas ref={canvasRef} width="390" height="844" aria-label="Block Shift puzzle room" />

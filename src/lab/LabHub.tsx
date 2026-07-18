@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { drawCharacterCanvas, type CharacterCustomization } from '../character/character';
 import { ClassicLab } from './ClassicLab';
 import { CLASSIC_LABS, type ClassicLabId } from './classicLabs';
 
@@ -22,7 +23,7 @@ function drawHubExplorer(ctx: CanvasRenderingContext2D, time: number) {
   ctx.fillStyle = '#173338'; ctx.font = '900 9px Inter, system-ui'; ctx.textAlign = 'center'; ctx.fillText('LAB', x, y + 4);
 }
 
-function drawHub(canvas: HTMLCanvasElement, time: number) {
+function drawHub(canvas: HTMLCanvasElement, time: number, character: CharacterCustomization) {
   const ctx = canvas.getContext('2d'); if (!ctx) return;
   const gradient = ctx.createLinearGradient(0, 0, 0, 844); gradient.addColorStop(0, '#183d42'); gradient.addColorStop(.48, '#32686a'); gradient.addColorStop(1, '#0a2329');
   ctx.fillStyle = gradient; ctx.fillRect(0, 0, 390, 844);
@@ -36,10 +37,10 @@ function drawHub(canvas: HTMLCanvasElement, time: number) {
     ctx.strokeStyle = index % 2 ? '#74dfd0aa' : '#f6c85faa'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(x, y, 29, Math.PI, 0); ctx.lineTo(x + 29, y + 38); ctx.lineTo(x - 29, y + 38); ctx.closePath(); ctx.stroke(); ctx.restore();
   }
   ctx.fillStyle = '#9fe8dc'; ctx.font = '900 9px Inter, system-ui'; ctx.textAlign = 'center'; ctx.fillText('ONE EXPLORER · MANY MECHANICS', 195, 112);
-  drawHubExplorer(ctx, time);
+  drawCharacterCanvas(ctx, character, { x: 195, groundY: 250, scale: .95, time, pose: 'idle', remote: true });
 }
 
-export function LabHub({ onExit, openBlockShift, openMineTrail }: { onExit: () => void; openBlockShift: () => void; openMineTrail: () => void }) {
+export function LabHub({ onExit, openBlockShift, openMineTrail, character }: { onExit: () => void; openBlockShift: () => void; openMineTrail: () => void; character: CharacterCustomization }) {
   const [selected, setSelected] = useState<LabSelection>(() => {
     const requested = Number(new URLSearchParams(window.location.search).get('lab'));
     return requested >= 3 && requested <= 9 ? requested as ClassicLabId : null;
@@ -50,23 +51,24 @@ export function LabHub({ onExit, openBlockShift, openMineTrail }: { onExit: () =
     if (selected !== null) return;
     const canvas = canvasRef.current; if (!canvas) return;
     let frame = 0;
-    const render = () => { drawHub(canvas, performance.now()); frame = requestAnimationFrame(render); };
+    const render = () => { drawHub(canvas, performance.now(), character); frame = requestAnimationFrame(render); };
     render(); return () => cancelAnimationFrame(frame);
-  }, [selected]);
+  }, [character, selected]);
 
   useEffect(() => {
     if (selected !== null) return;
     const bridge = window as typeof window & { advanceTime?: (ms: number) => void; render_game_to_text?: () => string };
-    bridge.advanceTime = () => { if (canvasRef.current) drawHub(canvasRef.current, performance.now()); };
+    bridge.advanceTime = () => { if (canvasRef.current) drawHub(canvasRef.current, performance.now(), character); };
     bridge.render_game_to_text = () => JSON.stringify({
       mode: 'lab-corridor', coordinateSystem: 'portrait menu; cards ordered top-to-bottom',
       playableLabs: [1, 2, ...CLASSIC_LABS.map((lab) => lab.id)],
       objective: 'Choose a prototype lab to play. Every playable lab uses the same explorer and portal system.',
+      character,
     });
     return () => { delete bridge.advanceTime; delete bridge.render_game_to_text; };
-  }, [selected]);
+  }, [character, selected]);
 
-  if (selected !== null) return <ClassicLab id={selected} onExit={() => setSelected(null)} />;
+  if (selected !== null) return <ClassicLab id={selected} character={character} onExit={() => setSelected(null)} />;
 
   return <section className="lab-hub-screen" aria-label="Prototype Lab corridor">
     <canvas ref={canvasRef} width="390" height="844" aria-label="Explorer standing in the prototype corridor" />

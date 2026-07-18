@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
+import { DEFAULT_CHARACTER, loadCharacterCustomization, normalizeCharacterCustomization, saveCharacterCustomization, type CharacterCustomization } from '../character/character';
 import { WEEK_ONE } from '../content/week1';
 import type { AttemptRecord, DailyAdventure, LevelResult, PlayerProfile, Settings } from '../game/types';
 import { addDays, localDateKey } from './date';
@@ -43,6 +44,7 @@ export interface VentureService {
   startAttempt(adventureId: string, isArchive: boolean, timeZone: string): Promise<AttemptRecord>;
   finishAttempt(input: FinishAttemptInput): Promise<AttemptRecord>;
   updateSettings(settings: Settings): Promise<void>;
+  updateCharacter(character: CharacterCustomization): Promise<void>;
 }
 
 class LocalReviewService implements VentureService {
@@ -53,6 +55,10 @@ class LocalReviewService implements VentureService {
     try {
       const saved = localStorage.getItem(PROFILE_KEY);
       this.profile = saved ? JSON.parse(saved) as PlayerProfile : null;
+      if (this.profile) {
+        this.profile.character = saveCharacterCustomization(normalizeCharacterCustomization(this.profile.character ?? loadCharacterCustomization()));
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(this.profile));
+      }
       if (this.profile && localStorage.getItem(SETTINGS_VERSION_KEY) !== SETTINGS_VERSION) {
         this.profile.settings = { ...this.profile.settings, highContrast: true };
         localStorage.setItem(SETTINGS_VERSION_KEY, SETTINGS_VERSION);
@@ -71,13 +77,13 @@ class LocalReviewService implements VentureService {
   async getProfile() { return this.profile; }
 
   async signIn(email: string) {
-    this.profile = { id: crypto.randomUUID(), email, role: 'reviewer', settings: DEFAULT_SETTINGS, attempts: [] };
+    this.profile = { id: crypto.randomUUID(), email, role: 'reviewer', character: loadCharacterCustomization(), settings: DEFAULT_SETTINGS, attempts: [] };
     this.persist();
     return { sent: false, profile: this.profile };
   }
 
   async enterLocalReview() {
-    if (!this.profile) this.profile = { id: crypto.randomUUID(), email: 'reviewer@local.preview', role: 'reviewer', settings: DEFAULT_SETTINGS, attempts: [] };
+    if (!this.profile) this.profile = { id: crypto.randomUUID(), email: 'reviewer@local.preview', role: 'reviewer', character: loadCharacterCustomization(), settings: DEFAULT_SETTINGS, attempts: [] };
     this.persist();
     return this.profile;
   }
@@ -154,6 +160,12 @@ class LocalReviewService implements VentureService {
     this.profile.settings = settings;
     this.persist();
   }
+
+  async updateCharacter(character: CharacterCustomization) {
+    if (!this.profile) throw new Error('Authentication required');
+    this.profile.character = saveCharacterCustomization(character);
+    this.persist();
+  }
 }
 
 class SupabaseVentureService implements VentureService {
@@ -188,6 +200,7 @@ class SupabaseVentureService implements VentureService {
   async startAttempt(adventureId: string, isArchive: boolean, timeZone: string) { return this.invoke<AttemptRecord>('start-attempt', { adventureId, isArchive, timeZone }); }
   async finishAttempt(input: FinishAttemptInput) { return this.invoke<AttemptRecord>('finish-attempt', { ...input }); }
   async updateSettings(settings: Settings) { await this.invoke('update-settings', { settings }); }
+  async updateCharacter(character: CharacterCustomization) { await this.invoke('update-character', { character: normalizeCharacterCustomization(character) }); }
 }
 
 export function createVentureService(): VentureService {
@@ -199,7 +212,7 @@ export function createVentureService(): VentureService {
 }
 
 export function profileFromSupabaseUser(user: User, settings = DEFAULT_SETTINGS): PlayerProfile {
-  return { id: user.id, email: user.email ?? 'player', role: 'player', settings, attempts: [] };
+  return { id: user.id, email: user.email ?? 'player', role: 'player', character: { ...DEFAULT_CHARACTER }, settings, attempts: [] };
 }
 
 export { DEFAULT_SETTINGS };
