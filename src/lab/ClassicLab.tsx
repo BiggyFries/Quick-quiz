@@ -27,6 +27,9 @@ import {
   type RiverState,
   type StackState,
 } from './classicLabs';
+import { PROTOTYPE_THEME, themeCss, type LabTheme } from './theme';
+import { useSwipeDirection } from './useSwipeDirection';
+import { beginVictoryJourney, idleVictoryJourney, moveVictoryJourney, tickVictoryJourney, victoryJourneyMessage, type VictoryJourney } from './victory';
 
 const CANVAS_WIDTH = 390;
 const CANVAS_HEIGHT = 844;
@@ -36,18 +39,18 @@ function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width:
   if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
 }
 
-function drawLabBackdrop(ctx: CanvasRenderingContext2D, definition: LabDefinition, time: number) {
+function drawLabBackdrop(ctx: CanvasRenderingContext2D, definition: LabDefinition, time: number, theme: LabTheme) {
   const gradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
-  gradient.addColorStop(0, '#163c42'); gradient.addColorStop(.55, '#2e6768'); gradient.addColorStop(1, '#071c24');
+  gradient.addColorStop(0, theme.skyTop); gradient.addColorStop(.55, theme.skyMid); gradient.addColorStop(1, theme.skyBottom);
   ctx.fillStyle = gradient; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   const glow = ctx.createRadialGradient(195, 315, 20, 195, 315, 260);
-  glow.addColorStop(0, `${definition.accent}42`); glow.addColorStop(1, '#0d2a3000');
+  glow.addColorStop(0, `${theme.accent}42`); glow.addColorStop(1, '#0d2a3000');
   ctx.fillStyle = glow; ctx.fillRect(0, 85, 390, 590);
   ctx.fillStyle = '#061a214c';
   ctx.beginPath(); ctx.moveTo(0, 680); ctx.lineTo(0, 150); ctx.quadraticCurveTo(55, 95, 104, 145); ctx.lineTo(86, 680); ctx.fill();
   ctx.beginPath(); ctx.moveTo(390, 680); ctx.lineTo(390, 150); ctx.quadraticCurveTo(335, 95, 286, 145); ctx.lineTo(304, 680); ctx.fill();
   const pulse = (Math.sin(time / 600) + 1) / 2;
-  ctx.strokeStyle = `${definition.accent}${Math.round(80 + pulse * 80).toString(16).padStart(2, '0')}`;
+  ctx.strokeStyle = `${theme.accent}${Math.round(80 + pulse * 80).toString(16).padStart(2, '0')}`;
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(195, 376, 182, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
   for (let x = 18; x < 390; x += 44) {
@@ -80,7 +83,10 @@ function drawExplorer(ctx: CanvasRenderingContext2D, x: number, y: number, scale
   ctx.restore();
 }
 
+let suppressGameCharacter = false;
+
 function drawCustomizedExplorer(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, time: number, character: CharacterCustomization, remote = false, facing: ClassicDirection = 'down') {
+  if (suppressGameCharacter) return;
   drawCharacterCanvas(ctx, character, { x, groundY: y + 24 * scale, scale: scale * .82, time, pose: 'idle', remote, facing });
 }
 
@@ -107,8 +113,8 @@ function drawRelic(ctx: CanvasRenderingContext2D, state: RelicState, time: numbe
     }
   }));
   const exitX = left + state.exit.x * cellW + cellW / 2; const exitY = top + state.exit.y * cellH + cellH / 2;
-  ctx.save(); ctx.shadowColor = state.score >= state.target ? '#f6c85f' : '#496b6b'; ctx.shadowBlur = state.score >= state.target ? 17 : 4;
-  ctx.fillStyle = state.score >= state.target ? '#f6c85f' : '#4d6767'; ctx.beginPath(); ctx.arc(exitX, exitY, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.save(); ctx.shadowColor = state.pellets.length === 0 ? '#f6c85f' : '#496b6b'; ctx.shadowBlur = state.pellets.length === 0 ? 17 : 4;
+  ctx.fillStyle = state.pellets.length === 0 ? '#f6c85f' : '#4d6767'; ctx.beginPath(); ctx.arc(exitX, exitY, 9, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#142b2f'; ctx.beginPath(); ctx.arc(exitX, exitY, 5, 0, Math.PI * 2); ctx.fill(); ctx.restore();
   state.pellets.forEach((key) => {
     const [x, y] = key.split(',').map(Number); const pulse = 1 + Math.sin(time / 180 + x + y) * .2;
@@ -179,6 +185,11 @@ function drawCoil(ctx: CanvasRenderingContext2D, state: CoilState, time: number,
   for (let y = 0; y < 16; y += 1) for (let x = 0; x < 15; x += 1) {
     ctx.fillStyle = (x + y) % 2 ? '#26484a' : '#2c5050'; ctx.fillRect(left + x * cell, top + y * cell, cell - 1, cell - 1);
   }
+  state.obstacles.forEach((point) => {
+    const x = left + point.x * cell + 10; const y = top + point.y * cell + 10;
+    ctx.fillStyle = '#172d32'; ctx.strokeStyle = '#b88454'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x, y - 8); ctx.lineTo(x + 7, y - 2); ctx.lineTo(x + 5, y + 8); ctx.lineTo(x - 6, y + 7); ctx.lineTo(x - 8, y - 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+  });
   ctx.strokeStyle = '#e8a95b'; ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.beginPath(); state.trail.slice().reverse().forEach((point, index) => {
     const x = left + point.x * cell + cell / 2; const y = top + point.y * cell + cell / 2;
@@ -207,6 +218,7 @@ function drawPrism(ctx: CanvasRenderingContext2D, state: PrismState, time: numbe
 }
 
 const MERGE_COLORS: Record<number, string> = { 2: '#5d8e88', 4: '#55a99c', 8: '#d6a351', 16: '#d37b51', 32: '#a76fb9', 64: '#f6c85f', 128: '#ef8378' };
+const MERGE_SYMBOLS: Record<number, string> = { 2: '●', 4: '▲', 8: '■', 16: '◆', 32: '✦', 64: '☀', 128: '✺' };
 
 function drawMerge(ctx: CanvasRenderingContext2D, state: MergeState, time: number, character: CharacterCustomization) {
   roundedRect(ctx, 48, 151, 294, 382, 26, '#07171ddd', '#d8b7ff59');
@@ -216,7 +228,7 @@ function drawMerge(ctx: CanvasRenderingContext2D, state: MergeState, time: numbe
     const px = left + x * cell; const py = top + y * cell;
     roundedRect(ctx, px, py, 55, 55, 12, value ? MERGE_COLORS[value] ?? '#e2746d' : '#ffffff0d', value ? '#ffffff52' : '#ffffff15');
     if (value) {
-      ctx.fillStyle = value >= 64 ? '#1f2a2b' : '#fff'; ctx.font = `900 ${value >= 100 ? 15 : 20}px Inter, system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(value), px + 27.5, py + 28);
+      ctx.fillStyle = value >= 64 ? '#1f2a2b' : '#fff'; ctx.font = '900 24px Inter, system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(MERGE_SYMBOLS[value] ?? '✺', px + 27.5, py + 28);
     }
   }));
   ctx.fillStyle = '#d7c6ec'; ctx.font = '800 10px Inter, system-ui'; ctx.textAlign = 'center'; ctx.fillText('WAYFINDER RUNE FORGE', 195, 458);
@@ -311,8 +323,20 @@ function drawOrbit(ctx: CanvasRenderingContext2D, state: OrbitState, time: numbe
   drawCustomizedExplorer(ctx, 195, 561, .74, time, character, true);
 }
 
-function drawStatusOverlay(ctx: CanvasRenderingContext2D, state: ClassicLabState, definition: LabDefinition) {
-  if (state.status === 'playing') return;
+function drawExitJourney(ctx: CanvasRenderingContext2D, journey: VictoryJourney, time: number, character: CharacterCustomization, theme: LabTheme) {
+  if (journey.phase === 'idle') return;
+  roundedRect(ctx, 34, 458, 322, 126, 24, '#06171bed', `${theme.portal}88`);
+  ctx.strokeStyle = '#ffffff25'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(62, 550); ctx.lineTo(331, 550); ctx.stroke();
+  const portalX = 323; const portalY = 542; const pulse = 1 + Math.sin(time / 230) * .04;
+  ctx.save(); ctx.shadowColor = theme.portal; ctx.shadowBlur = 18; ctx.strokeStyle = theme.portal; ctx.lineWidth = 7; ctx.beginPath(); ctx.ellipse(portalX, portalY - 28, 22 * pulse, 40 * pulse, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  const x = 77 + journey.x * 57; const y = 552 + journey.lane * 24;
+  drawCharacterCanvas(ctx, character, { x, groundY: y, scale: .56, time, pose: journey.phase === 'celebrating' || journey.phase === 'departed' ? 'celebrate' : 'walk', facing: 'right' });
+  ctx.fillStyle = theme.accent; ctx.font = '900 9px Inter, system-ui'; ctx.textAlign = 'center';
+  ctx.fillText(journey.phase === 'celebrating' ? 'ONE SECOND VICTORY MOMENT' : journey.phase === 'portal-open' ? `STEER INTO THE ${theme.portalName.toUpperCase()}` : 'PORTAL CROSSED', 195, 478);
+}
+
+function drawStatusOverlay(ctx: CanvasRenderingContext2D, state: ClassicLabState, definition: LabDefinition, journey: VictoryJourney) {
+  if (state.status === 'playing' || (state.status === 'complete' && journey.phase !== 'departed')) return;
   roundedRect(ctx, 53, 332, 284, 108, 22, '#06171bef', state.status === 'complete' ? '#ffe596' : '#ff9b8e');
   ctx.fillStyle = state.status === 'complete' ? definition.accent : '#ff8e82'; ctx.font = '900 11px Inter, system-ui'; ctx.textAlign = 'center';
   ctx.fillText(state.status === 'complete' ? 'LAB CLEARED' : 'SIGNAL LOST', 195, 365);
@@ -320,8 +344,9 @@ function drawStatusOverlay(ctx: CanvasRenderingContext2D, state: ClassicLabState
   ctx.fillStyle = '#b7d4d0'; ctx.font = '700 10px Inter, system-ui'; ctx.fillText(`${definition.title} · Lab ${String(definition.id).padStart(2, '0')}`, 195, 420);
 }
 
-function drawClassicLab(ctx: CanvasRenderingContext2D, state: ClassicLabState, definition: LabDefinition, time: number, character: CharacterCustomization) {
-  drawLabBackdrop(ctx, definition, time);
+function drawClassicLab(ctx: CanvasRenderingContext2D, state: ClassicLabState, definition: LabDefinition, time: number, character: CharacterCustomization, journey: VictoryJourney, theme: LabTheme) {
+  drawLabBackdrop(ctx, definition, time, theme);
+  suppressGameCharacter = journey.phase !== 'idle';
   if (state.id === 3) drawRelic(ctx, state, time, character);
   else if (state.id === 4) drawStack(ctx, state, time, character);
   else if (state.id === 5) drawRiver(ctx, state, time, character);
@@ -334,7 +359,9 @@ function drawClassicLab(ctx: CanvasRenderingContext2D, state: ClassicLabState, d
   else if (state.id === 12) drawEcho(ctx, state, time, character);
   else if (state.id === 13) drawGear(ctx, state, time, character);
   else drawOrbit(ctx, state, time, character);
-  drawStatusOverlay(ctx, state, definition);
+  suppressGameCharacter = false;
+  drawExitJourney(ctx, journey, time, character, theme);
+  drawStatusOverlay(ctx, state, definition, journey);
 }
 
 function labStats(state: ClassicLabState) {
@@ -343,7 +370,7 @@ function labStats(state: ClassicLabState) {
   if (state.id === 5) return [{ value: state.lives, label: 'lives' }, { value: 10 - state.bestRow, label: 'lanes' }];
   if (state.id === 6) return [{ value: `${state.score}/${state.target}`, label: 'signals' }, { value: state.trail.length, label: 'trail' }];
   if (state.id === 7) return [{ value: state.seals.length, label: 'seals' }, { value: state.lives, label: 'lives' }];
-  if (state.id === 8) return [{ value: state.highest, label: 'highest' }, { value: state.moves, label: 'moves' }];
+  if (state.id === 8) return [{ value: `${Math.log2(state.highest)}/6`, label: 'stack' }, { value: state.moves, label: 'moves' }];
   if (state.id === 9) return [{ value: `${state.lit}/25`, label: 'lit' }, { value: state.moves, label: 'moves' }];
   if (state.id === 10) return [{ value: `${state.collected.length}/4`, label: 'sigils' }, { value: state.moves, label: 'slides' }];
   if (state.id === 11) return [{ value: `${state.score}/3`, label: 'powered' }, { value: state.pushes, label: 'pushes' }];
@@ -362,7 +389,7 @@ function DirectionPad({ move, center, disabled }: { move: (direction: ClassicDir
   </div>;
 }
 
-export function ClassicLab({ id, onExit, character }: { id: ClassicLabId; onExit: () => void; character: CharacterCustomization }) {
+export function ClassicLab({ id, onExit, onComplete, character, theme = PROTOTYPE_THEME, contextLabel = 'PROTOTYPE CORRIDOR' }: { id: ClassicLabId; onExit: () => void; onComplete?: () => void; character: CharacterCustomization; theme?: LabTheme; contextLabel?: string }) {
   const definition = CLASSIC_LABS.find((lab) => lab.id === id)!;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [state, setState] = useState<ClassicLabState>(() => initialClassicLabState(id));
@@ -370,30 +397,48 @@ export function ClassicLab({ id, onExit, character }: { id: ClassicLabId; onExit
   const manualTime = useRef(false);
   const drawNowRef = useRef<(() => void) | null>(null);
   const [gridCursor, setGridCursor] = useState(0);
+  const [journey, setJourney] = useState<VictoryJourney>(idleVictoryJourney);
+  const journeyRef = useRef(journey);
+  const completionSent = useRef(false);
+
+  const updateJourney = useCallback((update: (current: VictoryJourney) => VictoryJourney) => {
+    const next = update(journeyRef.current); journeyRef.current = next; setJourney(next); drawNowRef.current?.();
+  }, []);
 
   const commit = useCallback((action: ClassicLabAction) => {
+    if (journeyRef.current.phase !== 'idle') {
+      if (action.type === 'tick') updateJourney((current) => tickVictoryJourney(current, action.ms));
+      else if (action.type === 'move') updateJourney((current) => moveVictoryJourney(current, action.direction));
+      return;
+    }
     const current = stateRef.current;
     const next = updateClassicLab(current, action);
     const statusChanged = next.status !== current.status;
-    stateRef.current = next; setState(next); drawNowRef.current?.();
+    stateRef.current = next; setState(next);
+    if (current.status !== 'complete' && next.status === 'complete') updateJourney(() => beginVictoryJourney());
+    drawNowRef.current?.();
     if (statusChanged || action.type !== 'tick') navigator.vibrate?.(next.status === 'complete' ? [30, 40, 60] : 10);
-  }, []);
+  }, [updateJourney]);
 
   const move = useCallback((direction: ClassicDirection) => commit({ type: 'move', direction }), [commit]);
   const reset = useCallback(() => {
-    const next = initialClassicLabState(id); stateRef.current = next; setState(next); drawNowRef.current?.();
+    const next = initialClassicLabState(id); stateRef.current = next; setState(next); completionSent.current = false;
+    const idle = idleVictoryJourney(); journeyRef.current = idle; setJourney(idle); drawNowRef.current?.();
   }, [id]);
+
+  useEffect(() => {
+    if (journey.phase === 'departed' && onComplete && !completionSent.current) { completionSent.current = true; onComplete(); }
+  }, [journey.phase, onComplete]);
 
   useEffect(() => {
     const canvas = canvasRef.current; const ctx = canvas?.getContext('2d'); if (!canvas || !ctx) return;
     let frame = 0;
-    const draw = () => { drawClassicLab(ctx, stateRef.current, definition, performance.now(), character); frame = requestAnimationFrame(draw); };
-    drawNowRef.current = () => drawClassicLab(ctx, stateRef.current, definition, performance.now(), character); draw();
+    const draw = () => { drawClassicLab(ctx, stateRef.current, definition, performance.now(), character, journeyRef.current, theme); frame = requestAnimationFrame(draw); };
+    drawNowRef.current = () => drawClassicLab(ctx, stateRef.current, definition, performance.now(), character, journeyRef.current, theme); draw();
     return () => { cancelAnimationFrame(frame); drawNowRef.current = null; };
-  }, [character, definition]);
+  }, [character, definition, theme]);
 
   useEffect(() => {
-    if (![3, 4, 5, 6, 7, 12, 14].includes(id)) return;
     const interval = window.setInterval(() => { if (!manualTime.current) commit({ type: 'tick', ms: 50 }); }, 50);
     return () => window.clearInterval(interval);
   }, [commit, id]);
@@ -406,7 +451,8 @@ export function ClassicLab({ id, onExit, character }: { id: ClassicLabId; onExit
         : key === 'arrowdown' || key === 's' ? 'down'
           : key === 'arrowleft' || key === 'a' ? 'left'
             : key === 'arrowright' || key === 'd' ? 'right' : null;
-      if (direction && id === 12) { event.preventDefault(); commit({ type: 'activate', index: direction === 'up' ? 0 : direction === 'right' ? 1 : direction === 'down' ? 2 : 3 }); }
+      if (direction && journeyRef.current.phase !== 'idle') { event.preventDefault(); move(direction); }
+      else if (direction && id === 12) { event.preventDefault(); commit({ type: 'activate', index: direction === 'up' ? 0 : direction === 'right' ? 1 : direction === 'down' ? 2 : 3 }); }
       else if (direction && id === 13) {
         event.preventDefault(); setGridCursor((current) => {
           const x = current % 4; const y = Math.floor(current / 4);
@@ -427,18 +473,27 @@ export function ClassicLab({ id, onExit, character }: { id: ClassicLabId; onExit
   useEffect(() => {
     const bridge = window as typeof window & { advanceTime?: (ms: number) => void; render_game_to_text?: () => string };
     bridge.advanceTime = (ms: number) => { manualTime.current = true; commit({ type: 'tick', ms }); };
-    bridge.render_game_to_text = () => JSON.stringify({ ...classicLabSnapshot(stateRef.current), character });
+    bridge.render_game_to_text = () => JSON.stringify({ ...classicLabSnapshot(stateRef.current), victory: journeyRef.current, character, theme: { id: theme.id, worldName: theme.worldName, portalName: theme.portalName } });
     return () => { delete bridge.advanceTime; delete bridge.render_game_to_text; };
-  }, [character, commit]);
+  }, [character, commit, theme]);
 
   const stats = labStats(state);
   const controlsDisabled = state.status !== 'playing';
+  const swipe = useSwipeDirection((direction) => {
+    if (journeyRef.current.phase !== 'idle') move(direction);
+    else if (id === 12) commit({ type: 'activate', index: direction === 'up' ? 0 : direction === 'right' ? 1 : direction === 'down' ? 2 : 3 });
+    else if (id === 13) setGridCursor((current) => {
+      const x = current % 4; const y = Math.floor(current / 4);
+      return direction === 'left' ? y * 4 + Math.max(0, x - 1) : direction === 'right' ? y * 4 + Math.min(3, x + 1) : direction === 'up' ? Math.max(0, y - 1) * 4 + x : Math.min(3, y + 1) * 4 + x;
+    });
+    else move(direction);
+  }, state.status === 'failed' || journey.phase === 'celebrating' || journey.phase === 'departed');
 
-  return <section className="lab-screen classic-lab-screen" aria-label={`${definition.title} puzzle lab`}>
-    <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} aria-label={`${definition.title} game world`} />
+  return <section className="lab-screen classic-lab-screen" aria-label={`${definition.title} puzzle lab`} style={themeCss(theme)}>
+    <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} aria-label={`${definition.title} game world`} {...swipe} />
     <header className="lab-header">
       <button className="icon-button glass" onClick={onExit} aria-label="Back to Lab corridor">←</button>
-      <div><span>PROTOTYPE CORRIDOR · LAB {String(id).padStart(2, '0')}</span><h1>{definition.title} · {definition.shortTitle}</h1></div>
+      <div><span>{contextLabel} · LAB {String(id).padStart(2, '0')}</span><h1>{definition.title} · {definition.shortTitle}</h1></div>
       <button className="lab-small-button glass" onClick={reset}>RESET</button>
     </header>
     <div className="lab-brief">
@@ -455,9 +510,13 @@ export function ClassicLab({ id, onExit, character }: { id: ClassicLabId; onExit
     {state.id === 13 && <div className="gear-hit-grid" aria-label="Gear link grid">
       {state.rotations.map((rotation, index) => <button className={gridCursor === index ? 'keyboard-current' : ''} key={index} disabled={state.status !== 'playing'} onClick={() => { setGridCursor(index); commit({ type: 'activate', index }); }} aria-label={`Gear link ${Math.floor(index / 4) + 1}, ${index % 4 + 1}, orientation ${rotation + 1}`} />)}
     </div>}
-    <div className={`lab-message classic-message ${state.status}`} aria-live="polite">{state.message}</div>
+    <div className={`lab-message classic-message ${state.status}`} aria-live="polite">{journey.phase === 'idle' ? state.message : victoryJourneyMessage(journey, theme.portalName)}</div>
     <div className={`lab-controls classic-controls lab-controls-${state.id}`} aria-label={`${definition.title} controls`}>
-      {state.id === 4 ? <>
+      {journey.phase !== 'idle' ? <>
+        <button className="lab-utility side-note" disabled>{journey.phase === 'celebrating' ? 'CHEER' : journey.phase === 'departed' ? 'CLEAR' : 'EXIT'}<small>{journey.x} / 4</small></button>
+        <DirectionPad move={move} center="◇" disabled={journey.phase !== 'portal-open'} />
+        <button className="lab-utility" onClick={reset}>RESET <small>R</small></button>
+      </> : state.id === 4 ? <>
         <button className="lab-utility" disabled={controlsDisabled} onClick={() => commit({ type: 'rotate' })}>ROTATE <small>Q / ↑</small></button>
         <DirectionPad move={move} center="▦" disabled={controlsDisabled} />
         <button className="lab-utility" disabled={controlsDisabled} onClick={() => commit({ type: 'hard-drop' })}>DROP <small>SPACE</small></button>

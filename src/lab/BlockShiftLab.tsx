@@ -13,6 +13,9 @@ import {
   type LabDirection,
   type ShiftBlock,
 } from './blockShift';
+import { PROTOTYPE_THEME, themeCss, type LabTheme } from './theme';
+import { useSwipeDirection } from './useSwipeDirection';
+import { beginVictoryJourney, idleVictoryJourney, moveVictoryJourney, tickVictoryJourney, victoryJourneyMessage, type VictoryJourney } from './victory';
 
 interface VisualTransition {
   from: BlockShiftState;
@@ -147,12 +150,22 @@ function drawExplorer(ctx: CanvasRenderingContext2D, point: GridPoint, time: num
 
 function drawCustomizedExplorer(ctx: CanvasRenderingContext2D, point: GridPoint, time: number, transition: VisualTransition | null, complete: boolean, facing: LabDirection, character: CharacterCustomization) {
   const center = iso(point); const progress = transitionProgress(transition, time); const moving = Boolean(transition) && progress < 1;
-  drawCharacterCanvas(ctx, character, { x: center.x, groundY: center.y + 14, scale: .72, time, pose: complete ? 'celebrate' : moving && transition?.pushed ? 'push' : moving ? 'walk' : 'idle', facing });
+  const delta = facing === 'left' ? { x: -.2, y: 0 } : facing === 'right' ? { x: .2, y: 0 } : facing === 'up' ? { x: 0, y: -.2 } : { x: 0, y: .2 };
+  const safeCenter = moving && transition?.pushed ? iso({ x: point.x - delta.x, y: point.y - delta.y }) : center;
+  drawCharacterCanvas(ctx, character, { x: safeCenter.x, groundY: safeCenter.y + 9, scale: .54, time, pose: complete ? 'celebrate' : moving && transition?.pushed ? 'push' : moving ? 'walk' : 'idle', facing });
 }
 
-function drawLab(ctx: CanvasRenderingContext2D, state: BlockShiftState, transition: VisualTransition | null, time: number, character: CharacterCustomization) {
+function drawVictoryStage(ctx: CanvasRenderingContext2D, journey: VictoryJourney, time: number, character: CharacterCustomization, theme: LabTheme) {
+  ctx.fillStyle = '#06171bed'; ctx.beginPath(); ctx.roundRect(38, 438, 314, 137, 24); ctx.fill();
+  ctx.strokeStyle = '#ffffff32'; ctx.beginPath(); ctx.moveTo(64, 548); ctx.lineTo(328, 548); ctx.stroke();
+  const pulse = 1 + Math.sin(time / 230) * .04; ctx.save(); ctx.shadowColor = theme.portal; ctx.shadowBlur = 18; ctx.strokeStyle = theme.portal; ctx.lineWidth = 7; ctx.beginPath(); ctx.ellipse(322, 518, 21 * pulse, 39 * pulse, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  drawCharacterCanvas(ctx, character, { x: 78 + journey.x * 57, groundY: 550 + journey.lane * 23, scale: .56, time, pose: journey.phase === 'celebrating' || journey.phase === 'departed' ? 'celebrate' : 'walk', facing: 'right' });
+  ctx.fillStyle = theme.accent; ctx.font = '900 9px Inter, system-ui'; ctx.textAlign = 'center'; ctx.fillText(journey.phase === 'celebrating' ? 'ONE SECOND VICTORY MOMENT' : journey.phase === 'portal-open' ? 'WALK TO THE OPEN DOOR' : 'DOOR CROSSED', 195, 461);
+}
+
+function drawLab(ctx: CanvasRenderingContext2D, state: BlockShiftState, transition: VisualTransition | null, time: number, character: CharacterCustomization, journey: VictoryJourney, theme: LabTheme) {
   const sky = ctx.createLinearGradient(0, 0, 0, 844);
-  sky.addColorStop(0, '#173f46'); sky.addColorStop(.55, '#34767a'); sky.addColorStop(1, '#102b32');
+  sky.addColorStop(0, theme.skyTop); sky.addColorStop(.55, theme.skyMid); sky.addColorStop(1, theme.skyBottom);
   ctx.fillStyle = sky; ctx.fillRect(0, 0, 390, 844);
   const halo = ctx.createRadialGradient(195, 340, 20, 195, 340, 260);
   halo.addColorStop(0, '#dff7cf4d'); halo.addColorStop(1, '#18383d00'); ctx.fillStyle = halo; ctx.fillRect(0, 115, 390, 500);
@@ -180,23 +193,30 @@ function drawLab(ctx: CanvasRenderingContext2D, state: BlockShiftState, transiti
     return { depth: point.x + block.width + point.y + block.height, draw: () => drawPrism(ctx, block, point, pulse) };
   });
   const playerPoint = animatedPoint(transition, 'player', state.player, time);
-  entities.push({ depth: playerPoint.x + playerPoint.y + 1.4, draw: () => drawCustomizedExplorer(ctx, playerPoint, time, transition, state.status === 'complete', state.facing, character) });
+  if (journey.phase === 'idle') entities.push({ depth: playerPoint.x + playerPoint.y + 1.4, draw: () => drawCustomizedExplorer(ctx, playerPoint, time, transition, false, state.facing, character) });
   entities.sort((a, b) => a.depth - b.depth).forEach((entity) => entity.draw());
+  drawVictoryStage(ctx, journey, time, character, theme);
 
-  if (state.status === 'complete') {
+  if (state.status === 'complete' && journey.phase === 'departed') {
     ctx.fillStyle = '#06171bc7'; ctx.beginPath(); ctx.roundRect(55, 505, 280, 63, 18); ctx.fill();
     ctx.fillStyle = '#f6c85f'; ctx.font = '900 11px Inter, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('PUZZLE CLEARED', 195, 528);
     ctx.fillStyle = '#fff'; ctx.font = '700 15px Inter, system-ui, sans-serif'; ctx.fillText('The challenge door is open', 195, 551);
   }
 }
 
-export function BlockShiftLab({ onExit, character }: { onExit: () => void; character: CharacterCustomization }) {
+export function BlockShiftLab({ onExit, onComplete, character, theme = PROTOTYPE_THEME, contextLabel = 'PREVIEW TESTER GAME' }: { onExit: () => void; onComplete?: () => void; character: CharacterCustomization; theme?: LabTheme; contextLabel?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [state, setState] = useState(initialBlockShiftState);
   const stateRef = useRef(state);
   const transitionRef = useRef<VisualTransition | null>(null);
   const manualTimeOffset = useRef(0);
   const drawNowRef = useRef<(() => void) | null>(null);
+  const [journey, setJourney] = useState<VictoryJourney>(idleVictoryJourney);
+  const journeyRef = useRef(journey); const manualTime = useRef(false); const completionSent = useRef(false);
+
+  const updateJourney = useCallback((update: (current: VictoryJourney) => VictoryJourney) => {
+    const next = update(journeyRef.current); journeyRef.current = next; setJourney(next); drawNowRef.current?.();
+  }, []);
 
   const commit = useCallback((update: (current: BlockShiftState) => BlockShiftState) => {
     setState((current) => {
@@ -209,24 +229,39 @@ export function BlockShiftLab({ onExit, character }: { onExit: () => void; chara
         transitionRef.current = { from: current, to: next, startedAt: performance.now() + manualTimeOffset.current, durationMs: changedBlock ? 260 : 215, pushed: changedBlock };
       }
       stateRef.current = next;
+      if (current.status !== 'complete' && next.status === 'complete') updateJourney(() => beginVictoryJourney());
       navigator.vibrate?.(changedBlock ? 24 : next.moves !== current.moves ? 9 : 5);
       return next;
     });
+  }, [updateJourney]);
+
+  const move = useCallback((direction: LabDirection) => {
+    if (journeyRef.current.phase !== 'idle') updateJourney((current) => moveVictoryJourney(current, direction));
+    else commit((current) => moveBlockShift(current, direction));
+  }, [commit, updateJourney]);
+  const undo = useCallback(() => {
+    if (journeyRef.current.phase !== 'idle') return;
+    commit(undoBlockShift);
+  }, [commit]);
+  const reset = useCallback(() => {
+    transitionRef.current = null; const next = initialBlockShiftState(); stateRef.current = next; setState(next); completionSent.current = false;
+    const idle = idleVictoryJourney(); journeyRef.current = idle; setJourney(idle);
   }, []);
 
-  const move = useCallback((direction: LabDirection) => commit((current) => moveBlockShift(current, direction)), [commit]);
-  const undo = useCallback(() => commit(undoBlockShift), [commit]);
-  const reset = useCallback(() => {
-    transitionRef.current = null; const next = initialBlockShiftState(); stateRef.current = next; setState(next);
-  }, []);
+  useEffect(() => { if (journey.phase === 'departed' && onComplete && !completionSent.current) { completionSent.current = true; onComplete(); } }, [journey.phase, onComplete]);
 
   useEffect(() => {
     const canvas = canvasRef.current; const ctx = canvas?.getContext('2d'); if (!canvas || !ctx) return;
     let frame = 0;
-    const render = () => { const time = performance.now() + manualTimeOffset.current; drawLab(ctx, stateRef.current, transitionRef.current, time, character); frame = requestAnimationFrame(render); };
-    drawNowRef.current = () => drawLab(ctx, stateRef.current, transitionRef.current, performance.now() + manualTimeOffset.current, character);
+    const render = () => { const time = performance.now() + manualTimeOffset.current; drawLab(ctx, stateRef.current, transitionRef.current, time, character, journeyRef.current, theme); frame = requestAnimationFrame(render); };
+    drawNowRef.current = () => drawLab(ctx, stateRef.current, transitionRef.current, performance.now() + manualTimeOffset.current, character, journeyRef.current, theme);
     render(); return () => { cancelAnimationFrame(frame); drawNowRef.current = null; };
-  }, [character]);
+  }, [character, theme]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => { if (!manualTime.current && journeyRef.current.phase === 'celebrating') updateJourney((current) => tickVictoryJourney(current, 50)); }, 50);
+    return () => window.clearInterval(interval);
+  }, [updateJourney]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -242,16 +277,18 @@ export function BlockShiftLab({ onExit, character }: { onExit: () => void; chara
 
   useEffect(() => {
     const bridge = window as typeof window & { advanceTime?: (ms: number) => void; render_game_to_text?: () => string };
-    bridge.advanceTime = (ms: number) => { manualTimeOffset.current += ms; drawNowRef.current?.(); };
-    bridge.render_game_to_text = () => JSON.stringify({ ...blockShiftSnapshot(stateRef.current), character });
+    bridge.advanceTime = (ms: number) => { manualTime.current = true; manualTimeOffset.current += ms; updateJourney((current) => tickVictoryJourney(current, ms)); drawNowRef.current?.(); };
+    bridge.render_game_to_text = () => JSON.stringify({ ...blockShiftSnapshot(stateRef.current), victory: journeyRef.current, character, theme: { id: theme.id, worldName: theme.worldName } });
     return () => { delete bridge.advanceTime; delete bridge.render_game_to_text; };
-  }, [character]);
+  }, [character, theme, updateJourney]);
 
-  return <section className="lab-screen" aria-label="Block Shift tester game">
-    <canvas ref={canvasRef} width="390" height="844" aria-label="Block Shift puzzle room" />
+  const swipe = useSwipeDirection(move, journey.phase === 'celebrating' || journey.phase === 'departed');
+
+  return <section className="lab-screen" aria-label="Block Shift tester game" style={themeCss(theme)}>
+    <canvas ref={canvasRef} width="390" height="844" aria-label="Block Shift puzzle room" {...swipe} />
     <header className="lab-header">
       <button className="icon-button glass" onClick={onExit} aria-label="Back to puzzle labs">←</button>
-      <div><span>PREVIEW TESTER GAME</span><h1>Block Shift · Lab 01</h1></div>
+      <div><span>{contextLabel}</span><h1>Block Shift · Lab 01</h1></div>
       <span className="lab-number" aria-hidden="true">01</span>
     </header>
     <div className="lab-brief">
@@ -260,19 +297,19 @@ export function BlockShiftLab({ onExit, character }: { onExit: () => void; chara
       <div><strong>{state.pushes}</strong><small>pushes</small></div>
     </div>
     <div className="lab-tool-row">
-      <button className="lab-utility" onClick={undo} disabled={!state.history.length}>↶ UNDO <small>Z</small></button>
+      <button className="lab-utility" onClick={undo} disabled={!state.history.length || journey.phase !== 'idle'}>↶ UNDO <small>Z</small></button>
       <button className="lab-utility" onClick={reset}>RESET ↻ <small>R</small></button>
     </div>
-    <div className={`lab-message ${state.status === 'complete' ? 'complete' : ''}`} aria-live="polite">{state.message}</div>
+    <div className={`lab-message ${state.status === 'complete' ? 'complete' : ''}`} aria-live="polite">{journey.phase === 'idle' ? state.message : victoryJourneyMessage(journey, 'challenge door')}</div>
     <div className="lab-controls block-controls" aria-label="Movement controls">
       <div className="lab-dpad">
-        <button className="up" onClick={() => move('up')} aria-label="Move up">↑</button>
-        <button className="left" onClick={() => move('left')} aria-label="Move left">←</button>
+        <button className="up" disabled={journey.phase === 'celebrating' || journey.phase === 'departed'} onClick={() => move('up')} aria-label="Move up">↑</button>
+        <button className="left" disabled={journey.phase === 'celebrating' || journey.phase === 'departed'} onClick={() => move('left')} aria-label="Move left">←</button>
         <span aria-hidden="true">◆</span>
-        <button className="right" onClick={() => move('right')} aria-label="Move right">→</button>
-        <button className="down" onClick={() => move('down')} aria-label="Move down">↓</button>
+        <button className="right" disabled={journey.phase === 'celebrating' || journey.phase === 'departed'} onClick={() => move('right')} aria-label="Move right">→</button>
+        <button className="down" disabled={journey.phase === 'celebrating' || journey.phase === 'departed'} onClick={() => move('down')} aria-label="Move down">↓</button>
       </div>
-      <p>Touch arrows · Desktop: Arrow keys or WASD</p>
+      <p>Swipe the world or use arrows · Walk into the portal after solving</p>
     </div>
   </section>;
 }

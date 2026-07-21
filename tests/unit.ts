@@ -4,6 +4,7 @@ import { WEEK_ONE } from '../src/content/week1';
 import { countLogicSolutions, dailyAdventureSchema, satisfiesLogicClues } from '../src/game/schema';
 import type { AttemptRecord } from '../src/game/types';
 import { blockShiftSnapshot, initialBlockShiftState, moveBlockShift, undoBlockShift } from '../src/lab/blockShift';
+import { adventureSnapshot, initialAdventureState, moveAdventure, tickAdventure } from '../src/lab/adventure';
 import { CLASSIC_LABS, classicLabSnapshot, initialClassicLabState, updateClassicLab, type ClassicLabState } from '../src/lab/classicLabs';
 import { adjacentMineCount, initialMineTrailState, isMine, mineTrailSnapshot, moveMineTrail, revealMineTrail } from '../src/lab/mineTrail';
 import { calculateAchievements } from '../src/services/achievements';
@@ -132,13 +133,14 @@ assert.equal(blockShiftSnapshot(completedLab).status, 'complete');
 
 const initialMineTrail = initialMineTrailState();
 assert.equal(adjacentMineCount({ x: 0, y: 0 }), 1);
-assert.ok(mineTrailSnapshot(initialMineTrail).cells.every((cell) => cell.state === 'covered' && cell.clue === null));
-const firstReveal = revealMineTrail(initialMineTrail);
+assert.deepEqual(initialMineTrail.player, { x: 2, y: 2 });
+assert.equal(mineTrailSnapshot(initialMineTrail).cells.filter((cell) => cell.state === 'safe').length, 1);
+const firstReveal = revealMineTrail({ ...initialMineTrail, player: { x: 0, y: 4 } });
 assert.equal(firstReveal.status, 'playing');
-assert.equal(firstReveal.revealed.length, 4);
-assert.equal(mineTrailSnapshot(firstReveal).safeTilesRemaining, 15);
+assert.equal(firstReveal.revealed.length, 5);
+assert.equal(mineTrailSnapshot(firstReveal).safeTilesRemaining, 14);
 let failedMineTrail = initialMineTrailState();
-for (const direction of ['right', 'up', 'up', 'up'] as const) failedMineTrail = moveMineTrail(failedMineTrail, direction);
+for (const direction of ['left', 'up'] as const) failedMineTrail = moveMineTrail(failedMineTrail, direction);
 failedMineTrail = revealMineTrail(failedMineTrail);
 assert.equal(failedMineTrail.status, 'failed');
 assert.deepEqual(failedMineTrail.detonated, { x: 1, y: 1 });
@@ -162,7 +164,7 @@ const relicInitial = initialClassicLabState(3);
 const relicWalk = updateClassicLab(relicInitial, { type: 'move', direction: 'right' });
 assert.deepEqual(relicWalk.player, { x: 2, y: 13 });
 assert.equal(relicWalk.score, 1);
-const relicClear = updateClassicLab({ ...relicInitial, player: { x: 10, y: 1 }, score: 18 } as ClassicLabState, { type: 'move', direction: 'right' });
+const relicClear = updateClassicLab({ ...relicInitial, player: { x: 10, y: 1 }, score: relicInitial.target, pellets: [] } as ClassicLabState, { type: 'move', direction: 'right' });
 assert.equal(relicClear.status, 'complete');
 
 const stackInitial = initialClassicLabState(4);
@@ -190,8 +192,18 @@ const prismClear = updateClassicLab({ ...prismInitial, ball: { x: 195, y: 500, v
 assert.equal(prismClear.status, 'complete');
 
 const mergeInitial = initialClassicLabState(8);
-const mergeClear = updateClassicLab({ ...mergeInitial, board: [[64, 64, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], highest: 64 } as ClassicLabState, { type: 'move', direction: 'left' });
-assert.equal(mergeClear.status, 'complete'); assert.equal(mergeClear.highest, 128);
+const mergeClear = updateClassicLab({ ...mergeInitial, board: [[32, 32, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], highest: 32 } as ClassicLabState, { type: 'move', direction: 'left' });
+assert.equal(mergeClear.status, 'complete'); assert.equal(mergeClear.highest, 64);
+assert.equal(classicLabSnapshot(mergeClear).highestStack, 6);
+
+let adventure = initialAdventureState();
+const adventureMove = (route: string) => { for (const key of route) adventure = moveAdventure(adventure, ({ U: 'up', D: 'down', L: 'left', R: 'right' } as const)[key as 'U' | 'D' | 'L' | 'R']); };
+adventureMove('RRLLDDDRRRUUURLDDDLLLLLDDRRLLD');
+assert.equal(adventure.phase, 'celebrating'); assert.equal(adventure.chips.length, 3); assert.equal(adventure.plateActive, true);
+adventure = tickAdventure(adventure, 999); assert.equal(adventure.phase, 'celebrating');
+adventure = tickAdventure(adventure, 1); assert.equal(adventure.phase, 'portal-open');
+adventureMove('UUURRRRRRDD D'.replaceAll(' ',''));
+assert.equal(adventure.phase, 'complete'); assert.equal(adventureSnapshot(adventure).portalOpen, true);
 
 let lanternComplete = initialClassicLabState(9);
 for (const index of [0, 2, 6, 10, 12, 14, 18, 22, 24]) lanternComplete = updateClassicLab(lanternComplete, { type: 'activate', index });
@@ -255,4 +267,4 @@ await migratedService.updateCharacter(customExplorer);
 assert.deepEqual((await migratedService.getProfile())?.character, customExplorer);
 assert.deepEqual(JSON.parse(localStorage.getItem('dailyVentureLocalReviewerProfile') ?? '{}').character, customExplorer);
 
-console.log('unit: character persistence, 7 schemas, fourteen Puzzle Labs, timezone gating, attempts, archive rules, idempotency, and achievement thresholds passed');
+console.log('unit: character persistence, 7 schemas, Adventure plus fourteen Puzzle Labs, timezone gating, attempts, archive rules, idempotency, and achievement thresholds passed');

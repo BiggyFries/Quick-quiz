@@ -1,0 +1,25 @@
+import { useMemo, useRef, type PointerEventHandler } from 'react';
+import type { ClassicDirection } from './classicLabs';
+
+interface PointerOrigin { id: number; x: number; y: number }
+
+export function useSwipeDirection(onDirection: (direction: ClassicDirection) => void, disabled = false) {
+  const origin = useRef<PointerOrigin | null>(null);
+  return useMemo(() => {
+    const onPointerDown: PointerEventHandler<HTMLElement> = (event) => {
+      if (disabled) return;
+      origin.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    };
+    const onPointerUp: PointerEventHandler<HTMLElement> = (event) => {
+      const start = origin.current;
+      origin.current = null;
+      if (disabled || !start || start.id !== event.pointerId) return;
+      const dx = event.clientX - start.x; const dy = event.clientY - start.y;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 22) return;
+      onDirection(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+    };
+    const onPointerCancel: PointerEventHandler<HTMLElement> = () => { origin.current = null; };
+    return { onPointerDown, onPointerUp, onPointerCancel };
+  }, [disabled, onDirection]);
+}

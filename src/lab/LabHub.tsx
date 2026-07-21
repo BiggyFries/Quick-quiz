@@ -40,7 +40,7 @@ function drawHub(canvas: HTMLCanvasElement, time: number, character: CharacterCu
   drawCharacterCanvas(ctx, character, { x: 195, groundY: 250, scale: .95, time, pose: 'idle', remote: true });
 }
 
-export function LabHub({ onExit, openBlockShift, openMineTrail, character }: { onExit: () => void; openBlockShift: () => void; openMineTrail: () => void; character: CharacterCustomization }) {
+export function LabHub({ onExit, openAdventure, openBlockShift, openMineTrail, character }: { onExit: () => void; openAdventure: () => void; openBlockShift: () => void; openMineTrail: () => void; character: CharacterCustomization }) {
   const [selected, setSelected] = useState<LabSelection>(() => {
     const requested = Number(new URLSearchParams(window.location.search).get('lab'));
     return requested >= 3 && requested <= 14 ? requested as ClassicLabId : null;
@@ -61,7 +61,7 @@ export function LabHub({ onExit, openBlockShift, openMineTrail, character }: { o
     bridge.advanceTime = () => { if (canvasRef.current) drawHub(canvasRef.current, performance.now(), character); };
     bridge.render_game_to_text = () => JSON.stringify({
       mode: 'lab-corridor', coordinateSystem: 'portrait menu; cards ordered top-to-bottom',
-      playableLabs: [1, 2, ...CLASSIC_LABS.map((lab) => lab.id)],
+      playableLabs: ['adventure', 1, 2, ...CLASSIC_LABS.map((lab) => lab.id)],
       objective: 'Choose a prototype lab to play. Every playable lab uses the same explorer and portal system.',
       character,
     });
@@ -75,13 +75,16 @@ export function LabHub({ onExit, openBlockShift, openMineTrail, character }: { o
     <header className="lab-hub-header">
       <button className="icon-button glass" onClick={onExit} aria-label="Back to home">←</button>
       <div><span>DAILY VENTURE · TEST WING</span><h1>Prototype Corridor</h1></div>
-      <div className="lab-count"><strong>14</strong><small>PLAYABLE</small></div>
+      <div className="lab-count"><strong>15</strong><small>PLAYABLE</small></div>
     </header>
     <div className="lab-hub-intro">
       <strong>Choose the next field test</strong>
       <span>Every room keeps the same explorer, portal language, and mobile controls.</span>
     </div>
     <div className="lab-card-list">
+      <button className="lab-card lab-card-adventure" onClick={openAdventure}>
+        <span className="lab-card-number">A</span><span className="lab-card-copy"><strong>Adventure</strong><small>Primary room · chips, gear, gates and crate logic</small></span><b>PLAY ›</b>
+      </button>
       <button className="lab-card lab-card-featured" onClick={openBlockShift}>
         <span className="lab-card-number">01</span><span className="lab-card-copy"><strong>Block Shift</strong><small>Original sliding-block room · 2.5D explorer</small></span><b>PLAY ›</b>
       </button>

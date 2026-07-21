@@ -6,14 +6,17 @@ import { VentureCanvas, type CanvasView } from './game/VentureCanvas';
 import { currentPuzzleConfig, initialSessionState, sessionReducer, sessionSnapshot } from './game/session';
 import type { DailyAdventure, FinaleConfig, LogicConfig, MemoryConfig, PuzzleConfig, RhythmConfig, Settings, TriviaConfig } from './game/types';
 import { BlockShiftLab } from './lab/BlockShiftLab';
+import { AdventureLab } from './lab/AdventureLab';
 import { CoreLabHub } from './lab/CoreLabHub';
 import { MineTrailLab } from './lab/MineTrailLab';
+import { FormulaPreview } from './lab/FormulaPreview';
+import { useSwipeDirection } from './lab/useSwipeDirection';
 import { calculateAchievements, newlyUnlocked } from './services/achievements';
 import { formatDate, localDateKey } from './services/date';
 import { createVentureService, DEFAULT_SETTINGS, type CalendarDay } from './services/ventureService';
 
 type Modal = 'help' | 'login' | 'achievements' | 'settings' | 'rooms' | 'customize' | null;
-type HomePage = 'home' | 'archive' | 'review' | 'lab' | 'lab-block' | 'lab-mine';
+type HomePage = 'home' | 'archive' | 'review' | 'formula' | 'lab' | 'lab-adventure' | 'lab-block' | 'lab-mine';
 
 function formatDuration(ms: number) {
   const total = Math.max(0, Math.round(ms / 1000));
@@ -125,7 +128,9 @@ export function App() {
   const [session, dispatch] = useReducer(sessionReducer, initialSessionState);
   const [page, setPage] = useState<HomePage>(() => {
     const requestedLab = new URLSearchParams(window.location.search).get('lab');
-    return requestedLab === 'block-shift' ? 'lab-block'
+    return requestedLab === 'formula' ? 'formula'
+      : requestedLab === 'adventure' ? 'lab-adventure'
+      : requestedLab === 'block-shift' ? 'lab-block'
       : requestedLab === 'mine-trail' ? 'lab-mine'
         : requestedLab && /^(?:0?[3-9]|1[0-4])$/.test(requestedLab) ? 'lab' : 'home';
   });
@@ -146,6 +151,7 @@ export function App() {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const today = localDateKey(new Date(), timeZone);
   const config = currentPuzzleConfig(session);
+  const ventureExitSwipe = useSwipeDirection((direction) => dispatch({ type: 'EXIT_MOVE', direction }), session.mode !== 'resolution' || session.resolutionOutcome !== 'success' || session.resolutionElapsedMs < 1000);
 
   useEffect(() => {
     service.getProfile().then((current) => {
@@ -170,7 +176,7 @@ export function App() {
   useEffect(() => () => { ambientNodes.current?.oscillators.forEach((oscillator) => oscillator.stop()); void audioContext.current?.close(); }, []);
 
   useEffect(() => {
-    if (page.startsWith('lab')) return;
+    if (page.startsWith('lab') || page === 'formula') return;
     const bridge = window as typeof window & { advanceTime?: (ms: number) => void; render_game_to_text?: () => string };
     bridge.advanceTime = (ms: number) => { manualTime.current = true; if (modal === null) dispatch({ type: 'TICK', ms }); };
     bridge.render_game_to_text = () => JSON.stringify({ ...sessionSnapshot(session), character });
@@ -198,10 +204,14 @@ export function App() {
       else if (session.mode === 'puzzle' && event.key === ' ') { event.preventDefault(); dispatch({ type: 'RHYTHM_TAP' }); }
       else if (session.mode === 'puzzle' && event.key === 'Enter') dispatch({ type: 'CONFIRM' });
       else if (session.mode === 'puzzle' && ['1', '2', '3', '4'].includes(event.key)) dispatch({ type: 'CHOOSE', value: Number(event.key) - 1 });
+      else if (session.mode === 'resolution' && session.resolutionOutcome === 'success') {
+        const direction = event.key === 'ArrowUp' || event.key.toLowerCase() === 'w' ? 'up' : event.key === 'ArrowDown' || event.key.toLowerCase() === 's' ? 'down' : event.key === 'ArrowLeft' || event.key.toLowerCase() === 'a' ? 'left' : event.key === 'ArrowRight' || event.key.toLowerCase() === 'd' ? 'right' : null;
+        if (direction) { event.preventDefault(); dispatch({ type: 'EXIT_MOVE', direction }); }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [session.mode]);
+  }, [session.mode, session.resolutionOutcome]);
 
   const stopAmbient = useCallback(() => {
     const nodes = ambientNodes.current;
@@ -359,6 +369,7 @@ export function App() {
     puzzle: session.puzzle,
     resolutionOutcome: session.resolutionOutcome,
     resolutionElapsedMs: session.resolutionElapsedMs,
+    exitPosition: session.exitPosition,
     reducedMotion: session.reducedMotion,
     character,
   };
@@ -368,9 +379,11 @@ export function App() {
 
   return <main className={`app ${settings.highContrast ? 'high-contrast' : ''} ${settings.reducedMotion ? 'reduced-motion' : ''}`}>
     <div className="phone-stage">
-      {!(session.mode === 'home' && page.startsWith('lab')) && <VentureCanvas view={session.mode === 'home' ? homeCanvasView : canvasView} />}
+      {!(session.mode === 'home' && (page.startsWith('lab') || page === 'formula')) && <VentureCanvas view={session.mode === 'home' ? homeCanvasView : canvasView} />}
 
-      {session.mode === 'home' && page === 'lab' && <CoreLabHub character={character} onExit={() => setPage('home')} openBlockShift={() => setPage('lab-block')} openMineTrail={() => setPage('lab-mine')} />}
+      {session.mode === 'home' && page === 'formula' && <FormulaPreview character={character} onExit={() => setPage('home')} />}
+      {session.mode === 'home' && page === 'lab' && <CoreLabHub character={character} onExit={() => setPage('home')} openAdventure={() => setPage('lab-adventure')} openBlockShift={() => setPage('lab-block')} openMineTrail={() => setPage('lab-mine')} />}
+      {session.mode === 'home' && page === 'lab-adventure' && <AdventureLab character={character} onExit={() => setPage('lab')} />}
       {session.mode === 'home' && page === 'lab-block' && <BlockShiftLab character={character} onExit={() => setPage('lab')} />}
       {session.mode === 'home' && page === 'lab-mine' && <MineTrailLab character={character} onExit={() => setPage('lab')} />}
 
@@ -385,7 +398,8 @@ export function App() {
         <div className="home-actions">
           <button className="primary-button" onClick={playToday} disabled={!todayAdventure}>VENTURE <small>{todayAdventure ? todayAdventure.title : 'Awaiting launch date'}</small></button>
           <button className="secondary-button" onClick={openArchive}>PAST VENTURES</button>
-          <button className="lab-preview-button" onClick={() => setPage('lab')}>PREVIEW TESTER GAMES <span>Prototype corridor · 14 playable labs</span></button>
+          <button className="formula-preview-button" onClick={() => setPage('formula')}>TEST DAILY FORMULA <span>Adventure → 2 puzzles → The Watcher</span></button>
+          <button className="lab-preview-button" onClick={() => setPage('lab')}>PREVIEW TESTER GAMES <span>Adventure + 14 prototype labs</span></button>
           <button className="review-button" onClick={enterReview}>PREVIEW WEEK 1 <span>Reviewer build</span></button>
         </div>
       </section>}
@@ -425,7 +439,7 @@ export function App() {
         {config.type === 'finale' && session.puzzle.kind === 'finale' && <FinalePuzzle config={config as FinaleConfig} puzzle={session.puzzle} choose={(value) => dispatch({ type: 'CHOOSE', value })} confirm={() => dispatch({ type: 'CONFIRM' })} replay={() => dispatch({ type: 'MEMORY_REPLAY' })} tapRhythm={feedbackPulse} />}
       </section>}
 
-      {session.mode === 'resolution' && config && <section className="screen-overlay resolution-screen"><div className="resolution-card"><div className="eyebrow">{session.resolutionOutcome === 'success' ? 'TRAIL CLEARED' : 'RUN ENDED'}</div><h1>{session.resolutionOutcome === 'success' ? `${session.adventure?.art.artifact} recovered` : 'The Venture claims you'}</h1><p>{session.resolutionOutcome === 'success' ? `${character.name} crosses the obstacle and carries the relic onward.` : `${character.name}'s trail closes here. Your result is waiting.`}</p><div className="resolution-meter"><span style={{ width: `${Math.min(100, session.resolutionElapsedMs / (session.reducedMotion ? 1200 : 4800) * 100)}%` }} /></div></div></section>}
+      {session.mode === 'resolution' && config && <section className={`screen-overlay resolution-screen ${session.resolutionOutcome === 'success' && session.resolutionElapsedMs >= 1000 ? 'portal-ready' : ''}`} {...ventureExitSwipe}><div className="resolution-card"><div className="eyebrow">{session.resolutionOutcome === 'success' ? session.resolutionElapsedMs < 1000 ? 'LEVEL WON · CELEBRATE' : 'PORTAL OPEN' : 'RUN ENDED'}</div><h1>{session.resolutionOutcome === 'success' ? session.resolutionElapsedMs < 1000 ? `${session.adventure?.art.artifact} recovered` : 'Walk into the next room' : 'The Venture claims you'}</h1><p>{session.resolutionOutcome === 'success' ? session.resolutionElapsedMs < 1000 ? `${character.name} celebrates the solved challenge.` : 'Swipe on the world or use the arrows to guide your explorer into the portal.' : `${character.name}'s trail closes here. Your result is waiting.`}</p>{session.resolutionOutcome === 'success' && session.resolutionElapsedMs >= 1000 ? <div className="venture-exit-dpad lab-dpad"><button className="up" onClick={() => dispatch({ type: 'EXIT_MOVE', direction: 'up' })} aria-label="Walk up toward portal">↑</button><button className="left" onClick={() => dispatch({ type: 'EXIT_MOVE', direction: 'left' })} aria-label="Walk left toward portal">←</button><span aria-hidden="true">◇</span><button className="right" onClick={() => dispatch({ type: 'EXIT_MOVE', direction: 'right' })} aria-label="Walk right toward portal">→</button><button className="down" onClick={() => dispatch({ type: 'EXIT_MOVE', direction: 'down' })} aria-label="Walk down toward portal">↓</button></div> : <div className="resolution-meter"><span style={{ width: `${Math.min(100, session.resolutionElapsedMs / (session.resolutionOutcome === 'success' ? 1000 : session.reducedMotion ? 1200 : 4800) * 100)}%` }} /></div>}</div></section>}
 
       {session.mode === 'results' && session.adventure && <section className="screen-overlay results-screen"><div className="results-card"><div className="eyebrow">{session.finalOutcome === 'survived' ? 'VENTURE SURVIVED' : 'EXPEDITION ENDED'}</div><h1>{session.finalOutcome === 'survived' ? 'The trail opens' : `Room ${session.results.length} stopped you`}</h1><h2>{session.adventure.title}</h2><div className="result-tiles">{Array.from({ length: 5 }, (_, index) => <span key={index} className={session.results[index]?.success ? 'success' : session.results[index] ? 'failed' : ''}>{session.results[index]?.success ? '✓' : session.results[index] ? '×' : '·'}</span>)}</div><div className="result-stats"><div><strong>{session.results.filter((item) => item.success).length}/5</strong><small>cleared</small></div><div><strong>{formatDuration(session.activeMs)}</strong><small>active time</small></div><div><strong>{session.attemptNumber}</strong><small>attempt</small></div></div>{session.newlyUnlocked.length > 0 && <p className="achievement-toast">Achievement unlocked · {session.newlyUnlocked.join(', ')}</p>}<button className="primary-button" onClick={retry}>RETRY FULL TRAIL</button><button className="secondary-button" disabled={!profile || !session.authenticated} onClick={share}>{profile && session.authenticated ? 'SHARE RESULT' : 'LOG IN BEFORE PLAYING TO SHARE'}</button>{!session.authenticated && <p className="guest-note">Guest results are never saved or made shareable. Logging in now only applies to your next run.</p>}{shareMessage && <p className="share-message">{shareMessage}</p>}<button className="text-button" onClick={goHome}>Return home</button></div></section>}
 

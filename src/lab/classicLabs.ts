@@ -14,12 +14,12 @@ export interface LabDefinition {
 }
 
 export const CLASSIC_LABS: LabDefinition[] = [
-  { id: 3, title: 'Relic Run', shortTitle: 'Maze chase', inspiration: 'Inspired by Pac-Man', objective: 'Collect 18 sun sparks, evade three temple shades, then reach the portal.', controlHint: 'Move one tile precisely', accent: '#f6c85f', icon: '☀' },
+  { id: 3, title: 'Relic Run', shortTitle: 'Maze chase', inspiration: 'Inspired by maze-chase classics', objective: 'Collect every sun spark, evade three temple shades, then reach the portal.', controlHint: 'Move one tile precisely', accent: '#f6c85f', icon: '☀' },
   { id: 4, title: 'Sky Stack', shortTitle: 'Falling blocks', inspiration: 'Inspired by Tetris', objective: 'Use the explorer’s remote to keep the airlock clear for 75 seconds.', controlHint: 'Move, rotate and drop', accent: '#66d6cb', icon: '▦' },
   { id: 5, title: 'River Relay', shortTitle: 'Crossing lanes', inspiration: 'Inspired by Frogger', objective: 'Guide the explorer over beetle roads and floating ruins to the far gate.', controlHint: 'Hop one space', accent: '#72d08f', icon: '≋' },
-  { id: 6, title: 'Trail Coil', shortTitle: 'Growing trail', inspiration: 'Inspired by Snake', objective: 'Collect ten signal orbs without crossing the explorer’s faster light trail.', controlHint: 'Queue one precise turn', accent: '#e8a95b', icon: '◇' },
+  { id: 6, title: 'Trail Coil', shortTitle: 'Obstacle trail', inspiration: 'Inspired by growing-trail classics', objective: 'Collect ten signal orbs while dodging stone pylons and your accelerating light trail.', controlHint: 'Queue one precise turn', accent: '#e8a95b', icon: '◇' },
   { id: 7, title: 'Prism Break', shortTitle: 'Ricochet puzzle', inspiration: 'Inspired by Breakout', objective: 'Aim the remote-guided light bar and shatter every suspended seal.', controlHint: 'Slide the light bar', accent: '#e97f78', icon: '◆' },
-  { id: 8, title: 'Rune Merge', shortTitle: 'Number merge', inspiration: 'Inspired by 2048', objective: 'Shift matching runes together until the explorer forges a level-128 rune.', controlHint: 'Shift the rune board', accent: '#ba91ec', icon: '✦' },
+  { id: 8, title: 'Rune Merge', shortTitle: 'Symbol merge', inspiration: 'Inspired by sliding merge puzzles', objective: 'Combine matching shapes until one rune reaches its sixth stack.', controlHint: 'Swipe the rune board', accent: '#ba91ec', icon: '✦' },
   { id: 9, title: 'Lantern Grid', shortTitle: 'Light-toggle logic', inspiration: 'Inspired by Lights Out', objective: 'Tap a rune to flip it and its neighbors. Light all 25 lanterns.', controlHint: 'Tap rune tiles', accent: '#70b9e8', icon: '✺' },
   { id: 10, title: 'Icebound Route', shortTitle: 'Momentum maze', inspiration: 'Ice-slide pathfinding', objective: 'Slide until a wall stops you, gather four frost sigils, then enter the north gate.', controlHint: 'Choose a slide direction', accent: '#8ed9ef', icon: '❄' },
   { id: 11, title: 'Crate Circuit', shortTitle: 'Push-box logic', inspiration: 'Inspired by Sokoban', objective: 'Push three power crates onto the matching circuit plates without trapping one.', controlHint: 'Walk and push one tile', accent: '#e8a461', icon: '▣' },
@@ -96,6 +96,7 @@ export interface CoilState extends BaseLabState {
   orb: Point;
   moveClock: number;
   target: number;
+  obstacles: Point[];
 }
 
 export interface Seal { id: number; x: number; y: number; color: number }
@@ -158,12 +159,14 @@ const directionDelta: Record<ClassicDirection, Point> = {
 
 function initialRelicState(): RelicState {
   const pellets: string[] = [];
-  RELIC_MAP.forEach((row, y) => [...row].forEach((cell, x) => { if (cell === '.' && !(x === 11 && y === 1)) pellets.push(pointKey({ x, y })); }));
+  RELIC_MAP.forEach((row, y) => [...row].forEach((cell, x) => {
+    if (cell === '.' && !(x === 11 && y === 1) && !(x === 1 && y === 13)) pellets.push(pointKey({ x, y }));
+  }));
   return {
     id: 3, status: 'playing', elapsedMs: 0, score: 0,
-    message: 'Gather 18 sun sparks. Three shades now patrol the maze.',
+    message: `Gather every one of the ${pellets.length} sun sparks. Three shades patrol the maze.`,
     player: { x: 1, y: 13 }, enemies: [{ id: 0, x: 6, y: 7 }, { id: 1, x: 7, y: 7 }, { id: 2, x: 5, y: 7 }],
-    pellets, lives: 3, enemyClock: 0, target: 18, exit: { x: 11, y: 1 },
+    pellets, lives: 3, enemyClock: 0, target: pellets.length, exit: { x: 11, y: 1 },
   };
 }
 
@@ -213,12 +216,19 @@ const ORB_SEQUENCE: Point[] = [
   { x: 2, y: 8 }, { x: 8, y: 11 }, { x: 12, y: 6 }, { x: 6, y: 2 }, { x: 1, y: 5 },
 ];
 
+const COIL_OBSTACLES: Point[] = [
+  { x: 2, y: 2 }, { x: 3, y: 2 }, { x: 4, y: 2 }, { x: 10, y: 2 }, { x: 11, y: 2 },
+  { x: 6, y: 5 }, { x: 7, y: 5 }, { x: 8, y: 5 }, { x: 9, y: 7 },
+  { x: 5, y: 8 }, { x: 6, y: 8 }, { x: 1, y: 11 }, { x: 2, y: 11 },
+  { x: 11, y: 12 }, { x: 12, y: 12 },
+];
+
 function initialCoilState(): CoilState {
   return {
     id: 6, status: 'playing', elapsedMs: 0, score: 0,
-    message: 'Follow the signal orbs. Never cross your own glowing trail.',
+    message: 'Follow the signal orbs. Dodge the stone pylons and never cross your own glowing trail.',
     trail: [{ x: 7, y: 13 }, { x: 7, y: 14 }, { x: 7, y: 15 }], direction: 'up', pendingDirection: 'up',
-    orb: { ...ORB_SEQUENCE[0] }, moveClock: 0, target: 10,
+    orb: { ...ORB_SEQUENCE[0] }, moveClock: 0, target: 10, obstacles: COIL_OBSTACLES.map((point) => ({ ...point })),
   };
 }
 
@@ -240,7 +250,7 @@ function initialMergeState(): MergeState {
   board[1][1] = 2; board[2][2] = 2;
   return {
     id: 8, status: 'playing', elapsedMs: 0, score: 0,
-    message: 'Matching runes fuse when they collide. Forge a level-128 rune.',
+    message: 'Matching shapes fuse when they collide. Forge a sixth-stack sun rune.',
     board, moves: 0, turn: 0, highest: 2,
   };
 }
@@ -335,16 +345,16 @@ function moveRelic(state: RelicState, direction: ClassicDirection): RelicState {
   const delta = directionDelta[direction];
   const player = { x: state.player.x + delta.x, y: state.player.y + delta.y };
   if (!relicWalkable(player)) return { ...state, message: 'A carved wall blocks that route.' };
-  if (pointEqual(player, state.exit) && state.score < state.target) return { ...state, message: `${state.target - state.score} more sun sparks are needed to open the portal.` };
+  if (pointEqual(player, state.exit) && state.pellets.length) return { ...state, message: `${state.pellets.length} more sun ${state.pellets.length === 1 ? 'spark is' : 'sparks are'} needed to open the portal.` };
   if (state.enemies.some((enemy) => pointEqual(enemy, player))) return loseRelicLife(state);
   const key = pointKey(player);
   const collected = state.pellets.includes(key);
   const pellets = collected ? state.pellets.filter((pellet) => pellet !== key) : state.pellets;
   const score = state.score + (collected ? 1 : 0);
-  const complete = pointEqual(player, state.exit) && score >= state.target;
+  const complete = pointEqual(player, state.exit) && pellets.length === 0;
   return {
     ...state, player, pellets, score, status: complete ? 'complete' : 'playing',
-    message: complete ? 'Portal unlocked. Relic Run is clear.' : score >= state.target ? 'The portal is open. Reach the glowing gate!' : collected ? `Sun spark secured. ${state.target - score} remain.` : 'Keep moving—the shades are closing in.',
+    message: complete ? 'Every spark gathered. Relic Run is clear.' : pellets.length === 0 ? 'Every spark is yours. Reach the glowing gate!' : collected ? `Sun spark secured. ${pellets.length} remain.` : 'Keep moving—the shades are closing in.',
   };
 }
 
@@ -439,7 +449,8 @@ function tickStack(state: StackState, ms: number): StackState {
   if (elapsedMs >= 75000) return { ...state, elapsedMs, remainingMs: 0, status: 'complete', score: state.score + 750, message: 'Seventy-five seconds survived. The airlock portal is open!' };
   let next = { ...state, elapsedMs, remainingMs: 75000 - elapsedMs, fallClock: state.fallClock + ms };
   let steps = 0;
-  const interval = Math.max(155, 760 - Math.floor(elapsedMs / 10000) * 92);
+  const urgency = elapsedMs / 75000;
+  const interval = Math.max(105, 650 - urgency * 520);
   while (next.fallClock >= interval && next.status === 'playing' && steps < 30) {
     next = { ...moveStack(next, 'down'), fallClock: next.fallClock - interval };
     steps += 1;
@@ -508,8 +519,9 @@ function stepCoil(state: CoilState): CoilState {
   const direction = state.pendingDirection;
   const delta = directionDelta[direction];
   const head = { x: state.trail[0].x + delta.x, y: state.trail[0].y + delta.y };
-  if (head.x < 0 || head.x >= 15 || head.y < 0 || head.y >= 16 || state.trail.slice(0, -1).some((point) => pointEqual(point, head))) {
-    return { ...state, direction, status: 'failed', message: 'The explorer crossed the trail field. Reset to chart a new route.' };
+  const hitObstacle = state.obstacles.some((point) => pointEqual(point, head));
+  if (head.x < 0 || head.x >= 15 || head.y < 0 || head.y >= 16 || hitObstacle || state.trail.slice(0, -1).some((point) => pointEqual(point, head))) {
+    return { ...state, direction, status: 'failed', message: hitObstacle ? 'The explorer struck a stone pylon. Reset and weave a safer trail.' : 'The explorer crossed the trail field. Reset to chart a new route.' };
   }
   const collected = pointEqual(head, state.orb);
   const score = state.score + (collected ? 1 : 0);
@@ -623,12 +635,12 @@ function moveMerge(state: MergeState, direction: ClassicDirection): MergeState {
     board[spawn.y][spawn.x] = turn % 5 === 0 ? 4 : 2;
   }
   const highest = Math.max(...board.flat());
-  const complete = highest >= 128;
+  const complete = highest >= 64;
   const failed = !complete && !canMergeBoard(board);
   return {
     ...state, board, turn, moves: state.moves + 1, score: state.score + gain, highest,
     status: complete ? 'complete' : failed ? 'failed' : 'playing',
-    message: complete ? 'Level-128 rune forged. Rune Merge is clear!' : failed ? 'The rune board is locked. Reset and try a new merge path.' : gain ? `Runes fused for ${gain} energy.` : 'Rune board shifted.',
+    message: complete ? 'Six symbol stacks forged the sun rune. Rune Merge is clear!' : failed ? 'The rune board is locked. Reset and try a new merge path.' : gain ? 'Matching symbols fused into a stronger shape.' : 'Rune board shifted.',
   };
 }
 
@@ -772,12 +784,12 @@ export function classicLabSnapshot(state: ClassicLabState) {
     mode: 'puzzle-lab', puzzle: `classic-lab-${String(state.id).padStart(2, '0')}`,
     status: state.status, elapsedMs: Math.round(state.elapsedMs), score: state.score, message: state.message,
   };
-  if (state.id === 3) return { ...base, coordinateSystem: '13x15 maze; origin top-left; x right; y down', objective: `Collect ${state.target} sparks and reach exit`, player: state.player, enemies: state.enemies, visibleSparks: state.pellets, collected: state.score, target: state.target, lives: state.lives, exit: state.exit, portalOpen: state.score >= state.target };
+  if (state.id === 3) return { ...base, coordinateSystem: '13x15 maze; origin top-left; x right; y down', objective: `Collect all ${state.target} sparks and reach exit`, player: state.player, enemies: state.enemies, visibleSparks: state.pellets, collected: state.score, target: state.target, lives: state.lives, exit: state.exit, portalOpen: state.pellets.length === 0 };
   if (state.id === 4) return { ...base, coordinateSystem: '10x18 stack grid; origin top-left; x right; y down', objective: 'Survive 75 seconds', board: state.board, active: state.active, remainingMs: state.remainingMs, lines: state.lines, pieces: state.pieces };
   if (state.id === 5) return { ...base, coordinateSystem: '9x11 crossing grid; origin at far-left gate; x right; y toward explorer', objective: 'Reach row 0', player: state.player, movers: state.movers.map(({ id, row, x, width, kind }) => ({ id, row, x: Number(x.toFixed(2)), width, kind })), lives: state.lives, hops: state.hops };
-  if (state.id === 6) return { ...base, coordinateSystem: '15x16 trail grid; origin top-left; x right; y down', objective: `Collect ${state.target} signal orbs`, explorer: state.trail[0], direction: state.direction, pendingDirection: state.pendingDirection, trail: state.trail, orb: state.orb, collected: state.score, target: state.target };
+  if (state.id === 6) return { ...base, coordinateSystem: '15x16 trail grid; origin top-left; x right; y down', objective: `Collect ${state.target} signal orbs while avoiding obstacles`, explorer: state.trail[0], direction: state.direction, pendingDirection: state.pendingDirection, trail: state.trail, obstacles: state.obstacles, orb: state.orb, collected: state.score, target: state.target };
   if (state.id === 7) return { ...base, coordinateSystem: '390x844 canvas pixels; origin top-left; x right; y down', objective: 'Break all prism seals', paddleX: Math.round(state.paddleX), ball: { x: Math.round(state.ball.x), y: Math.round(state.ball.y), vx: Math.round(state.ball.vx), vy: Math.round(state.ball.vy) }, seals: state.seals, lives: state.lives, combo: state.combo };
-  if (state.id === 8) return { ...base, coordinateSystem: '4x4 merge grid; origin top-left; x right; y down', objective: 'Forge a level-128 rune', board: state.board, moves: state.moves, highest: state.highest };
+  if (state.id === 8) return { ...base, coordinateSystem: '4x4 merge grid; origin top-left; x right; y down', objective: 'Forge one six-stack symbol', stackBoard: state.board.map((row) => row.map((value) => value ? Math.log2(value) : 0)), moves: state.moves, highestStack: Math.log2(state.highest) };
   if (state.id === 9) return { ...base, coordinateSystem: '5x5 light grid; index=y*5+x; origin top-left', objective: 'Turn all 25 lanterns on; activating a tile toggles itself and its direct neighbors', lights: state.lights, lit: state.lit, moves: state.moves, dark: 25 - state.lit };
   if (state.id === 10) return { ...base, coordinateSystem: '9x11 ice grid; origin top-left; x right; y down', objective: 'Collect four frost sigils and stop on the north gate', map: ICE_MAP, player: state.player, sigils: state.sigils, collected: state.collected, moves: state.moves, exit: state.exit };
   if (state.id === 11) return { ...base, coordinateSystem: '8x8 crate grid; origin top-left; x right; y down', objective: 'Push all three crates onto circuit goals', map: CRATE_MAP, player: state.player, crates: state.crates, goals: state.goals, pushes: state.pushes, moves: state.moves };
