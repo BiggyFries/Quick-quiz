@@ -68,7 +68,10 @@ function winFinale(state: SessionState, config: FinaleConfig): SessionState {
 
 export function finishResolution(state: SessionState): SessionState {
   assert.equal(state.mode, 'resolution');
-  return send(state, { type: 'TICK', ms: 4800 });
+  if (state.resolutionOutcome === 'failed') return send(state, { type: 'TICK', ms: 4800 });
+  state = send(state, { type: 'TICK', ms: 1000 });
+  for (let step = 0; step < 4; step += 1) state = send(state, { type: 'EXIT_MOVE', direction: 'right' });
+  return state;
 }
 
 export function failCurrentPuzzle(state: SessionState, config: PuzzleConfig): SessionState {

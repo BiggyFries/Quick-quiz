@@ -218,7 +218,6 @@ export function drawCharacterCanvas(ctx: CanvasRenderingContext2D, characterValu
   }
   ctx.strokeStyle = character.legs === 'scout-pants' ? '#273b36' : '#26343a'; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(leftFoot - 6, 0); ctx.lineTo(leftFoot + 3, 0); ctx.moveTo(rightFoot - 3, 0); ctx.lineTo(rightFoot + 7, 0); ctx.stroke();
 
-  ctx.fillStyle = palette.pack; ctx.beginPath(); ctx.roundRect(-bodyWidth / 2 - 7, -78, 13, 42, 6); ctx.fill();
   ctx.fillStyle = palette.body; ctx.beginPath(); ctx.roundRect(-bodyWidth / 2, -82 + breath, bodyWidth, 43, character.body === 'storm-coat' ? 6 : 10); ctx.fill();
   ctx.fillStyle = palette.accent; path(ctx, [{ x: -bodyWidth / 2 + 4, y: -80 }, { x: 3, y: -40 }, { x: bodyWidth / 2 - 3, y: -79 }]); ctx.fill();
   if (character.body === 'field-vest') { ctx.strokeStyle = '#d8ece5'; ctx.lineWidth = 2; ctx.strokeRect(-12, -68, 9, 9); ctx.strokeRect(4, -68, 9, 9); }

@@ -27,7 +27,7 @@ h1 { font-family: Georgia, 'Times New Roman', serif; }
 .icon-button.glass { color: #fff; }
 .icon-button:disabled { opacity: .38; cursor: not-allowed; }
 .account-button { min-height: 44px; border-radius: 15px; border: 0; padding: 0 16px; font-size: 11px; font-weight: 800; letter-spacing: .1em; cursor: pointer; }
-.primary-button, .secondary-button, .review-button, .lab-preview-button { width: 100%; min-height: 60px; border: 0; border-radius: 18px; font-weight: 800; letter-spacing: .04em; cursor: pointer; }
+.primary-button, .secondary-button, .review-button, .lab-preview-button, .formula-preview-button { width: 100%; min-height: 60px; border: 0; border-radius: 18px; font-weight: 800; letter-spacing: .04em; cursor: pointer; }
 .primary-button { background: #f6c85fe8; color: #14262a; box-shadow: 0 10px 28px #0004; backdrop-filter: blur(8px); }
 .primary-button small { display: block; font-size: 10px; opacity: .66; margin-top: 2px; }
 .primary-button:disabled { background: #d2c4a1; color: #4e514d; box-shadow: none; cursor: not-allowed; }
@@ -36,6 +36,8 @@ h1 { font-family: Georgia, 'Times New Roman', serif; }
 .review-button span { display: block; font-size: 10px; color: #8fe3da; }
 .lab-preview-button { background: #2d6768e8; border: 1px solid #b6fff069; color: #fff; backdrop-filter: blur(8px); }
 .lab-preview-button span { display: block; margin-top: 2px; color: #c9fff5; font-size: 10px; }
+.formula-preview-button { color: #fff; border: 1px solid #ffe4a16b; backdrop-filter: blur(8px); }
+.formula-preview-button span { display: block; margin-top: 2px; color: #fff0bd; font-size: 10px; }
 .compact { min-height: 50px; margin-top: 10px; }
 .text-button { min-height: 44px; border: 0; background: transparent; color: #1f4144; text-decoration: underline; font-weight: 700; }
 
@@ -50,7 +52,27 @@ h1 { font-family: Georgia, 'Times New Roman', serif; }
 .home-actions .primary-button { background: #f6c85fc9; border: 1px solid #ffe7a26b; }
 .home-actions .secondary-button { background: #f7fbf1c2; border: 1px solid #ffffff7a; }
 .home-actions .lab-preview-button { background: #2d6768c7; }
+.home-actions .formula-preview-button { background: #785f31c7; }
 .home-actions .review-button { background: #112b31b5; }
+
+.formula-close { position: absolute; z-index: 3; top: max(14px, env(safe-area-inset-top)); left: 14px; }
+.formula-story-card, .formula-finish-card { position: absolute; z-index: 2; left: 20px; right: 20px; bottom: max(24px, env(safe-area-inset-bottom)); padding: 22px; border: 1px solid #fff8; border-radius: 26px; color: #fff; background: #07191ee8; box-shadow: 0 20px 44px #0008; text-align: center; backdrop-filter: blur(12px); }
+.formula-story-card h1, .formula-finish-card h1 { margin: 7px 0 10px; font-size: 31px; }
+.formula-story-card p, .formula-finish-card p { margin: 0 0 17px; color: #d5e6e1; font-size: 13px; line-height: 1.55; }
+.watcher-card { position: absolute; z-index: 3; left: 20px; right: 20px; bottom: max(26px, env(safe-area-inset-bottom)); padding: 19px; border: 1px solid #f1c96b7a; border-radius: 24px; background: #06171bef; box-shadow: 0 18px 42px #0008; text-align: center; }
+.watcher-card h2 { margin: 7px 0 10px; font-size: 22px; }
+.watcher-card p { color: #d3e4df; font-size: 12px; line-height: 1.45; }
+.watcher-card.quiz { padding: 15px; }
+.watcher-card.quiz h2 { margin: 7px 0 12px; font-size: 16px; line-height: 1.35; }
+.watcher-card.quiz .choice-grid { gap: 7px; }
+.watcher-card.quiz .choice-grid button { min-height: 45px; padding: 8px 10px; font-size: 11px; }
+.watcher-card.failed { border-color: #ff9387; }
+.watcher-card.compact { bottom: 32px; }
+.watcher-exit-controls { position: absolute; z-index: 3; left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); display: grid; place-items: center; padding: 10px; border: 1px solid #fff6; border-radius: 24px; background: #06171bea; }
+.watcher-exit-controls p { margin: 0; color: #e5f4ee; font-size: 11px; font-weight: 800; }
+.watcher-exit-controls .lab-dpad { height: 150px; }
+.formula-complete { background: radial-gradient(circle at 50% 25%, #4f8278, #172f45 52%, #071c24); }
+.formula-finish-card { top: 50%; bottom: auto; transform: translateY(-50%); }
 
 .lab-screen { position: absolute; inset: 0; z-index: 10; overflow: hidden; background: #173d42; color: #fff; }
 .lab-screen > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
@@ -100,6 +122,7 @@ h1 { font-family: Georgia, 'Times New Roman', serif; }
 .lab-hub-screen .lab-card-list::-webkit-scrollbar { display: none; }
 .lab-hub-screen .lab-card { --lab-accent: #55b7a5; min-height: 74px; display: grid; grid-template-columns: 42px 34px 1fr auto; align-items: center; gap: 9px; padding: 10px 13px; border: 1px solid #ffffff4a; border-radius: 18px; background: linear-gradient(110deg, color-mix(in srgb, var(--lab-accent) 42%, #12343a), #071a20ef); color: #fff; box-shadow: 0 9px 20px #0004; text-align: left; cursor: pointer; }
 .lab-hub-screen .lab-card-featured { grid-template-columns: 42px 1fr auto; --lab-accent: #55b7a5; }
+.lab-hub-screen .lab-card-adventure { grid-template-columns: 42px 1fr auto; --lab-accent: #f1c96b; border-color: #ffe9a88c; }
 .lab-hub-screen .lab-card-mine { grid-template-columns: 42px 1fr auto; --lab-accent: #70a8c1; }
 .lab-hub-screen .lab-card-number { position: static; width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid #ffffff61; border-radius: 12px; background: #06171b82; color: #f6c85f; font-family: Georgia, serif; font-size: 17px; line-height: 1; }
 .lab-hub-screen .lab-card-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: var(--lab-accent); color: #132a2f; font-size: 17px; font-weight: 900; }
@@ -239,6 +262,8 @@ h1 { font-family: Georgia, 'Times New Roman', serif; }
 .replay-button:disabled { opacity: .42; }
 
 .resolution-screen { display: flex; align-items: flex-start; padding: 120px 18px 18px; }
+.resolution-screen.portal-ready { pointer-events: auto; touch-action: none; }
+.venture-exit-dpad { margin: 8px auto 0; }
 .resolution-card { width: 100%; pointer-events: none; text-align: center; background: #0b2025dd; border: 1px solid #ffffff2b; border-radius: 24px; padding: 19px; backdrop-filter: blur(14px); }
 .resolution-card h1 { font-size: 26px; margin: 6px 0; }
 .resolution-card p { font-size: 12px; color: #d1dfdd; margin-bottom: 8px; }
@@ -338,7 +363,7 @@ h1 { font-family: Georgia, 'Times New Roman', serif; }
   .home-title h1 { font-size: 40px; }
   .home-title p { font-size: 12px; }
   .home-actions { gap: 7px; }
-  .primary-button, .secondary-button, .review-button, .lab-preview-button { min-height: 48px; }
+  .primary-button, .secondary-button, .review-button, .lab-preview-button, .formula-preview-button { min-height: 48px; }
   .home-actions { bottom: 12px; }
   .lab-controls { height: 185px; }
   .lab-message { bottom: 204px; }

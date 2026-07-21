@@ -51,9 +51,9 @@ export function adjacentMineCount(point: GridPoint) {
 
 export function initialMineTrailState(): MineTrailState {
   return {
-    player: { x: 0, y: 4 }, facing: 'right', revealed: [], detonated: null,
+    player: { x: 2, y: 2 }, facing: 'right', revealed: ['2,2'], detonated: null,
     moves: 0, actions: 0, status: 'playing',
-    message: 'Move across the covered tiles. Press ACTION to reveal the tile beneath the explorer.',
+    message: 'The center tile is already exposed. Follow its clue, then reveal the remaining safe ground.',
     lastAction: 'idle',
   };
 }
@@ -114,6 +114,6 @@ export function mineTrailSnapshot(state: MineTrailState) {
     player: state.player, facing: state.facing, status: state.status, moves: state.moves, actions: state.actions,
     safeTilesRemaining: safeTotal - state.revealed.filter((item) => !MINE_TRAIL_MINES.some((mine) => key(mine) === item)).length,
     cells, message: state.message,
-    controls: 'Arrow keys or WASD; touch D-pad; Space or Enter to reveal; R reset',
+    controls: 'Swipe, Arrow keys or WASD; touch D-pad; Space or Enter to reveal; R reset',
   };
 }

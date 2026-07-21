@@ -196,4 +196,7 @@ export interface GameSnapshot {
   results: LevelResult[];
   activeMs: number;
   puzzle: Record<string, unknown>;
+  resolutionOutcome?: 'success' | 'failed' | null;
+  resolutionElapsedMs?: number;
+  exitPosition?: { x: number; lane: number };
 }

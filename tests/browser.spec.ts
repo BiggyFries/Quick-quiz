@@ -21,6 +21,11 @@ async function advance(page: Page, ms: number) {
   await page.waitForTimeout(35);
 }
 
+async function enterSuccessPortal(page: Page) {
+  await advance(page, 1000);
+  for (let step = 0; step < 4; step += 1) await page.keyboard.press('ArrowRight');
+}
+
 async function openPreview(page: Page, adventure: DailyAdventure) {
   await page.getByRole('button', { name: /PREVIEW WEEK 1/i }).click();
   const row = page.locator('.review-list button').filter({ hasText: adventure.title });
@@ -111,13 +116,13 @@ test('mobile home remains usable across the supported phone range', async ({ pag
     await expect(page.getByRole('heading', { name: /DAILY VENTURE/i })).toBeVisible();
     await expect(page.getByRole('button', { name: 'About Daily Venture' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Achievements' })).toBeEnabled();
-    await expect(page.getByRole('button', { name: /PREVIEW TESTER GAMES/i })).toContainText('14 playable labs');
+    await expect(page.getByRole('button', { name: /PREVIEW TESTER GAMES/i })).toContainText('Adventure + 14 prototype labs');
     const characterButton = await page.getByRole('button', { name: /^Customize character,/ }).boundingBox();
     expect(characterButton).not.toBeNull();
     expect(characterButton!.width).toBeGreaterThanOrEqual(44);
     expect(characterButton!.height).toBeGreaterThanOrEqual(44);
     expect(characterButton!.x + characterButton!.width).toBeLessThanOrEqual(viewport.width);
-    for (const label of ['VENTURE', 'PAST VENTURES', 'PREVIEW TESTER GAMES?', 'PREVIEW WEEK 1']) {
+    for (const label of ['VENTURE', 'PAST VENTURES', 'TEST DAILY FORMULA', 'PREVIEW TESTER GAMES?', 'PREVIEW WEEK 1']) {
       const box = await page.getByRole('button', { name: new RegExp(`^${label}(?:\\s|$)`, 'i') }).boundingBox();
       expect(box).not.toBeNull();
       expect(box!.height).toBeGreaterThanOrEqual(44);
@@ -231,7 +236,12 @@ test('Block Shift lab supports touch controls, undo, keyboard play, and a comple
   state = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
   expect(state.status).toBe('complete');
   expect(state.keystone).toMatchObject({ x: 7, y: 3, width: 2, height: 1 });
-  await expect(page.getByText(/Door unlocked/i)).toBeVisible();
+  expect(state.victory.phase).toBe('celebrating');
+  await expect(page.getByText(/challenge door is open/i)).toBeVisible();
+  await advance(page, 1000);
+  for (let step = 0; step < 4; step += 1) await page.keyboard.press('ArrowRight');
+  state = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
+  expect(state.victory.phase).toBe('departed');
   await page.screenshot({ path: path.join(captures, 'block-shift-complete.png') });
   await page.getByRole('button', { name: 'Back to puzzle labs' }).click();
   await expect(page.getByRole('heading', { name: 'Prototype Corridor' })).toBeVisible();
@@ -248,13 +258,13 @@ test('Mine Trail uses character movement and an action reveal for safe, failed, 
 
   await page.getByRole('button', { name: 'Reveal current tile' }).click();
   let state = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
-  expect(state.player).toEqual({ x: 0, y: 4 });
-  expect(state.actions).toBe(1);
-  expect(state.safeTilesRemaining).toBe(15);
-  expect(state.cells.filter((cell: { state: string }) => cell.state === 'safe')).toHaveLength(4);
+  expect(state.player).toEqual({ x: 2, y: 2 });
+  expect(state.actions).toBe(0);
+  expect(state.safeTilesRemaining).toBe(18);
+  expect(state.cells.filter((cell: { state: string }) => cell.state === 'safe')).toHaveLength(1);
 
   await page.getByRole('button', { name: /RESET/i }).click();
-  for (const key of ['ArrowRight', 'ArrowUp', 'ArrowUp', 'ArrowUp']) await page.keyboard.press(key);
+  for (const key of ['ArrowLeft', 'ArrowUp']) await page.keyboard.press(key);
   await page.keyboard.press('Space');
   state = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
   expect(state.status).toBe('failed');
@@ -264,20 +274,26 @@ test('Mine Trail uses character movement and an action reveal for safe, failed, 
 
   await page.getByRole('button', { name: /RESET/i }).click();
   const mines = new Set(['4,4', '2,3', '0,2', '4,2', '1,1', '3,0']);
-  let current = { x: 0, y: 4 };
-  for (let y = 4; y >= 0; y -= 1) {
-    const xs = (4 - y) % 2 === 0 ? [0, 1, 2, 3, 4] : [4, 3, 2, 1, 0];
+  let current = { x: 2, y: 2 };
+  while (current.x > 0) { await page.keyboard.press('ArrowLeft'); current.x -= 1; }
+  while (current.y > 0) { await page.keyboard.press('ArrowUp'); current.y -= 1; }
+  for (let y = 0; y < 5; y += 1) {
+    const xs = y % 2 === 0 ? [0, 1, 2, 3, 4] : [4, 3, 2, 1, 0];
     for (const x of xs) {
       while (current.x < x) { await page.keyboard.press('ArrowRight'); current.x += 1; }
       while (current.x > x) { await page.keyboard.press('ArrowLeft'); current.x -= 1; }
       if (!mines.has(`${x},${y}`)) await page.keyboard.press('Space');
     }
-    if (y > 0) { await page.keyboard.press('ArrowUp'); current.y -= 1; }
+    if (y < 4) { await page.keyboard.press('ArrowDown'); current.y += 1; }
   }
   state = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
   expect(state.status).toBe('complete');
   expect(state.safeTilesRemaining).toBe(0);
-  await expect(page.getByText(/Minefield cleared/i)).toBeVisible();
+  expect(state.victory.phase).toBe('celebrating');
+  await advance(page, 1000);
+  for (let step = 0; step < 4; step += 1) await page.keyboard.press('ArrowRight');
+  state = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
+  expect(state.victory.phase).toBe('departed');
   await page.screenshot({ path: path.join(captures, 'mine-trail-complete.png') });
 });
 
@@ -334,7 +350,7 @@ test('reviewer can survive all seven adventures through all 35 real room UIs', a
       await page.screenshot({ path: path.join(captures, `${daySlug}-room-${levelIndex + 1}-${type}.png`) });
       await completePuzzle(page, config, type === 'finale' ? path.join(captures, `${daySlug}-finale-physics.png`) : undefined);
       await page.screenshot({ path: path.join(captures, `${daySlug}-room-${levelIndex + 1}-success.png`) });
-      await advance(page, 4800);
+      await enterSuccessPortal(page);
     }
     await expect(page.locator('.results-card')).toBeVisible();
     await expect(page.locator('.result-tiles .success')).toHaveCount(5);
@@ -360,7 +376,7 @@ test('every theme and all five traversal variants render a defeat and guest-safe
       await page.getByRole('button', { name: 'READY' }).click();
       if (levelIndex < target) {
         await completePuzzle(page, config);
-        await advance(page, 4800);
+        await enterSuccessPortal(page);
       } else {
         await failPuzzle(page, config);
       }

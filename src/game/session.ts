@@ -38,6 +38,7 @@ export interface SessionState {
   puzzle: PuzzleState;
   resolutionOutcome: ResolutionOutcome | null;
   resolutionElapsedMs: number;
+  exitPosition: { x: number; lane: number };
   finalOutcome: 'failed' | 'survived' | null;
   newlyUnlocked: string[];
   reducedMotion: boolean;
@@ -52,6 +53,7 @@ export type SessionAction =
   | { type: 'CONFIRM' }
   | { type: 'MEMORY_REPLAY' }
   | { type: 'RHYTHM_TAP' }
+  | { type: 'EXIT_MOVE'; direction: 'up' | 'down' | 'left' | 'right' }
   | { type: 'TICK'; ms: number }
   | { type: 'SET_NEW_ACHIEVEMENTS'; codes: string[] }
   | { type: 'GO_HOME' };
@@ -60,6 +62,7 @@ export const initialSessionState: SessionState = {
   mode: 'home', adventure: null, levelIndex: 0, attemptNumber: 1, attemptId: null, isArchive: false,
   authenticated: false, reviewer: false, isTesting: false, activeMs: 0, levelActiveMs: 0,
   results: [], puzzle: { kind: 'none' }, resolutionOutcome: null, resolutionElapsedMs: 0,
+  exitPosition: { x: 0, lane: 0 },
   finalOutcome: null, newlyUnlocked: [], reducedMotion: false,
 };
 
@@ -85,8 +88,14 @@ function resolveLevel(state: SessionState, success: boolean): SessionState {
   const result: LevelResult = { type: config.type, success, activeMs: Math.round(state.levelActiveMs) };
   return {
     ...state, mode: 'resolution', results: [...state.results, result],
-    resolutionOutcome: success ? 'success' : 'failed', resolutionElapsedMs: 0,
+    resolutionOutcome: success ? 'success' : 'failed', resolutionElapsedMs: 0, exitPosition: { x: 0, lane: 0 },
   };
+}
+
+function finishSuccessfulResolution(state: SessionState): SessionState {
+  if (state.isTesting) return { ...state, mode: 'ready', results: [], puzzle: { kind: 'none' }, resolutionOutcome: null, resolutionElapsedMs: 0, exitPosition: { x: 0, lane: 0 } };
+  if (state.levelIndex >= 4) return { ...state, mode: 'results', finalOutcome: 'survived' };
+  return { ...state, mode: 'ready', levelIndex: state.levelIndex + 1, resolutionOutcome: null, resolutionElapsedMs: 0, exitPosition: { x: 0, lane: 0 }, puzzle: { kind: 'none' } };
 }
 
 function tickRhythm(state: SessionState, config: RhythmConfig, puzzle: Extract<PuzzleState, { kind: 'rhythm' }>, ms: number): SessionState {
@@ -152,7 +161,7 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
   if (action.type === 'SHOW_READY' && state.adventure) return { ...state, mode: 'ready', puzzle: { kind: 'none' } };
   if (action.type === 'JUMP_TO_LEVEL' && state.adventure && state.reviewer && action.levelIndex >= 0 && action.levelIndex < 5) return {
     ...state, mode: 'ready', levelIndex: action.levelIndex, isTesting: true, activeMs: 0, levelActiveMs: 0,
-    results: [], puzzle: { kind: 'none' }, resolutionOutcome: null, resolutionElapsedMs: 0, finalOutcome: null,
+    results: [], puzzle: { kind: 'none' }, resolutionOutcome: null, resolutionElapsedMs: 0, exitPosition: { x: 0, lane: 0 }, finalOutcome: null,
   };
   if (action.type === 'BEGIN_LEVEL') {
     const config = currentPuzzleConfig(state);
@@ -166,19 +175,25 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
 
   if (action.type === 'TICK') {
     if (state.mode === 'resolution') {
+      if (state.resolutionOutcome === 'success') return { ...state, resolutionElapsedMs: Math.min(1000, state.resolutionElapsedMs + action.ms) };
       const elapsed = state.resolutionElapsedMs + action.ms;
       const duration = state.reducedMotion ? 1200 : 4800;
       if (elapsed < duration) return { ...state, resolutionElapsedMs: elapsed };
-      if (state.isTesting) return { ...state, mode: 'ready', results: [], puzzle: { kind: 'none' }, resolutionOutcome: null, resolutionElapsedMs: 0 };
       if (state.resolutionOutcome === 'failed') return { ...state, mode: 'results', finalOutcome: 'failed', resolutionElapsedMs: duration };
-      if (state.levelIndex >= 4) return { ...state, mode: 'results', finalOutcome: 'survived', resolutionElapsedMs: duration };
-      return { ...state, mode: 'ready', levelIndex: state.levelIndex + 1, resolutionOutcome: null, resolutionElapsedMs: 0, puzzle: { kind: 'none' } };
+      return state;
     }
     if (state.mode !== 'puzzle') return state;
     if (config.type === 'rhythm' && state.puzzle.kind === 'rhythm') return tickRhythm(state, config, state.puzzle, action.ms);
     if (config.type === 'memory' && state.puzzle.kind === 'memory') return tickMemory(state, config, state.puzzle, action.ms);
     if (config.type === 'finale' && state.puzzle.kind === 'finale') return tickFinale(state, config, state.puzzle, action.ms);
     return { ...state, activeMs: state.activeMs + action.ms, levelActiveMs: state.levelActiveMs + action.ms };
+  }
+
+  if (action.type === 'EXIT_MOVE' && state.mode === 'resolution' && state.resolutionOutcome === 'success' && state.resolutionElapsedMs >= 1000) {
+    const x = Math.max(0, Math.min(4, state.exitPosition.x + (action.direction === 'right' ? 1 : action.direction === 'left' ? -1 : 0)));
+    const lane = Math.max(-1, Math.min(1, state.exitPosition.lane + (action.direction === 'down' ? 1 : action.direction === 'up' ? -1 : 0)));
+    const moved = { ...state, exitPosition: { x, lane } };
+    return x === 4 && lane === 0 ? finishSuccessfulResolution(moved) : moved;
   }
 
   if (state.mode !== 'puzzle') return state;
@@ -271,5 +286,6 @@ export function sessionSnapshot(state: SessionState): GameSnapshot {
     adventureId: state.adventure?.id, adventureTitle: state.adventure?.title, levelIndex: state.levelIndex,
     levelType: config?.type, attemptNumber: state.attemptNumber, authenticated: state.authenticated,
     reviewer: state.reviewer, testing: state.isTesting, results: state.results, activeMs: Math.round(state.activeMs), puzzle,
+    resolutionOutcome: state.resolutionOutcome, resolutionElapsedMs: state.resolutionElapsedMs, exitPosition: state.exitPosition,
   };
 }

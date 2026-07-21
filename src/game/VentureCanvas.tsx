@@ -12,6 +12,7 @@ export interface CanvasView {
   puzzle: PuzzleState;
   resolutionOutcome: 'success' | 'failed' | null;
   resolutionElapsedMs: number;
+  exitPosition: { x: number; lane: number };
   reducedMotion: boolean;
   character: CharacterCustomization;
 }
@@ -24,7 +25,7 @@ const BACKPLATES = ['home', 'temple', 'airship', 'library', 'forest', 'observato
 const colorNumber = (value: string) => Number.parseInt(value.replace('#', ''), 16);
 
 class DailyVentureScene extends Phaser.Scene implements VentureScene {
-  private view: CanvasView = { adventure: null, mode: 'home', levelIndex: 0, puzzle: { kind: 'none' }, resolutionOutcome: null, resolutionElapsedMs: 0, reducedMotion: false, character: DEFAULT_CHARACTER };
+  private view: CanvasView = { adventure: null, mode: 'home', levelIndex: 0, puzzle: { kind: 'none' }, resolutionOutcome: null, resolutionElapsedMs: 0, exitPosition: { x: 0, lane: 0 }, reducedMotion: false, character: DEFAULT_CHARACTER };
   private art!: Phaser.GameObjects.Container;
   private matterBodies: MatterJS.BodyType[] = [];
   private physicsKind = '';
@@ -52,7 +53,7 @@ class DailyVentureScene extends Phaser.Scene implements VentureScene {
     this.physicsKind = '';
   }
 
-  private drawExplorer(x: number, y: number, pose: string) {
+  private drawExplorer(x: number, y: number, pose: string, visualScale = 1) {
     const g = this.add.graphics();
     const character = this.view.character;
     const palette = characterPalette(character);
@@ -80,7 +81,6 @@ class DailyVentureScene extends Phaser.Scene implements VentureScene {
     g.fillStyle(character.legs === 'scout-pants' ? 0x273b36 : 0x26343a); g.fillEllipse(leftFootX - 2, y + 41, 20, 8); g.fillEllipse(rightFootX + 2, y + 41, 20, 8);
 
     const bodyWidth = (character.body === 'field-vest' ? 36 : character.body === 'storm-coat' ? 44 : character.body === 'heritage-tee' ? 42 : 40) * (character.frame === 'sturdy' ? 1.15 : 1);
-    g.fillStyle(colorNumber(palette.pack)); g.fillRoundedRect(x - bodyWidth / 2 - 7, y - 28, 13, 42, 6);
     g.fillStyle(colorNumber(palette.body)); g.fillRoundedRect(x - bodyWidth / 2, y - 32, bodyWidth, 48 + breath, character.body === 'storm-coat' ? 7 : 11);
     g.fillStyle(colorNumber(palette.accent)); g.fillTriangle(x - bodyWidth / 2 + 3, y - 30, x + 3, y + 12, x + bodyWidth / 2, y - 27);
     g.lineStyle(3, 0x6f4937, 0.8); g.lineBetween(x + 5, y - 28, x + 5, y + 12);
@@ -124,6 +124,15 @@ class DailyVentureScene extends Phaser.Scene implements VentureScene {
       else { g.lineStyle(12, hazardColors[defeatVariant % hazardColors.length], 0.75); g.strokeCircle(x, y - 22, 56); }
       g.setRotation((defeatVariant - 2) * 0.06);
     }
+    if (visualScale !== 1) g.setScale(visualScale).setPosition(x * (1 - visualScale), y * (1 - visualScale));
+    this.art.add(g);
+  }
+
+  private drawPortal(x: number, y: number) {
+    const g = this.add.graphics(); const pulse = 1 + Math.sin(this.time.now / 240) * .04;
+    g.lineStyle(10, 0xa8f3df, .85); g.strokeEllipse(x, y - 38, 54 * pulse, 92 * pulse);
+    g.lineStyle(3, 0xffffff, .8); g.strokeEllipse(x, y - 38, 37 * pulse, 70 * pulse);
+    g.fillStyle(0x7ce1ce, .16); g.fillEllipse(x, y - 38, 35, 68);
     this.art.add(g);
   }
 
@@ -184,7 +193,7 @@ class DailyVentureScene extends Phaser.Scene implements VentureScene {
       const base = this.add.rectangle(195, 422, 390, 844, 0x17383a); this.art.add(base);
     }
     if (this.view.mode === 'home') {
-      this.drawExplorer(195, 610, 'walk');
+      this.drawExplorer(195, 455, 'idle', .62);
       return;
     }
 
@@ -212,13 +221,15 @@ class DailyVentureScene extends Phaser.Scene implements VentureScene {
     }
 
     if (this.view.mode === 'resolution') {
-      const progress = Math.min(1, this.view.resolutionElapsedMs / (this.view.reducedMotion ? 1200 : 4800));
-      const x = this.view.resolutionOutcome === 'success' ? 72 + progress * 290 : 195;
       const traversal = this.view.levelIndex % 5;
-      const arcs = [100, 45, 145, 72, 120];
-      const drift = traversal === 1 ? progress * 45 : traversal === 3 ? -progress * 34 : 0;
-      const y = this.view.resolutionOutcome === 'success' ? 690 - Math.sin(progress * Math.PI) * arcs[traversal] + drift : 690;
-      this.drawExplorer(x, y, this.view.resolutionOutcome === 'success' ? (traversal === 4 ? 'celebrate' : 'walk') : `failed-${traversal}`);
+      if (this.view.resolutionOutcome === 'success') {
+        if (this.view.resolutionElapsedMs < 1000) this.drawExplorer(88, 690, 'celebrate');
+        else {
+          this.drawPortal(335, 690);
+          const x = 82 + this.view.exitPosition.x * 62; const y = 690 + this.view.exitPosition.lane * 34;
+          this.drawExplorer(x, y, this.view.exitPosition.x >= 4 && this.view.exitPosition.lane === 0 ? 'celebrate' : 'walk');
+        }
+      } else this.drawExplorer(195, 690, `failed-${traversal}`);
       return;
     }
 

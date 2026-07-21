@@ -8,7 +8,7 @@
 .block-controls { display: grid; place-items: center; }
 .lab-utility { min-width: 82px; min-height: 44px; padding: 0 12px; border-color: #ffffff61; background: #0b2e35e8; box-shadow: 0 6px 15px #0004; }
 .lab-utility small { display: inline; margin: 0 0 0 5px; }
-.lab-dpad { width: 138px; height: 138px; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px); }
+.lab-dpad { width: 154px; height: 154px; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 48px); }
 .mine-controls { display: grid; grid-template-columns: 160px 1fr; gap: 10px; align-items: center; }
 .mine-action { justify-self: center; width: 104px; height: 104px; border-radius: 50%; border: 4px solid #fff4c8; background: #f6c85f; color: #172c32; box-shadow: inset 0 -7px 0 #bd8a2c, 0 8px 23px #0007; font-size: 11px; font-weight: 950; letter-spacing: .07em; }
 .mine-action span, .mine-action small { display: block; }
