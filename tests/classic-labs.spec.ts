@@ -40,14 +40,15 @@ test('Adventure combines chips, equipment, locks, a pressure crate, celebration,
   await advance(page, 0);
   const canvas = await page.getByLabel('Adventure game world').boundingBox();
   expect(canvas).not.toBeNull();
+  await page.screenshot({ path: path.join(captures, 'adventure-primary-start.png') });
   await page.mouse.move(canvas!.x + 115, canvas!.y + 350); await page.mouse.down(); await page.mouse.move(canvas!.x + 235, canvas!.y + 350, { steps: 4 }); await page.mouse.up();
-  let state = await snapshot(page); expect(state.player).toEqual({ x: 3, y: 2 });
+  let state = await snapshot(page); expect(state.player).toEqual({ x: 3, y: 3 });
   await page.getByRole('button', { name: 'RESET', exact: true }).click();
-  await walkRoute(page, 'RRLLDDDRRRUUURLDDDLLLLLDDRRLLD');
-  state = await snapshot(page); expect(state.phase).toBe('celebrating'); expect(state.inventory.chips).toBe(3); expect(state.plateActive).toBe(true);
+  await walkRoute(page, 'URRDDURRRRURRLLDDDDRRLDDDDLLLLLLLLURR');
+  state = await snapshot(page); expect(state.phase).toBe('celebrating'); expect(state.inventory.chips).toBe(5); expect(state.doors.chipGateOpen).toBe(true); expect(state.plateActive).toBe(true);
   await advance(page, 999); expect((await snapshot(page)).phase).toBe('celebrating');
   await advance(page, 1); expect((await snapshot(page)).phase).toBe('portal-open');
-  await walkRoute(page, 'UUURRRRRRDD D'.replaceAll(' ', ''));
+  await walkRoute(page, 'DLLD');
   state = await snapshot(page); expect(state.phase).toBe('complete'); expect(state.portalOpen).toBe(true);
   await page.screenshot({ path: path.join(captures, 'adventure-primary-complete.png') });
 });
@@ -59,7 +60,7 @@ test('daily formula preview runs Adventure, two themed prototypes, and the named
   await expect(page.getByRole('heading', { name: 'The Verdant Orrery' })).toBeVisible();
   await page.getByRole('button', { name: 'ENTER THE ADVENTURE' }).click();
   await advance(page, 0);
-  await walkRoute(page, 'RRLLDDDRRRUUURLDDDLLLLLDDRRLLD'); await advance(page, 1000); await walkRoute(page, 'UUURRRRRRDD D'.replaceAll(' ', ''));
+  await walkRoute(page, 'URRDDURRRRURRLLDDDDRRLDDDDLLLLLLLLURR'); await advance(page, 1000); await walkRoute(page, 'DLLD');
   await expect(page.getByRole('heading', { name: /Gear Links/i })).toBeVisible();
   let state = await snapshot(page);
   for (let index = 0; index < 16; index += 1) {
@@ -243,5 +244,22 @@ test('classic Lab controls remain reachable on the compact phone layout', async 
       expect(keyboard).not.toBeNull(); expect(stage).not.toBeNull();
       expect(Math.abs((keyboard!.x + keyboard!.width / 2) - (stage!.x + stage!.width / 2))).toBeLessThanOrEqual(1);
     }
+  }
+});
+
+test('expanded Adventure map and controls fit every supported phone size', async ({ page }) => {
+  for (const viewport of [{ width: 360, height: 640 }, { width: 390, height: 844 }, { width: 430, height: 932 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/?lab=adventure');
+    await expect(page.getByLabel('Adventure game world')).toBeVisible();
+    const state = await snapshot(page);
+    expect(state.coordinateSystem).toContain('13x13');
+    expect(state.map).toHaveLength(13);
+    expect(state.inventory.chipTotal).toBe(5);
+    const controls = await page.locator('.lab-controls').boundingBox();
+    const stage = await page.locator('.phone-stage').boundingBox();
+    expect(controls).not.toBeNull(); expect(stage).not.toBeNull();
+    expect(controls!.y + controls!.height).toBeLessThanOrEqual(stage!.y + stage!.height + 1);
+    await page.screenshot({ path: path.join(captures, `adventure-expanded-${viewport.width}x${viewport.height}.png`) });
   }
 });

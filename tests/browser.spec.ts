@@ -220,35 +220,34 @@ test('Block Shift lab supports touch controls, undo, keyboard play, and a comple
   await expect(page.getByLabel('Block Shift puzzle room')).toBeVisible();
   await page.screenshot({ path: path.join(captures, 'block-shift-start.png') });
 
-  await page.getByRole('button', { name: 'Move right' }).click();
+  await page.getByRole('button', { name: 'Move up' }).click();
   let state = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
-  expect(state.player).toEqual({ x: 1, y: 5 });
+  expect(state.player).toEqual({ x: 0, y: 7 });
   expect(state.moves).toBe(1);
   await page.getByRole('button', { name: /UNDO/i }).click();
   state = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
-  expect(state.player).toEqual({ x: 0, y: 5 });
+  expect(state.player).toEqual({ x: 0, y: 8 });
   expect(state.moves).toBe(0);
   expect(state.blocks.map((block: { width: number; height: number }) => `${block.width}x${block.height}`)).toEqual(expect.arrayContaining(['2x1', '1x2', '2x2', '1x3', '3x1']));
+  expect(state.coordinateSystem).toContain('12x10');
+  expect(state.puzzle).toBe('block-shift-rebuilt-01');
 
   const undoBox = await page.getByRole('button', { name: /UNDO/i }).boundingBox();
   const upBox = await page.getByRole('button', { name: 'Move up' }).boundingBox();
   expect(undoBox).not.toBeNull(); expect(upBox).not.toBeNull();
   expect(undoBox!.y + undoBox!.height).toBeLessThan(upBox!.y - 200);
 
-  const solution = [
-    'ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowRight',
-    'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'ArrowLeft',
-    'ArrowLeft', 'ArrowUp', 'ArrowUp', 'ArrowLeft', 'ArrowLeft', 'ArrowDown', 'ArrowUp',
-    'ArrowLeft', 'ArrowLeft', 'ArrowLeft', 'ArrowDown',
-    'ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowRight',
-  ];
+  const keyForStep = { U: 'ArrowUp', D: 'ArrowDown', L: 'ArrowLeft', R: 'ArrowRight' } as const;
+  const solution = [...'URRRRRRDLLLUUUUUDDRUURRDDRUDRDRRRUUUULLLDDURRDDULLLLLLLDLLLURRRRRRRRR']
+    .map((step) => keyForStep[step as keyof typeof keyForStep]);
   for (const key of solution) {
     await page.keyboard.press(key);
     await page.waitForTimeout(18);
   }
   state = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
   expect(state.status).toBe('complete');
-  expect(state.keystone).toMatchObject({ x: 7, y: 3, width: 2, height: 1 });
+  expect(state.relic).toMatchObject({ x: 10, y: 4, width: 2, height: 1 });
+  expect(state.serviceBeam).toMatchObject({ x: 7, y: 7, width: 3, height: 1 });
   expect(state.victory.phase).toBe('celebrating');
   await expect(page.getByText(/challenge door is open/i)).toBeVisible();
   await advance(page, 1000);

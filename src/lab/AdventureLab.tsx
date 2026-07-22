@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { drawCharacterCanvas, type CharacterCustomization } from '../character/character';
 import {
   ADVENTURE_CHIP_TOTAL,
+  ADVENTURE_EXIT,
   ADVENTURE_MAP,
   adventureSnapshot,
   initialAdventureState,
@@ -16,9 +17,9 @@ import { useSwipeDirection } from './useSwipeDirection';
 
 const WIDTH = 390;
 const HEIGHT = 844;
-const TILE_W = 34;
-const TILE_H = 27;
-const ORIGIN = { x: 195, y: 158 };
+const TILE_W = 29;
+const TILE_H = 21;
+const ORIGIN = { x: 195, y: 178 };
 
 function iso(point: AdventurePoint) {
   return { x: ORIGIN.x + (point.x - point.y) * TILE_W / 2, y: ORIGIN.y + (point.x + point.y) * TILE_H / 2 };
@@ -30,7 +31,7 @@ function diamond(ctx: CanvasRenderingContext2D, center: AdventurePoint, fill: st
 }
 
 function drawWall(ctx: CanvasRenderingContext2D, center: AdventurePoint, theme: LabTheme) {
-  const h = 27;
+  const h = 23;
   ctx.beginPath(); ctx.moveTo(center.x, center.y - TILE_H / 2 - h); ctx.lineTo(center.x + TILE_W / 2, center.y - h); ctx.lineTo(center.x + TILE_W / 2, center.y); ctx.lineTo(center.x, center.y + TILE_H / 2); ctx.lineTo(center.x - TILE_W / 2, center.y); ctx.lineTo(center.x - TILE_W / 2, center.y - h); ctx.closePath();
   ctx.fillStyle = theme.surface; ctx.fill(); ctx.strokeStyle = '#ffffff25'; ctx.stroke();
   diamond(ctx, { x: center.x, y: center.y - h }, theme.surfaceAlt, '#ffffff46');
@@ -70,10 +71,11 @@ function drawAdventure(ctx: CanvasRenderingContext2D, state: AdventureState, tim
     const point = { x, y }; const center = iso(point); const depth = x + y;
     if (tile === '#') entities.push({ depth, draw: () => drawWall(ctx, center, theme) });
     else {
-      diamond(ctx, center, tile === 'W' ? '#397b83' : tile === 'o' ? state.plateActive ? theme.accent : '#8b7548' : (x + y) % 2 ? theme.surface : theme.surfaceAlt);
+      diamond(ctx, center, tile === 'W' ? '#397b83' : tile === 'G' ? '#755e8f' : tile === 'o' ? state.plateActive ? theme.accent : '#8b7548' : (x + y) % 2 ? theme.surface : theme.surfaceAlt);
       if (tile === 'W') { ctx.strokeStyle = '#b9f5f45d'; ctx.beginPath(); ctx.arc(center.x, center.y, 8, 0, Math.PI); ctx.stroke(); }
       if (tile === 'R') entities.push({ depth: depth + .2, draw: () => drawDoor(ctx, center, '#ef7c69', state.redDoorOpen) });
       if (tile === 'B') entities.push({ depth: depth + .2, draw: () => drawDoor(ctx, center, '#72bdf0', state.blueDoorOpen) });
+      if (tile === 'G') entities.push({ depth: depth + .2, draw: () => drawDoor(ctx, center, '#c19be8', state.chipGateOpen) });
       if ('crbt'.includes(tile)) entities.push({ depth: depth + .15, draw: () => drawItem(ctx, tile, center, time, state, point, theme) });
     }
   }));
@@ -83,16 +85,16 @@ function drawAdventure(ctx: CanvasRenderingContext2D, state: AdventureState, tim
     ctx.strokeStyle = '#5d3d2c'; ctx.beginPath(); ctx.moveTo(crateCenter.x - 8, crateCenter.y - 27); ctx.lineTo(crateCenter.x + 8, crateCenter.y - 11); ctx.moveTo(crateCenter.x + 8, crateCenter.y - 27); ctx.lineTo(crateCenter.x - 8, crateCenter.y - 11); ctx.stroke();
   } });
 
-  const exit = iso({ x: 8, y: 8 }); const open = state.phase === 'portal-open' || state.phase === 'complete';
-  entities.push({ depth: 16.1, draw: () => { ctx.save(); ctx.shadowColor = open ? theme.portal : '#51666a'; ctx.shadowBlur = open ? 22 : 4; ctx.strokeStyle = open ? theme.portal : '#51666a'; ctx.lineWidth = 7; ctx.beginPath(); ctx.ellipse(exit.x, exit.y - 32, 19, 34, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); } });
+  const exit = iso(ADVENTURE_EXIT); const open = state.phase === 'portal-open' || state.phase === 'complete';
+  entities.push({ depth: ADVENTURE_EXIT.x + ADVENTURE_EXIT.y + .1, draw: () => { ctx.save(); ctx.shadowColor = open ? theme.portal : '#51666a'; ctx.shadowBlur = open ? 22 : 4; ctx.strokeStyle = open ? theme.portal : '#51666a'; ctx.lineWidth = 6; ctx.beginPath(); ctx.ellipse(exit.x, exit.y - 27, 16, 29, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); } });
 
-  const player = iso(state.player); entities.push({ depth: state.player.x + state.player.y + .8, draw: () => drawCharacterCanvas(ctx, character, { x: player.x, groundY: player.y + 8, scale: .48, time, pose: state.phase === 'celebrating' || state.phase === 'complete' ? 'celebrate' : 'walk', facing: state.facing }) });
+  const player = iso(state.player); entities.push({ depth: state.player.x + state.player.y + .8, draw: () => drawCharacterCanvas(ctx, character, { x: player.x, groundY: player.y + 6, scale: .42, time, pose: state.phase === 'celebrating' || state.phase === 'complete' ? 'celebrate' : 'walk', facing: state.facing }) });
   entities.sort((a, b) => a.depth - b.depth).forEach((entity) => entity.draw());
 
-  ctx.fillStyle = '#06171bd9'; ctx.beginPath(); ctx.roundRect(42, 475, 306, 91, 20); ctx.fill(); ctx.strokeStyle = `${theme.accent}77`; ctx.stroke();
-  ctx.fillStyle = theme.accent; ctx.font = '900 10px Inter, system-ui'; ctx.textAlign = 'center'; ctx.fillText(state.phase === 'celebrating' ? 'ROOM SOLVED · CELEBRATING' : open ? 'PORTAL OPEN · WALK TO EXIT' : theme.worldName.toUpperCase(), 195, 499);
-  ctx.fillStyle = '#fff'; ctx.font = '800 12px Inter, system-ui'; ctx.fillText(`${state.chips.length}/${ADVENTURE_CHIP_TOTAL} CHIPS  ·  ${state.plateActive ? 'PLATE POWERED' : 'PLATE DARK'}`, 195, 526);
-  ctx.fillStyle = '#c6dcd8'; ctx.font = '700 9px Inter, system-ui'; ctx.fillText(`${state.redKey ? '◆' : '◇'} RED  ${state.blueKey ? '◆' : '◇'} BLUE  ${state.boots ? '◆' : '◇'} TIDE BOOTS`, 195, 549);
+  ctx.fillStyle = '#06171bd9'; ctx.beginPath(); ctx.roundRect(42, 442, 306, 74, 20); ctx.fill(); ctx.strokeStyle = `${theme.accent}77`; ctx.stroke();
+  ctx.fillStyle = theme.accent; ctx.font = '900 9px Inter, system-ui'; ctx.textAlign = 'center'; ctx.fillText(state.phase === 'celebrating' ? 'ROOM SOLVED · CELEBRATING' : open ? 'PORTAL OPEN · WALK TO EXIT' : theme.worldName.toUpperCase(), 195, 463);
+  ctx.fillStyle = '#fff'; ctx.font = '800 11px Inter, system-ui'; ctx.fillText(`${state.chips.length}/${ADVENTURE_CHIP_TOTAL} CHIPS  ·  ${state.plateActive ? 'PLATE POWERED' : 'PLATE DARK'}`, 195, 486);
+  ctx.fillStyle = '#c6dcd8'; ctx.font = '700 8px Inter, system-ui'; ctx.fillText(`${state.redKey ? '◆' : '◇'} RED  ${state.blueKey ? '◆' : '◇'} BLUE  ${state.boots ? '◆' : '◇'} BOOTS  ${state.chipGateOpen ? '◆' : '◇'} CHIP GATE`, 195, 508);
 }
 
 function DirectionPad({ move, disabled }: { move: (direction: AdventureDirection) => void; disabled: boolean }) {
@@ -144,7 +146,7 @@ export function AdventureLab({ onExit, onComplete, character, theme = PROTOTYPE_
   return <section className="lab-screen adventure-lab-screen" aria-label="Adventure primary puzzle" style={themeCss(theme)}>
     <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} aria-label="Adventure game world" {...swipe} />
     <header className="lab-header"><button className="icon-button glass" onClick={onExit} aria-label="Back to Lab corridor">←</button><div><span>{contextLabel}</span><h1>Adventure · Venture Circuit</h1></div><button className="lab-small-button glass" onClick={reset}>RESET</button></header>
-    <div className="lab-brief"><div><strong>{state.chips.length}/{ADVENTURE_CHIP_TOTAL}</strong><small>chips</small></div><p>Collect chips, keys and boots. Push the crate onto its plate, then walk to the portal.</p><div><strong>{state.moves}</strong><small>moves</small></div></div>
+    <div className="lab-brief"><div><strong>{state.chips.length}/{ADVENTURE_CHIP_TOTAL}</strong><small>chips</small></div><p>Clear both locks and the chip gate, cross the flood, then push the crate onto its plate.</p><div><strong>{state.moves}</strong><small>moves</small></div></div>
     <div className={`lab-message ${state.phase === 'complete' ? 'complete' : ''}`} aria-live="polite">{state.message}</div>
     <div className="lab-controls"><button className="lab-utility side-note" disabled>GEAR<small>{state.redKey ? '◆' : '◇'} {state.blueKey ? '◆' : '◇'} {state.boots ? '◆' : '◇'}</small></button><DirectionPad move={move} disabled={state.phase === 'celebrating' || state.phase === 'complete'} /><button className="lab-utility" onClick={reset}>RESET<small>R</small></button><p>Tap or swipe the world, tap arrows, or use WASD / arrow keys</p></div>
   </section>;

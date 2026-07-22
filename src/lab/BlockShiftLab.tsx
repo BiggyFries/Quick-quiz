@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { drawCharacterCanvas, type CharacterCustomization } from '../character/character';
 import {
+  BLOCK_SHIFT_BAY,
   BLOCK_SHIFT_GOAL,
   BLOCK_SHIFT_HEIGHT,
   BLOCK_SHIFT_WIDTH,
@@ -25,9 +26,9 @@ interface VisualTransition {
   pushed: boolean;
 }
 
-const TILE_W = 43;
-const TILE_H = 31;
-const ORIGIN = { x: 195, y: 210 };
+const TILE_W = 32;
+const TILE_H = 23;
+const ORIGIN = { x: 195, y: 220 };
 
 function iso(point: GridPoint) {
   return {
@@ -71,19 +72,19 @@ function drawTile(ctx: CanvasRenderingContext2D, point: GridPoint, fill: string,
 
 function drawPrism(ctx: CanvasRenderingContext2D, block: ShiftBlock, point: GridPoint, pulse: number) {
   const base = footprint(point, block.width, block.height);
-  const height = block.kind === 'keystone' ? 23 : 29 + Math.min(7, block.width + block.height);
+  const height = block.kind === 'relic' ? 21 : 25 + Math.min(6, block.width + block.height);
   const top = base.map((item) => ({ x: item.x, y: item.y - height }));
   ctx.save();
-  if (block.kind === 'keystone') { ctx.shadowColor = block.color; ctx.shadowBlur = 14 + pulse * 8; }
+  if (block.kind === 'relic') { ctx.shadowColor = block.color; ctx.shadowBlur = 14 + pulse * 8; }
   path(ctx, [top[1], top[2], base[2], base[1]]); ctx.fillStyle = colorShade(block.color, -62); ctx.fill();
   path(ctx, [top[2], top[3], base[3], base[2]]); ctx.fillStyle = colorShade(block.color, -38); ctx.fill();
   path(ctx, top); ctx.fillStyle = block.color; ctx.fill(); ctx.strokeStyle = '#fff9'; ctx.lineWidth = 1.2; ctx.stroke();
   const centerX = top.reduce((sum, item) => sum + item.x, 0) / 4;
   const centerY = top.reduce((sum, item) => sum + item.y, 0) / 4;
-  ctx.shadowBlur = 0; ctx.fillStyle = block.kind === 'keystone' ? '#2b3434' : '#f8fbf7';
-  ctx.font = '900 8px Inter, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.shadowBlur = 0; ctx.fillStyle = block.kind === 'relic' ? '#2b3434' : '#f8fbf7';
+  ctx.font = '900 7px Inter, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const axis = block.axis === 'horizontal' ? '↔' : block.axis === 'vertical' ? '↕' : '◆';
-  ctx.fillText(block.kind === 'keystone' ? 'KEY  ↔' : `${block.width}×${block.height}  ${axis}`, centerX, centerY);
+  ctx.fillText(block.kind === 'relic' ? 'RELIC  ↔' : `${block.width}×${block.height}  ${axis}`, centerX, centerY);
   ctx.restore();
 }
 
@@ -152,7 +153,7 @@ function drawCustomizedExplorer(ctx: CanvasRenderingContext2D, point: GridPoint,
   const center = iso(point); const progress = transitionProgress(transition, time); const moving = Boolean(transition) && progress < 1;
   const delta = facing === 'left' ? { x: -.2, y: 0 } : facing === 'right' ? { x: .2, y: 0 } : facing === 'up' ? { x: 0, y: -.2 } : { x: 0, y: .2 };
   const safeCenter = moving && transition?.pushed ? iso({ x: point.x - delta.x, y: point.y - delta.y }) : center;
-  drawCharacterCanvas(ctx, character, { x: safeCenter.x, groundY: safeCenter.y + 3, scale: .54, time, pose: complete ? 'celebrate' : moving && transition?.pushed ? 'push' : moving ? 'walk' : 'idle', facing });
+  drawCharacterCanvas(ctx, character, { x: safeCenter.x, groundY: safeCenter.y + 2, scale: .47, time, pose: complete ? 'celebrate' : moving && transition?.pushed ? 'push' : moving ? 'walk' : 'idle', facing });
 }
 
 function drawVictoryInRoom(ctx: CanvasRenderingContext2D, state: BlockShiftState, journey: VictoryJourney, time: number, character: CharacterCustomization, theme: LabTheme) {
@@ -164,7 +165,7 @@ function drawVictoryInRoom(ctx: CanvasRenderingContext2D, state: BlockShiftState
     const pulse = 1 + Math.sin(time / 230) * .04; ctx.save(); ctx.shadowColor = theme.portal; ctx.shadowBlur = 18; ctx.strokeStyle = theme.portal; ctx.lineWidth = 6;
     ctx.beginPath(); ctx.ellipse(portal.x + 14, portal.y - 36, 19 * pulse, 35 * pulse, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
   }
-  drawCharacterCanvas(ctx, character, { x, groundY: y + 8, scale: .54, time, pose: journey.phase === 'celebrating' || journey.phase === 'departed' ? 'celebrate' : 'walk', facing: 'right' });
+  drawCharacterCanvas(ctx, character, { x, groundY: y + 6, scale: .47, time, pose: journey.phase === 'celebrating' || journey.phase === 'departed' ? 'celebrate' : 'walk', facing: 'right' });
 }
 
 function drawLab(ctx: CanvasRenderingContext2D, state: BlockShiftState, transition: VisualTransition | null, time: number, character: CharacterCustomization, journey: VictoryJourney, theme: LabTheme) {
@@ -179,10 +180,14 @@ function drawLab(ctx: CanvasRenderingContext2D, state: BlockShiftState, transiti
   for (let y = 0; y < BLOCK_SHIFT_HEIGHT; y += 1) {
     for (let x = 0; x < BLOCK_SHIFT_WIDTH; x += 1) {
       const rail = y === BLOCK_SHIFT_GOAL.y;
-      drawTile(ctx, { x, y }, rail ? '#bdb38a' : (x + y) % 2 ? '#7e9a91' : '#8aa59a');
+      const bay = y === BLOCK_SHIFT_BAY.y && x >= BLOCK_SHIFT_BAY.x && x < BLOCK_SHIFT_BAY.x + 3;
+      drawTile(ctx, { x, y }, bay ? '#5b8e99' : rail ? '#bdb38a' : (x + y) % 2 ? '#7e9a91' : '#8aa59a');
       if (rail) {
-        const center = iso({ x, y }); ctx.strokeStyle = '#ffe08b99'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(center.x - 15, center.y); ctx.lineTo(center.x + 15, center.y); ctx.stroke();
+        const center = iso({ x, y }); ctx.strokeStyle = '#ffe08b99'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(center.x - 12, center.y); ctx.lineTo(center.x + 12, center.y); ctx.stroke();
+      } else if (bay) {
+        const center = iso({ x, y }); ctx.strokeStyle = '#baf5ff99'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(center.x - 10, center.y - 4); ctx.lineTo(center.x + 10, center.y + 4); ctx.stroke();
       }
     }
   }
@@ -302,7 +307,7 @@ export function BlockShiftLab({ onExit, onComplete, character, theme = PROTOTYPE
     </header>
     <div className="lab-brief">
       <div><strong>{state.moves}</strong><small>moves</small></div>
-      <p>Slide the varied-size pieces from the gold lane. Arrows show how each piece can move.</p>
+      <p>Dock the long beam in its blue bay, clear the gold rail, then deliver the relic cart.</p>
       <div><strong>{state.pushes}</strong><small>pushes</small></div>
     </div>
     <div className="lab-tool-row">
@@ -318,7 +323,7 @@ export function BlockShiftLab({ onExit, onComplete, character, theme = PROTOTYPE
         <button className="right" disabled={journey.phase === 'celebrating' || journey.phase === 'departed'} onClick={() => move('right')} aria-label="Move right">→</button>
         <button className="down" disabled={journey.phase === 'celebrating' || journey.phase === 'departed'} onClick={() => move('down')} aria-label="Move down">↓</button>
       </div>
-      <p>Tap or swipe the world · Walk into the in-room door after solving</p>
+      <p>Tap or swipe · Move the 3×1 beam first · Walk through the door after solving</p>
     </div>
   </section>;
 }

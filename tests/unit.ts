@@ -99,42 +99,41 @@ assert.equal(calculateAchievements(uniqueVictories).find((item) => item.code ===
 
 const initialLab = initialBlockShiftState();
 assert.equal(initialLab.status, 'playing');
-assert.deepEqual(initialLab.blocks.find((block) => block.id === 'keystone'), {
-  id: 'keystone', kind: 'keystone', label: 'Keystone sled', color: '#f6c85f',
-  x: 1, y: 3, width: 2, height: 1, axis: 'horizontal',
+assert.deepEqual(initialLab.blocks.find((block) => block.id === 'relic'), {
+  id: 'relic', kind: 'relic', label: 'Sun relic cart', color: '#f5c85d',
+  x: 1, y: 4, width: 2, height: 1, axis: 'horizontal',
 });
-const blockedRailMove = moveBlockShift({ ...initialLab, player: { x: 1, y: 4 } }, 'up');
+const blockedRailMove = moveBlockShift({ ...initialLab, player: { x: 1, y: 5 } }, 'up');
 assert.equal(blockedRailMove.moves, 0);
 assert.match(blockedRailMove.message, /sideways/i);
 
-const labStep = ['right', 'right', 'right', 'up'].reduce(moveBlockShift, initialLab);
+const labStep = ['up', 'right', 'right', 'right', 'right'].reduce(moveBlockShift, initialLab);
 assert.deepEqual(
-  (({ x, y }) => ({ x, y }))(labStep.blocks.find((block) => block.id === 'amber')!),
-  { x: 3, y: 2 },
+  (({ x, y }) => ({ x, y }))(labStep.blocks.find((block) => block.id === 'service-beam')!),
+  { x: 5, y: 7 },
 );
 assert.equal(labStep.pushes, 1);
 const undoneLabStep = undoBlockShift(labStep);
 assert.deepEqual(
-  (({ x, y }) => ({ x, y }))(undoneLabStep.blocks.find((block) => block.id === 'amber')!),
-  { x: 3, y: 3 },
+  (({ x, y }) => ({ x, y }))(undoneLabStep.blocks.find((block) => block.id === 'service-beam')!),
+  { x: 4, y: 7 },
 );
-assert.deepEqual(undoneLabStep.player, { x: 3, y: 5 });
-assert.equal(undoneLabStep.moves, 3);
+assert.deepEqual(undoneLabStep.player, { x: 3, y: 7 });
+assert.equal(undoneLabStep.moves, 4);
 
-const labSolution = [
-  'right', 'right', 'right', 'right', 'right', 'right', 'up', 'up', 'down', 'right',
-  'up', 'down', 'left', 'left', 'up', 'up', 'left', 'left', 'down', 'up', 'left', 'left', 'left', 'down',
-  'right', 'right', 'right', 'right', 'right', 'right',
-] as const;
+const blockDirection = { U: 'up', D: 'down', L: 'left', R: 'right' } as const;
+const labSolution = [...'URRRRRRDLLLUUUUUDDRUURRDDRUDRDRRRUUUULLLDDURRDDULLLLLLLDLLLURRRRRRRRR']
+  .map((key) => blockDirection[key as keyof typeof blockDirection]);
 const completedLab = labSolution.reduce(moveBlockShift, initialBlockShiftState());
 assert.equal(completedLab.status, 'complete');
-assert.deepEqual(completedLab.blocks.find((block) => block.id === 'keystone'), {
-  id: 'keystone', kind: 'keystone', label: 'Keystone sled', color: '#f6c85f',
-  x: 7, y: 3, width: 2, height: 1, axis: 'horizontal',
+assert.deepEqual(completedLab.blocks.find((block) => block.id === 'relic'), {
+  id: 'relic', kind: 'relic', label: 'Sun relic cart', color: '#f5c85d',
+  x: 10, y: 4, width: 2, height: 1, axis: 'horizontal',
 });
-assert.equal(completedLab.moves, 30);
-assert.equal(completedLab.pushes, 12);
-assert.equal(moveBlockShift(completedLab, 'left').moves, 30);
+assert.deepEqual((({ x, y }) => ({ x, y }))(completedLab.blocks.find((block) => block.id === 'service-beam')!), { x: 7, y: 7 });
+assert.equal(completedLab.moves, 69);
+assert.equal(completedLab.pushes, 24);
+assert.equal(moveBlockShift(completedLab, 'left').moves, 69);
 assert.equal(blockShiftSnapshot(completedLab).status, 'complete');
 
 const initialMineTrail = initialMineTrailState();
@@ -206,11 +205,11 @@ assert.equal(classicLabSnapshot(mergeClear).highestStack, 6);
 
 let adventure = initialAdventureState();
 const adventureMove = (route: string) => { for (const key of route) adventure = moveAdventure(adventure, ({ U: 'up', D: 'down', L: 'left', R: 'right' } as const)[key as 'U' | 'D' | 'L' | 'R']); };
-adventureMove('RRLLDDDRRRUUURLDDDLLLLLDDRRLLD');
-assert.equal(adventure.phase, 'celebrating'); assert.equal(adventure.chips.length, 3); assert.equal(adventure.plateActive, true);
+adventureMove('URRDDURRRRURRLLDDDDRRLDDDDLLLLLLLLURR');
+assert.equal(adventure.phase, 'celebrating'); assert.equal(adventure.chips.length, 5); assert.equal(adventure.chipGateOpen, true); assert.equal(adventure.plateActive, true);
 adventure = tickAdventure(adventure, 999); assert.equal(adventure.phase, 'celebrating');
 adventure = tickAdventure(adventure, 1); assert.equal(adventure.phase, 'portal-open');
-adventureMove('UUURRRRRRDD D'.replaceAll(' ',''));
+adventureMove('DLLD');
 assert.equal(adventure.phase, 'complete'); assert.equal(adventureSnapshot(adventure).portalOpen, true);
 
 let lanternComplete = initialClassicLabState(9);
