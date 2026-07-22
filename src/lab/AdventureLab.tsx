@@ -16,9 +16,9 @@ import { useSwipeDirection } from './useSwipeDirection';
 
 const WIDTH = 390;
 const HEIGHT = 844;
-const TILE_W = 38;
-const TILE_H = 22;
-const ORIGIN = { x: 195, y: 210 };
+const TILE_W = 34;
+const TILE_H = 27;
+const ORIGIN = { x: 195, y: 158 };
 
 function iso(point: AdventurePoint) {
   return { x: ORIGIN.x + (point.x - point.y) * TILE_W / 2, y: ORIGIN.y + (point.x + point.y) * TILE_H / 2 };
@@ -83,8 +83,8 @@ function drawAdventure(ctx: CanvasRenderingContext2D, state: AdventureState, tim
     ctx.strokeStyle = '#5d3d2c'; ctx.beginPath(); ctx.moveTo(crateCenter.x - 8, crateCenter.y - 27); ctx.lineTo(crateCenter.x + 8, crateCenter.y - 11); ctx.moveTo(crateCenter.x + 8, crateCenter.y - 27); ctx.lineTo(crateCenter.x - 8, crateCenter.y - 11); ctx.stroke();
   } });
 
-  const exit = iso({ x: 7, y: 7 }); const open = state.phase === 'portal-open' || state.phase === 'complete';
-  entities.push({ depth: 14.1, draw: () => { ctx.save(); ctx.shadowColor = open ? theme.portal : '#51666a'; ctx.shadowBlur = open ? 22 : 4; ctx.strokeStyle = open ? theme.portal : '#51666a'; ctx.lineWidth = 7; ctx.beginPath(); ctx.ellipse(exit.x, exit.y - 32, 19, 34, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); } });
+  const exit = iso({ x: 8, y: 8 }); const open = state.phase === 'portal-open' || state.phase === 'complete';
+  entities.push({ depth: 16.1, draw: () => { ctx.save(); ctx.shadowColor = open ? theme.portal : '#51666a'; ctx.shadowBlur = open ? 22 : 4; ctx.strokeStyle = open ? theme.portal : '#51666a'; ctx.lineWidth = 7; ctx.beginPath(); ctx.ellipse(exit.x, exit.y - 32, 19, 34, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); } });
 
   const player = iso(state.player); entities.push({ depth: state.player.x + state.player.y + .8, draw: () => drawCharacterCanvas(ctx, character, { x: player.x, groundY: player.y + 8, scale: .48, time, pose: state.phase === 'celebrating' || state.phase === 'complete' ? 'celebrate' : 'walk', facing: state.facing }) });
   entities.sort((a, b) => a.depth - b.depth).forEach((entity) => entity.draw());
@@ -135,13 +135,17 @@ export function AdventureLab({ onExit, onComplete, character, theme = PROTOTYPE_
     bridge.render_game_to_text = () => JSON.stringify({ ...adventureSnapshot(stateRef.current), character, theme: { id: theme.id, worldName: theme.worldName, portalName: theme.portalName } });
     return () => { delete bridge.advanceTime; delete bridge.render_game_to_text; };
   }, [character, commit, theme]);
-  const swipe = useSwipeDirection(move, state.phase === 'celebrating' || state.phase === 'complete');
+  const tapMove = useCallback(({ x, y }: { x: number; y: number }) => {
+    const dx = x - .5; const dy = y - .48;
+    move(Math.abs(dx) > Math.abs(dy) ? dx > 0 ? 'right' : 'left' : dy > 0 ? 'down' : 'up');
+  }, [move]);
+  const swipe = useSwipeDirection(move, state.phase === 'celebrating' || state.phase === 'complete', tapMove);
 
   return <section className="lab-screen adventure-lab-screen" aria-label="Adventure primary puzzle" style={themeCss(theme)}>
     <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} aria-label="Adventure game world" {...swipe} />
     <header className="lab-header"><button className="icon-button glass" onClick={onExit} aria-label="Back to Lab corridor">←</button><div><span>{contextLabel}</span><h1>Adventure · Venture Circuit</h1></div><button className="lab-small-button glass" onClick={reset}>RESET</button></header>
     <div className="lab-brief"><div><strong>{state.chips.length}/{ADVENTURE_CHIP_TOTAL}</strong><small>chips</small></div><p>Collect chips, keys and boots. Push the crate onto its plate, then walk to the portal.</p><div><strong>{state.moves}</strong><small>moves</small></div></div>
     <div className={`lab-message ${state.phase === 'complete' ? 'complete' : ''}`} aria-live="polite">{state.message}</div>
-    <div className="lab-controls"><button className="lab-utility side-note" disabled>GEAR<small>{state.redKey ? '◆' : '◇'} {state.blueKey ? '◆' : '◇'} {state.boots ? '◆' : '◇'}</small></button><DirectionPad move={move} disabled={state.phase === 'celebrating' || state.phase === 'complete'} /><button className="lab-utility" onClick={reset}>RESET<small>R</small></button><p>Swipe the world, tap arrows, or use WASD / arrow keys</p></div>
+    <div className="lab-controls"><button className="lab-utility side-note" disabled>GEAR<small>{state.redKey ? '◆' : '◇'} {state.blueKey ? '◆' : '◇'} {state.boots ? '◆' : '◇'}</small></button><DirectionPad move={move} disabled={state.phase === 'celebrating' || state.phase === 'complete'} /><button className="lab-utility" onClick={reset}>RESET<small>R</small></button><p>Tap or swipe the world, tap arrows, or use WASD / arrow keys</p></div>
   </section>;
 }

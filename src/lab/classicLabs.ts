@@ -1,4 +1,4 @@
-export type ClassicLabId = 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
+export type ClassicLabId = 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16;
 export type ClassicDirection = 'up' | 'down' | 'left' | 'right';
 export type ClassicLabStatus = 'playing' | 'complete' | 'failed';
 
@@ -15,7 +15,7 @@ export interface LabDefinition {
 
 export const CLASSIC_LABS: LabDefinition[] = [
   { id: 3, title: 'Relic Run', shortTitle: 'Maze chase', inspiration: 'Inspired by maze-chase classics', objective: 'Collect every sun spark, evade three temple shades, then reach the portal.', controlHint: 'Move one tile precisely', accent: '#f6c85f', icon: '☀' },
-  { id: 4, title: 'Sky Stack', shortTitle: 'Falling blocks', inspiration: 'Inspired by Tetris', objective: 'Use the explorer’s remote to keep the airlock clear for 75 seconds.', controlHint: 'Move, rotate and drop', accent: '#66d6cb', icon: '▦' },
+  { id: 4, title: 'Sky Stack', shortTitle: 'Falling blocks', inspiration: 'Falling-block line challenge', objective: 'Keep the airlock clear for 75 seconds or complete 50 cargo lines.', controlHint: 'Move, rotate, swipe or tap to drop', accent: '#66d6cb', icon: '▦' },
   { id: 5, title: 'River Relay', shortTitle: 'Crossing lanes', inspiration: 'Inspired by Frogger', objective: 'Guide the explorer over beetle roads and floating ruins to the far gate.', controlHint: 'Hop one space', accent: '#72d08f', icon: '≋' },
   { id: 6, title: 'Trail Coil', shortTitle: 'Obstacle trail', inspiration: 'Inspired by growing-trail classics', objective: 'Collect ten signal orbs while dodging stone pylons and your accelerating light trail.', controlHint: 'Queue one precise turn', accent: '#e8a95b', icon: '◇' },
   { id: 7, title: 'Prism Break', shortTitle: 'Ricochet puzzle', inspiration: 'Inspired by Breakout', objective: 'Aim the remote-guided light bar and shatter every suspended seal.', controlHint: 'Slide the light bar', accent: '#e97f78', icon: '◆' },
@@ -26,6 +26,8 @@ export const CLASSIC_LABS: LabDefinition[] = [
   { id: 12, title: 'Echo Sequence', shortTitle: 'Pattern memory', inspiration: 'Inspired by Simon', objective: 'Watch and repeat three increasingly long four-pad signal sequences.', controlHint: 'Tap the glowing pads', accent: '#d58be6', icon: '◈' },
   { id: 13, title: 'Gear Links', shortTitle: 'Circuit rotation', inspiration: 'Rotating pipe logic', objective: 'Rotate all sixteen gear links to match the etched circuit blueprint.', controlHint: 'Tap a link to rotate it', accent: '#74cfa0', icon: '⚙' },
   { id: 14, title: 'Orbit Pulse', shortTitle: 'One-button timing', inspiration: 'Precision timing challenge', objective: 'Pulse inside six moving target windows before three mistimed signals overload the ring.', controlHint: 'Tap PULSE at the target', accent: '#f08c78', icon: '◎' },
+  { id: 15, title: 'Rune Word', shortTitle: 'Word deduction', inspiration: 'Five-letter deduction puzzle', objective: 'Deduce the hidden five-letter venture word in six guesses.', controlHint: 'Tap letters, then enter', accent: '#78c9a8', icon: 'A' },
+  { id: 16, title: 'Relic Groups', shortTitle: 'Hidden connections', inspiration: 'Four-group association puzzle', objective: 'Sort sixteen relic words into four hidden groups before four mistakes.', controlHint: 'Select four related tiles', accent: '#d99ac8', icon: '▦' },
 ];
 
 export interface Point { x: number; y: number }
@@ -142,14 +144,27 @@ export interface GearState extends BaseLabState { id: 13; rotations: number[]; t
 
 export interface OrbitState extends BaseLabState { id: 14; angle: number; targetAngle: number; targetWidth: number; gate: number; misses: number; speed: number }
 
-export type ClassicLabState = RelicState | StackState | RiverState | CoilState | PrismState | MergeState | LanternState | IceState | CrateState | EchoState | GearState | OrbitState;
+export type WordMark = 'correct' | 'present' | 'absent';
+export interface WordGuess { word: string; marks: WordMark[] }
+export interface WordState extends BaseLabState { id: 15; target: string; current: string; guesses: WordGuess[]; maxGuesses: number }
+
+export interface ConnectionGroup { name: string; words: string[]; color: string }
+export interface ConnectionsState extends BaseLabState { id: 16; groups: ConnectionGroup[]; words: string[]; selected: string[]; solved: string[]; mistakes: number; maxMistakes: number }
+
+export type ClassicLabState = RelicState | StackState | RiverState | CoilState | PrismState | MergeState | LanternState | IceState | CrateState | EchoState | GearState | OrbitState | WordState | ConnectionsState;
 
 export type ClassicLabAction =
   | { type: 'move'; direction: ClassicDirection }
   | { type: 'tick'; ms: number }
   | { type: 'rotate' }
   | { type: 'hard-drop' }
-  | { type: 'activate'; index: number };
+  | { type: 'activate'; index: number }
+  | { type: 'letter'; letter: string }
+  | { type: 'backspace' }
+  | { type: 'submit-word' }
+  | { type: 'toggle-connection'; word: string }
+  | { type: 'submit-connection' }
+  | { type: 'shuffle-connection' };
 
 const pointKey = ({ x, y }: Point) => `${x},${y}`;
 const pointEqual = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
@@ -312,6 +327,21 @@ function initialOrbitState(): OrbitState {
   return { id: 14, status: 'playing', elapsedMs: 0, score: 0, message: 'Pulse only when the orbiting spark crosses the highlighted window.', angle: 0, targetAngle: ORBIT_TARGETS[0], targetWidth: .34, gate: 0, misses: 0, speed: 1.9 };
 }
 
+function initialWordState(): WordState {
+  return { id: 15, status: 'playing', elapsedMs: 0, score: 0, message: 'Enter a five-letter word. Green is exact; gold belongs somewhere else.', target: 'TRAIL', current: '', guesses: [], maxGuesses: 6 };
+}
+
+const CONNECTION_GROUPS: ConnectionGroup[] = [
+  { name: 'NAVIGATION', words: ['COMPASS', 'MAP', 'BEACON', 'SEXTANT'], color: '#73c8b0' },
+  { name: 'TREES', words: ['PINE', 'OAK', 'ELM', 'BIRCH'], color: '#86bd75' },
+  { name: 'LIGHT SOURCES', words: ['TORCH', 'LANTERN', 'CANDLE', 'STAR'], color: '#e8bd62' },
+  { name: 'WINTER WEATHER', words: ['RAIN', 'HAIL', 'SLEET', 'SNOW'], color: '#8ab8d9' },
+];
+const CONNECTION_ORDER = ['COMPASS', 'PINE', 'TORCH', 'RAIN', 'MAP', 'OAK', 'LANTERN', 'HAIL', 'BEACON', 'ELM', 'CANDLE', 'SLEET', 'SEXTANT', 'BIRCH', 'STAR', 'SNOW'];
+function initialConnectionsState(): ConnectionsState {
+  return { id: 16, status: 'playing', elapsedMs: 0, score: 0, message: 'Select four words that share one precise connection.', groups: CONNECTION_GROUPS.map((group) => ({ ...group, words: [...group.words] })), words: [...CONNECTION_ORDER], selected: [], solved: [], mistakes: 0, maxMistakes: 4 };
+}
+
 export function initialClassicLabState(id: ClassicLabId): ClassicLabState {
   if (id === 3) return initialRelicState();
   if (id === 4) return initialStackState();
@@ -324,7 +354,9 @@ export function initialClassicLabState(id: ClassicLabId): ClassicLabState {
   if (id === 11) return initialCrateState();
   if (id === 12) return initialEchoState();
   if (id === 13) return initialGearState();
-  return initialOrbitState();
+  if (id === 14) return initialOrbitState();
+  if (id === 15) return initialWordState();
+  return initialConnectionsState();
 }
 
 function relicWalkable(point: Point) {
@@ -407,10 +439,15 @@ function lockStackPiece(state: StackState): StackState {
   const result = clearStackLines(board);
   const active = stackPiece(state.active.sequenceIndex + 1);
   const failed = stackCollides(result.board, active);
+  const lines = state.lines + result.cleared;
+  const lineScores = [0, 100, 300, 500, 800];
+  const complete = lines >= 50;
   return {
-    ...state, board: result.board, active, pieces: state.pieces + 1, lines: state.lines + result.cleared,
-    score: state.score + 10 + result.cleared * 100, status: failed ? 'failed' : state.status,
-    message: failed ? 'Cargo reached the warning line. Reset the airlock and try again.' : result.cleared ? `${result.cleared} cargo line ${result.cleared === 1 ? 'cleared' : 'cleared'}!` : 'Cargo locked. The next shape is incoming.',
+    ...state, board: result.board, active, pieces: state.pieces + 1, lines,
+    score: state.score + 10 + lineScores[result.cleared], status: complete ? 'complete' : failed ? 'failed' : state.status,
+    message: complete ? 'Fifty cargo lines cleared. The airlock portal is open!'
+      : failed ? 'Cargo reached the warning line. Reset the airlock and try again.'
+        : result.cleared ? `${result.cleared} cargo line ${result.cleared === 1 ? 'cleared' : 'cleared'} · +${lineScores[result.cleared]} points!` : 'Cargo locked. The next shape is incoming.',
   };
 }
 
@@ -445,6 +482,7 @@ function hardDropStack(state: StackState): StackState {
 
 function tickStack(state: StackState, ms: number): StackState {
   if (state.status !== 'playing') return state;
+  if (state.lines >= 50) return { ...state, status: 'complete', message: 'Fifty cargo lines cleared. The airlock portal is open!' };
   const elapsedMs = Math.min(75000, state.elapsedMs + ms);
   if (elapsedMs >= 75000) return { ...state, elapsedMs, remainingMs: 0, status: 'complete', score: state.score + 750, message: 'Seventy-five seconds survived. The airlock portal is open!' };
   let next = { ...state, elapsedMs, remainingMs: 75000 - elapsedMs, fallClock: state.fallClock + ms };
@@ -748,6 +786,62 @@ function activateOrbit(state: OrbitState): OrbitState {
   return { ...state, gate, score: gate, targetAngle: ORBIT_TARGETS[gate], targetWidth: Math.max(.19, state.targetWidth - .025), speed: state.speed + .22, message: `Gate ${gate} locked. The next orbit is faster and tighter.` };
 }
 
+export function markWordGuess(guessValue: string, targetValue: string): WordMark[] {
+  const guess = guessValue.toUpperCase(); const target = targetValue.toUpperCase();
+  const marks: WordMark[] = Array(guess.length).fill('absent'); const remaining = [...target];
+  for (let index = 0; index < guess.length; index += 1) if (guess[index] === target[index]) { marks[index] = 'correct'; remaining[index] = ''; }
+  for (let index = 0; index < guess.length; index += 1) {
+    if (marks[index] === 'correct') continue; const found = remaining.indexOf(guess[index]);
+    if (found >= 0) { marks[index] = 'present'; remaining[found] = ''; }
+  }
+  return marks;
+}
+
+function inputWordLetter(state: WordState, letter: string): WordState {
+  if (state.status !== 'playing') return state;
+  const clean = letter.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 1);
+  if (!clean || state.current.length >= 5) return state;
+  return { ...state, current: state.current + clean, message: 'Build a five-letter guess, then press ENTER.' };
+}
+
+function submitWord(state: WordState): WordState {
+  if (state.status !== 'playing') return state;
+  if (state.current.length !== 5) return { ...state, message: 'The rune lock needs exactly five letters.' };
+  const guess: WordGuess = { word: state.current, marks: markWordGuess(state.current, state.target) };
+  const guesses = [...state.guesses, guess]; const won = state.current === state.target; const failed = !won && guesses.length >= state.maxGuesses;
+  return {
+    ...state, current: '', guesses, score: won ? Math.max(100, 700 - guesses.length * 100) : state.score,
+    status: won ? 'complete' : failed ? 'failed' : 'playing',
+    message: won ? `${state.target} unlocked the rune door!` : failed ? `The hidden word was ${state.target}. Reset to try again.` : `${state.maxGuesses - guesses.length} guesses remain. Use every color clue.`,
+  };
+}
+
+function toggleConnection(state: ConnectionsState, word: string): ConnectionsState {
+  if (state.status !== 'playing' || !state.words.includes(word)) return state;
+  const selected = state.selected.includes(word) ? state.selected.filter((item) => item !== word) : state.selected.length < 4 ? [...state.selected, word] : state.selected;
+  return { ...state, selected, message: selected.length === 4 ? 'Four relics selected. Submit the group when ready.' : `Select ${4 - selected.length} more related ${4 - selected.length === 1 ? 'relic' : 'relics'}.` };
+}
+
+function submitConnection(state: ConnectionsState): ConnectionsState {
+  if (state.status !== 'playing') return state;
+  if (state.selected.length !== 4) return { ...state, message: 'Select exactly four relics before submitting.' };
+  const selectedSet = new Set(state.selected);
+  const group = state.groups.find((candidate) => !state.solved.includes(candidate.name) && candidate.words.every((word) => selectedSet.has(word)));
+  if (group) {
+    const solved = [...state.solved, group.name]; const words = state.words.filter((word) => !selectedSet.has(word)); const complete = solved.length === state.groups.length;
+    return { ...state, solved, words, selected: [], score: solved.length * 250, status: complete ? 'complete' : 'playing', message: complete ? 'All four relic connections restored. The archive door is open!' : `${group.name} connected. ${state.groups.length - solved.length} groups remain.` };
+  }
+  const almost = state.groups.some((candidate) => !state.solved.includes(candidate.name) && candidate.words.filter((word) => selectedSet.has(word)).length === 3);
+  const mistakes = state.mistakes + 1; const failed = mistakes >= state.maxMistakes;
+  return { ...state, mistakes, selected: [], status: failed ? 'failed' : 'playing', message: failed ? 'Four false links sealed the archive. Reset to try again.' : almost ? `One relic away. ${state.maxMistakes - mistakes} mistakes remain.` : `That group does not connect. ${state.maxMistakes - mistakes} mistakes remain.` };
+}
+
+function shuffleConnections(state: ConnectionsState): ConnectionsState {
+  if (state.status !== 'playing') return state;
+  const words = state.words.length ? [...state.words.slice(3), ...state.words.slice(0, 3)] : state.words;
+  return { ...state, words, selected: [], message: 'The remaining relics have been rearranged.' };
+}
+
 export function updateClassicLab(state: ClassicLabState, action: ClassicLabAction): ClassicLabState {
   if (action.type === 'tick') {
     if (state.id === 3) return tickRelic(state, action.ms);
@@ -776,6 +870,12 @@ export function updateClassicLab(state: ClassicLabState, action: ClassicLabActio
   if (action.type === 'activate' && state.id === 12) return activateEcho(state, action.index);
   if (action.type === 'activate' && state.id === 13) return activateGear(state, action.index);
   if (action.type === 'activate' && state.id === 14) return activateOrbit(state);
+  if (action.type === 'letter' && state.id === 15) return inputWordLetter(state, action.letter);
+  if (action.type === 'backspace' && state.id === 15) return { ...state, current: state.current.slice(0, -1), message: 'Last letter removed.' };
+  if (action.type === 'submit-word' && state.id === 15) return submitWord(state);
+  if (action.type === 'toggle-connection' && state.id === 16) return toggleConnection(state, action.word);
+  if (action.type === 'submit-connection' && state.id === 16) return submitConnection(state);
+  if (action.type === 'shuffle-connection' && state.id === 16) return shuffleConnections(state);
   return state;
 }
 
@@ -785,7 +885,7 @@ export function classicLabSnapshot(state: ClassicLabState) {
     status: state.status, elapsedMs: Math.round(state.elapsedMs), score: state.score, message: state.message,
   };
   if (state.id === 3) return { ...base, coordinateSystem: '13x15 maze; origin top-left; x right; y down', objective: `Collect all ${state.target} sparks and reach exit`, player: state.player, enemies: state.enemies, visibleSparks: state.pellets, collected: state.score, target: state.target, lives: state.lives, exit: state.exit, portalOpen: state.pellets.length === 0 };
-  if (state.id === 4) return { ...base, coordinateSystem: '10x18 stack grid; origin top-left; x right; y down', objective: 'Survive 75 seconds', board: state.board, active: state.active, remainingMs: state.remainingMs, lines: state.lines, pieces: state.pieces };
+  if (state.id === 4) return { ...base, coordinateSystem: '10x18 stack grid; origin top-left; x right; y down', objective: 'Survive 75 seconds or clear 50 lines', board: state.board, active: state.active, remainingMs: state.remainingMs, lines: state.lines, lineTarget: 50, pieces: state.pieces };
   if (state.id === 5) return { ...base, coordinateSystem: '9x11 crossing grid; origin at far-left gate; x right; y toward explorer', objective: 'Reach row 0', player: state.player, movers: state.movers.map(({ id, row, x, width, kind }) => ({ id, row, x: Number(x.toFixed(2)), width, kind })), lives: state.lives, hops: state.hops };
   if (state.id === 6) return { ...base, coordinateSystem: '15x16 trail grid; origin top-left; x right; y down', objective: `Collect ${state.target} signal orbs while avoiding obstacles`, explorer: state.trail[0], direction: state.direction, pendingDirection: state.pendingDirection, trail: state.trail, obstacles: state.obstacles, orb: state.orb, collected: state.score, target: state.target };
   if (state.id === 7) return { ...base, coordinateSystem: '390x844 canvas pixels; origin top-left; x right; y down', objective: 'Break all prism seals', paddleX: Math.round(state.paddleX), ball: { x: Math.round(state.ball.x), y: Math.round(state.ball.y), vx: Math.round(state.ball.vx), vy: Math.round(state.ball.vy) }, seals: state.seals, lives: state.lives, combo: state.combo };
@@ -795,5 +895,7 @@ export function classicLabSnapshot(state: ClassicLabState) {
   if (state.id === 11) return { ...base, coordinateSystem: '8x8 crate grid; origin top-left; x right; y down', objective: 'Push all three crates onto circuit goals', map: CRATE_MAP, player: state.player, crates: state.crates, goals: state.goals, pushes: state.pushes, moves: state.moves };
   if (state.id === 12) return { ...base, coordinateSystem: 'four pads indexed 0 top, 1 right, 2 bottom, 3 left', objective: 'Repeat three sequences of lengths 4, 6, and 8', round: state.round + 1, sequenceLength: echoRoundLength(state.round), activePad: state.acceptingInput ? null : state.sequence[Math.min(state.revealIndex, echoRoundLength(state.round) - 1)], acceptingInput: state.acceptingInput, inputIndex: state.inputIndex, strikes: state.strikes };
   if (state.id === 13) return { ...base, coordinateSystem: '4x4 gear grid; index=y*4+x; origin top-left', objective: 'Rotate all sixteen links to their target orientations', rotations: state.rotations, target: state.target, aligned: state.aligned, moves: state.moves };
-  return { ...base, coordinateSystem: 'circular orbit in radians; zero points right; angles increase clockwise', objective: 'Pulse inside six target windows before three misses', angle: Number(state.angle.toFixed(3)), targetAngle: state.targetAngle, targetWidth: state.targetWidth, gate: state.gate, misses: state.misses, speed: state.speed };
+  if (state.id === 14) return { ...base, coordinateSystem: 'circular orbit in radians; zero points right; angles increase clockwise', objective: 'Pulse inside six target windows before three misses', angle: Number(state.angle.toFixed(3)), targetAngle: state.targetAngle, targetWidth: state.targetWidth, gate: state.gate, misses: state.misses, speed: state.speed };
+  if (state.id === 15) return { ...base, coordinateSystem: 'six rows of five letters', objective: 'Deduce the hidden five-letter word in six guesses', current: state.current, guesses: state.guesses, guessesRemaining: state.maxGuesses - state.guesses.length };
+  return { ...base, coordinateSystem: 'sixteen word tiles; choose groups of four', objective: 'Find four hidden groups before four mistakes', words: state.words, selected: state.selected, solved: state.solved, mistakes: state.mistakes, mistakesRemaining: state.maxMistakes - state.mistakes };
 }

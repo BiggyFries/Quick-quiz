@@ -22,15 +22,17 @@ export interface AdventureState {
 }
 
 export const ADVENTURE_MAP = [
-  '#########',
-  '#P.c.rR##',
-  '#.#.#...#',
-  '#...#.#.#',
-  '#c.tW.bB#',
-  '#.###...#',
-  '#.O.o.#.#',
-  '#c....#E#',
-  '#########',
+  '###########',
+  '###########',
+  '##P.c.rR###',
+  '##.#.#...##',
+  '##...#.#.##',
+  '##c.tW.bB##',
+  '##.###...##',
+  '##.O.o.#.##',
+  '##c....#E##',
+  '###########',
+  '###########',
 ];
 
 export const ADVENTURE_CHIP_TOTAL = ADVENTURE_MAP.join('').split('c').length - 1;
@@ -42,7 +44,7 @@ const delta: Record<AdventureDirection, AdventurePoint> = {
 
 export function initialAdventureState(): AdventureState {
   return {
-    player: { x: 1, y: 1 }, crate: { x: 2, y: 6 }, facing: 'down', phase: 'playing', celebrationMs: 0,
+    player: { x: 2, y: 2 }, crate: { x: 3, y: 7 }, facing: 'down', phase: 'playing', celebrationMs: 0,
     elapsedMs: 0, moves: 0, chips: [], redKey: false, blueKey: false, boots: false,
     redDoorOpen: false, blueDoorOpen: false, plateActive: false,
     message: 'Collect three venture chips, equip the tide boots, unlock the gates, and power the floor plate.',

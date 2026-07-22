@@ -6,6 +6,7 @@ import {
   DEFAULT_CHARACTER,
   EYE_COLORS,
   EYE_SHAPE_OPTIONS,
+  FACE_OPTIONS,
   FRAME_OPTIONS,
   HAIR_COLORS,
   HAIR_OPTIONS,
@@ -92,7 +93,12 @@ export function CharacterCustomizer({ character, onSave }: { character: Characte
     <ColorRow label="Hair color" value={draft.hairColor} colors={HAIR_COLORS} onChange={(value) => update('hairColor', value)} />
     <ChoiceRow label="Eye shape" value={draft.eyeShape} options={EYE_SHAPE_OPTIONS} onChange={(value) => update('eyeShape', value)} />
     <ColorRow label="Eye color" value={draft.eyeColor} colors={EYE_COLORS} onChange={(value) => update('eyeColor', value)} />
+    <ChoiceRow label="Face type" value={draft.face} options={FACE_OPTIONS} onChange={(value) => update('face', value)} />
     <ChoiceRow label="Accessory" value={draft.accessory} options={ACCESSORY_OPTIONS} onChange={(value) => update('accessory', value)} />
+    <fieldset className="character-fieldset"><legend>Scarf</legend><div className="character-choice-row">
+      <button type="button" className={!draft.scarf ? 'selected' : ''} aria-pressed={!draft.scarf} onClick={() => update('scarf', false)}>Off</button>
+      <button type="button" className={draft.scarf ? 'selected' : ''} aria-pressed={draft.scarf} onClick={() => update('scarf', true)}>On</button>
+    </div></fieldset>
 
     <div className="character-save-row">
       <button type="button" className="secondary-button" onClick={() => { setDraft({ ...DEFAULT_CHARACTER }); setMessage('Default explorer restored in the preview.'); }}>RESET</button>

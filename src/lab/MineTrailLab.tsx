@@ -19,8 +19,8 @@ import { beginVictoryJourney, idleVictoryJourney, moveVictoryJourney, tickVictor
 interface MoveTransition { from: GridPoint; to: GridPoint; startedAt: number; durationMs: number }
 
 const TILE_W = 68;
-const TILE_H = 37;
-const ORIGIN = { x: 195, y: 275 };
+const TILE_H = 49;
+const ORIGIN = { x: 195, y: 220 };
 const key = (point: GridPoint) => `${point.x},${point.y}`;
 
 function iso(point: GridPoint) {
@@ -119,13 +119,11 @@ function drawSmoke(ctx: CanvasRenderingContext2D, point: GridPoint, time: number
   }
 }
 
-function drawMineVictory(ctx: CanvasRenderingContext2D, journey: VictoryJourney, time: number, character: CharacterCustomization, theme: LabTheme) {
+function drawMineVictory(ctx: CanvasRenderingContext2D, state: MineTrailState, journey: VictoryJourney, time: number, character: CharacterCustomization, theme: LabTheme) {
   if (journey.phase === 'idle') return;
-  ctx.fillStyle = '#06171bed'; ctx.beginPath(); ctx.roundRect(38, 438, 314, 137, 24); ctx.fill();
-  ctx.strokeStyle = '#ffffff32'; ctx.beginPath(); ctx.moveTo(64, 548); ctx.lineTo(328, 548); ctx.stroke();
-  const pulse = 1 + Math.sin(time / 230) * .04; ctx.save(); ctx.shadowColor = theme.portal; ctx.shadowBlur = 18; ctx.strokeStyle = theme.portal; ctx.lineWidth = 7; ctx.beginPath(); ctx.ellipse(322, 518, 21 * pulse, 39 * pulse, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
-  drawCharacterCanvas(ctx, character, { x: 78 + journey.x * 57, groundY: 550 + journey.lane * 23, scale: .56, time, pose: journey.phase === 'celebrating' || journey.phase === 'departed' ? 'celebrate' : 'walk', facing: 'right' });
-  ctx.fillStyle = theme.accent; ctx.font = '900 9px Inter, system-ui'; ctx.textAlign = 'center'; ctx.fillText(journey.phase === 'celebrating' ? 'ONE SECOND VICTORY MOMENT' : journey.phase === 'portal-open' ? `STEER INTO THE ${theme.portalName.toUpperCase()}` : 'PORTAL CROSSED', 195, 461);
+  const start = iso(state.player); const portal = iso({ x: MINE_TRAIL_WIDTH + .15, y: 2 }); const progress = journey.x / 4;
+  if (journey.phase !== 'celebrating') { const pulse = 1 + Math.sin(time / 230) * .04; ctx.save(); ctx.shadowColor = theme.portal; ctx.shadowBlur = 18; ctx.strokeStyle = theme.portal; ctx.lineWidth = 7; ctx.beginPath(); ctx.ellipse(portal.x, portal.y - 37, 20 * pulse, 38 * pulse, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
+  drawCharacterCanvas(ctx, character, { x: start.x + (portal.x - start.x) * progress + journey.lane * 8, groundY: start.y + (portal.y - start.y) * progress + journey.lane * 20 - 8, scale: .56, time, pose: journey.phase === 'celebrating' || journey.phase === 'departed' ? 'celebrate' : 'walk', facing: 'right' });
 }
 
 function drawMineLab(ctx: CanvasRenderingContext2D, state: MineTrailState, transition: MoveTransition | null, actionStartedAt: number, time: number, character: CharacterCustomization, journey: VictoryJourney, theme: LabTheme) {
@@ -143,7 +141,7 @@ function drawMineLab(ctx: CanvasRenderingContext2D, state: MineTrailState, trans
   }
   const player = animatedPlayer(state, transition, time); if (journey.phase === 'idle') drawCustomizedExplorer(ctx, player, time, transition, actionStartedAt, state.status, state.facing, character);
   if (state.detonated) drawSmoke(ctx, state.detonated, time);
-  drawMineVictory(ctx, journey, time, character, theme);
+  drawMineVictory(ctx, state, journey, time, character, theme);
   if (state.status !== 'playing' && (state.status === 'failed' || journey.phase === 'departed')) {
     ctx.fillStyle = '#071820c7'; ctx.beginPath(); ctx.roundRect(55, 494, 280, 70, 18); ctx.fill();
     ctx.fillStyle = state.status === 'complete' ? '#f6c85f' : '#f09a7f'; ctx.font = '900 11px Inter, system-ui, sans-serif'; ctx.textAlign = 'center';
@@ -212,7 +210,10 @@ export function MineTrailLab({ onExit, onComplete, character, theme = PROTOTYPE_
   }, [character, theme, updateJourney]);
 
   const safeRemaining = mineTrailSnapshot(state).safeTilesRemaining;
-  const swipe = useSwipeDirection(move, state.status === 'failed' || journey.phase === 'celebrating' || journey.phase === 'departed');
+  const tapMove = useCallback(({ x, y }: { x: number; y: number }) => {
+    const dx = x - .5; const dy = y - .46; move(Math.abs(dx) > Math.abs(dy) ? dx > 0 ? 'right' : 'left' : dy > 0 ? 'down' : 'up');
+  }, [move]);
+  const swipe = useSwipeDirection(move, state.status === 'failed' || journey.phase === 'celebrating' || journey.phase === 'departed', tapMove);
   return <section className="lab-screen mine-lab-screen" aria-label="Mine Trail tester game" style={themeCss(theme)}>
     <canvas ref={canvasRef} width="390" height="844" aria-label="Mine Trail puzzle room" {...swipe} />
     <header className="lab-header">
@@ -236,7 +237,7 @@ export function MineTrailLab({ onExit, onComplete, character, theme = PROTOTYPE_
         <button className="down" disabled={journey.phase === 'celebrating' || journey.phase === 'departed'} onClick={() => move('down')} aria-label="Move down">↓</button>
       </div>
       <button className="mine-action" onClick={reveal} disabled={state.status !== 'playing' || journey.phase !== 'idle'} aria-label="Reveal current tile"><span>✦</span>ACTION<small>SPACE</small></button>
-      <p>Swipe the world or use arrows · Reveal with ACTION</p>
+      <p>Tap or swipe the world · Reveal with ACTION</p>
     </div>
   </section>;
 }

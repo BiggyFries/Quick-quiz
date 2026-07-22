@@ -43,7 +43,7 @@ function drawHub(canvas: HTMLCanvasElement, time: number, character: CharacterCu
 export function LabHub({ onExit, openAdventure, openBlockShift, openMineTrail, character }: { onExit: () => void; openAdventure: () => void; openBlockShift: () => void; openMineTrail: () => void; character: CharacterCustomization }) {
   const [selected, setSelected] = useState<LabSelection>(() => {
     const requested = Number(new URLSearchParams(window.location.search).get('lab'));
-    return requested >= 3 && requested <= 14 ? requested as ClassicLabId : null;
+    return requested >= 3 && requested <= 16 ? requested as ClassicLabId : null;
   });
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -75,7 +75,7 @@ export function LabHub({ onExit, openAdventure, openBlockShift, openMineTrail, c
     <header className="lab-hub-header">
       <button className="icon-button glass" onClick={onExit} aria-label="Back to home">←</button>
       <div><span>DAILY VENTURE · TEST WING</span><h1>Prototype Corridor</h1></div>
-      <div className="lab-count"><strong>15</strong><small>PLAYABLE</small></div>
+      <div className="lab-count"><strong>17</strong><small>PLAYABLE</small></div>
     </header>
     <div className="lab-hub-intro">
       <strong>Choose the next field test</strong>
