@@ -37,6 +37,18 @@ const CANVAS_WIDTH = 390;
 const CANVAS_HEIGHT = 844;
 const WORD_KEY_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
 
+function wordKeyMark(state: WordState, letter: string) {
+  let result: 'correct' | 'present' | 'absent' | undefined;
+  state.guesses.forEach((guess) => {
+    [...guess.word].forEach((guessedLetter, index) => {
+      if (guessedLetter !== letter) return;
+      const mark = guess.marks[index];
+      if (mark === 'correct' || (mark === 'present' && result !== 'correct') || (mark === 'absent' && !result)) result = mark;
+    });
+  });
+  return result;
+}
+
 function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number, fill: string, stroke?: string) {
   ctx.beginPath(); ctx.roundRect(x, y, width, height, radius); ctx.fillStyle = fill; ctx.fill();
   if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
@@ -292,8 +304,10 @@ const ECHO_PAD_POSITIONS = [{ x: 195, y: 215 }, { x: 287, y: 326 }, { x: 195, y:
 function drawEcho(ctx: CanvasRenderingContext2D, state: EchoState, time: number, character: CharacterCustomization) {
   roundedRect(ctx, 29, 151, 332, 424, 26, '#07171ddd', '#e7b4f562');
   ctx.strokeStyle = '#d58be64a'; ctx.lineWidth = 7; ctx.beginPath(); ctx.arc(195, 326, 112, 0, Math.PI * 2); ctx.stroke();
-  const length = 4 + state.round * 2; const activePad = state.acceptingInput ? -1 : state.sequence[Math.min(state.revealIndex, length - 1)];
-  ECHO_PAD_POSITIONS.forEach((position, index) => { const active = activePad === index; ctx.save(); if (active) { ctx.shadowColor = '#fff0a6'; ctx.shadowBlur = 24; } roundedRect(ctx, position.x - 38, position.y - 38, 76, 76, 22, active ? '#f6c85f' : ['#7cc6bd', '#d8847d', '#8da8df', '#ca91dc'][index], '#ffffff88'); ctx.fillStyle = active ? '#183238' : '#fff'; ctx.font = '900 20px Inter, system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(index + 1), position.x, position.y); ctx.restore(); });
+  const length = 4 + state.round * 2;
+  const pressedPad = state.pressedMs > 0 ? state.pressedPad : null;
+  const activePad = pressedPad ?? (state.acceptingInput ? -1 : state.sequence[Math.min(state.revealIndex, length - 1)]);
+  ECHO_PAD_POSITIONS.forEach((position, index) => { const active = activePad === index; const pressed = pressedPad === index; ctx.save(); if (active) { ctx.shadowColor = pressed ? '#ffffff' : '#fff0a6'; ctx.shadowBlur = pressed ? 32 : 24; } roundedRect(ctx, position.x - 38, position.y - 38, 76, 76, 22, active ? '#f6c85f' : ['#7cc6bd', '#d8847d', '#8da8df', '#ca91dc'][index], pressed ? '#ffffff' : '#ffffff88'); if (pressed) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.stroke(); } ctx.fillStyle = active ? '#183238' : '#fff'; ctx.font = '900 20px Inter, system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(index + 1), position.x, position.y); ctx.restore(); });
   ctx.fillStyle = '#d9cde3'; ctx.font = '800 10px Inter, system-ui'; ctx.textAlign = 'center'; ctx.fillText(state.acceptingInput ? `REPEAT ${length} SIGNALS` : `WATCH · ROUND ${state.round + 1}`, 195, 333);
   drawCustomizedExplorer(ctx, 195, 563, .74, time, character, true);
 }
@@ -434,7 +448,13 @@ export function ClassicLab({ id, onExit, onComplete, character, theme = PROTOTYP
 
   const commit = useCallback((action: ClassicLabAction) => {
     if (journeyRef.current.phase !== 'idle') {
-      if (action.type === 'tick') updateJourney((current) => tickVictoryJourney(current, action.ms));
+      if (action.type === 'tick') {
+        updateJourney((current) => tickVictoryJourney(current, action.ms));
+        const current = stateRef.current;
+        if (current.id === 12 && current.pressedMs > 0) {
+          const next = updateClassicLab(current, action); stateRef.current = next; setState(next);
+        }
+      }
       else if (action.type === 'move') updateJourney((current) => moveVictoryJourney(current, action.direction));
       return;
     }
@@ -549,13 +569,13 @@ export function ClassicLab({ id, onExit, onComplete, character, theme = PROTOTYP
       {state.lights.map((lit, index) => <button key={index} disabled={state.status !== 'playing'} onClick={() => commit({ type: 'activate', index })} aria-label={`Lantern rune ${Math.floor(index / 5) + 1}, ${index % 5 + 1}, ${lit ? 'lit' : 'dark'}`} />)}
     </div>}
     {state.id === 12 && <div className="echo-hit-grid" aria-label="Echo signal pads">
-      {['north', 'east', 'south', 'west'].map((label, index) => <button key={label} disabled={state.status !== 'playing' || !state.acceptingInput} onClick={() => commit({ type: 'activate', index })} aria-label={`Echo pad ${index + 1}, ${label}`} />)}
+      {['north', 'east', 'south', 'west'].map((label, index) => <button className={state.pressedMs > 0 && state.pressedPad === index ? 'pressed' : ''} key={label} disabled={state.status !== 'playing' || !state.acceptingInput} onClick={() => commit({ type: 'activate', index })} aria-label={`Echo pad ${index + 1}, ${label}`} />)}
     </div>}
     {state.id === 13 && <div className="gear-hit-grid" aria-label="Gear link grid">
       {state.rotations.map((rotation, index) => <button className={gridCursor === index ? 'keyboard-current' : ''} key={index} disabled={state.status !== 'playing'} onClick={() => { setGridCursor(index); commit({ type: 'activate', index }); }} aria-label={`Gear link ${Math.floor(index / 4) + 1}, ${index % 4 + 1}, orientation ${rotation + 1}`} />)}
     </div>}
     {state.id === 15 && journey.phase === 'idle' && <div className="word-keyboard" aria-label="Rune Word keyboard">
-      {WORD_KEY_ROWS.map((row) => <div key={row}>{[...row].map((letter) => <button key={letter} disabled={state.status !== 'playing'} onClick={() => commit({ type: 'letter', letter })} aria-label={`Letter ${letter}`}>{letter}</button>)}</div>)}
+      {WORD_KEY_ROWS.map((row) => <div key={row}>{[...row].map((letter) => { const mark = wordKeyMark(state, letter); return <button key={letter} className={mark ? `key-${mark}` : ''} data-letter-state={mark ?? 'unused'} disabled={state.status !== 'playing'} onClick={() => commit({ type: 'letter', letter })} aria-label={`Letter ${letter}`}>{letter}</button>; })}</div>)}
       <div className="word-keyboard-actions"><button disabled={state.status !== 'playing'} onClick={() => commit({ type: 'backspace' })} aria-label="Delete letter">⌫ DELETE</button><button disabled={state.status !== 'playing'} onClick={() => commit({ type: 'submit-word' })}>ENTER ↵</button></div>
     </div>}
     {state.id === 16 && journey.phase === 'idle' && <div className="connection-panel" aria-label="Relic connection tiles">

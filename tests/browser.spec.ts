@@ -160,6 +160,14 @@ test('character creator saves appearance and name for the toolbar, profile, and 
   await page.getByRole('button', { name: 'Skin tone: Deep brown' }).click();
   await page.getByRole('button', { name: 'Hair color: Violet' }).click();
   await page.getByRole('button', { name: 'Eye color: Green' }).click();
+  const customizer = page.getByRole('dialog', { name: 'Customize character' });
+  await customizer.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  const customizerBox = await customizer.boundingBox();
+  const previewBox = await page.locator('.character-preview-card').boundingBox();
+  expect(customizerBox).not.toBeNull(); expect(previewBox).not.toBeNull();
+  expect(previewBox!.y).toBeGreaterThanOrEqual(customizerBox!.y - 1);
+  expect(previewBox!.y + previewBox!.height).toBeLessThanOrEqual(customizerBox!.y + customizerBox!.height + 1);
+  await expect(page.getByLabel('Nova Vale character preview')).toBeVisible();
   await page.screenshot({ path: path.join(captures, 'character-customizer-nova.png') });
   await page.getByRole('button', { name: 'SAVE CHARACTER' }).click();
   await expect(page.getByText(/Nova Vale is ready/i)).toBeVisible();

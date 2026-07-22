@@ -104,7 +104,7 @@ test('Prototype Corridor exposes Adventure and Labs 03 through 16 with matching 
     { id: 9, title: 'Lantern Grid', act: async () => page.getByRole('button', { name: /Lantern rune 1, 1/ }).click() },
     { id: 10, title: 'Icebound Route', act: async () => page.keyboard.press('ArrowUp') },
     { id: 11, title: 'Crate Circuit', act: async () => page.keyboard.press('ArrowUp') },
-    { id: 12, title: 'Echo Sequence', act: async () => { await advance(page, 2080); await page.getByRole('button', { name: /Echo pad 1/ }).click(); } },
+    { id: 12, title: 'Echo Sequence', act: async () => { await advance(page, 2080); const pad = page.getByRole('button', { name: /Echo pad 1/ }); await pad.click(); await expect(pad).toHaveClass(/pressed/); } },
     { id: 13, title: 'Gear Links', act: async () => page.getByRole('button', { name: /Gear link 1, 1/ }).click() },
     { id: 14, title: 'Orbit Pulse', act: async () => { await advance(page, 290); await page.getByRole('button', { name: 'PULSE' }).click(); } },
     { id: 15, title: 'Rune Word', act: async () => { await page.keyboard.type('STONE'); await page.keyboard.press('Enter'); } },
@@ -130,10 +130,18 @@ test('Prototype Corridor exposes Adventure and Labs 03 through 16 with matching 
     if (lab.id === 9) expect(state.moves).toBe(1);
     if (lab.id === 10) expect(state.moves).toBe(1);
     if (lab.id === 11) expect(state.player.y).toBe(5);
-    if (lab.id === 12) expect(state.inputIndex).toBe(1);
+    if (lab.id === 12) {
+      expect(state.inputIndex).toBe(1); expect(state.pressedPad).toBe(0);
+      await page.screenshot({ path: path.join(captures, 'lab-12-echo-press-feedback.png') });
+      await advance(page, 180); await expect(page.getByRole('button', { name: /Echo pad 1/ })).not.toHaveClass(/pressed/);
+    }
     if (lab.id === 13) expect(state.moves).toBe(1);
     if (lab.id === 14) expect(state.gate).toBe(1);
-    if (lab.id === 15) { expect(state.guesses).toHaveLength(1); expect(state.guessesRemaining).toBe(5); }
+    if (lab.id === 15) {
+      expect(state.guesses).toHaveLength(1); expect(state.guessesRemaining).toBe(5);
+      await expect(page.getByRole('button', { name: 'Letter S' })).toHaveAttribute('data-letter-state', 'absent');
+      await expect(page.getByRole('button', { name: 'Letter T' })).toHaveAttribute('data-letter-state', 'present');
+    }
     if (lab.id === 16) { expect(state.solved).toEqual(['NAVIGATION']); expect(state.mistakes).toBe(0); }
     await page.screenshot({ path: path.join(captures, `lab-${String(lab.id).padStart(2, '0')}-${slug(lab.title)}.png`) });
 
@@ -229,5 +237,11 @@ test('classic Lab controls remain reachable on the compact phone layout', async 
     expect(controls!.y + controls!.height).toBeLessThanOrEqual(640);
     expect(reset!.height).toBeGreaterThanOrEqual(44);
     expect(reset!.y + reset!.height).toBeLessThan(controls!.y);
+    if (id === 15) {
+      const keyboard = await page.getByLabel('Rune Word keyboard').boundingBox();
+      const stage = await page.locator('.phone-stage').boundingBox();
+      expect(keyboard).not.toBeNull(); expect(stage).not.toBeNull();
+      expect(Math.abs((keyboard!.x + keyboard!.width / 2) - (stage!.x + stage!.width / 2))).toBeLessThanOrEqual(1);
+    }
   }
 });
