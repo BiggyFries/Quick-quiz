@@ -152,7 +152,7 @@ function drawCustomizedExplorer(ctx: CanvasRenderingContext2D, point: GridPoint,
   const center = iso(point); const progress = transitionProgress(transition, time); const moving = Boolean(transition) && progress < 1;
   const delta = facing === 'left' ? { x: -.2, y: 0 } : facing === 'right' ? { x: .2, y: 0 } : facing === 'up' ? { x: 0, y: -.2 } : { x: 0, y: .2 };
   const safeCenter = moving && transition?.pushed ? iso({ x: point.x - delta.x, y: point.y - delta.y }) : center;
-  drawCharacterCanvas(ctx, character, { x: safeCenter.x, groundY: safeCenter.y + 9, scale: .54, time, pose: complete ? 'celebrate' : moving && transition?.pushed ? 'push' : moving ? 'walk' : 'idle', facing });
+  drawCharacterCanvas(ctx, character, { x: safeCenter.x, groundY: safeCenter.y + 3, scale: .54, time, pose: complete ? 'celebrate' : moving && transition?.pushed ? 'push' : moving ? 'walk' : 'idle', facing });
 }
 
 function drawVictoryInRoom(ctx: CanvasRenderingContext2D, state: BlockShiftState, journey: VictoryJourney, time: number, character: CharacterCustomization, theme: LabTheme) {
@@ -197,8 +197,10 @@ function drawLab(ctx: CanvasRenderingContext2D, state: BlockShiftState, transiti
     return { depth: point.x + block.width + point.y + block.height, draw: () => drawPrism(ctx, block, point, pulse) };
   });
   const playerPoint = animatedPoint(transition, 'player', state.player, time);
-  if (journey.phase === 'idle') entities.push({ depth: playerPoint.x + playerPoint.y + 1.4, draw: () => drawCustomizedExplorer(ctx, playerPoint, time, transition, false, state.facing, character) });
   entities.sort((a, b) => a.depth - b.depth).forEach((entity) => entity.draw());
+  // The explorer is always the readable foreground subject in this room. Collision
+  // still prevents overlap, while this final pass keeps tall blocks from hiding them.
+  if (journey.phase === 'idle') drawCustomizedExplorer(ctx, playerPoint, time, transition, false, state.facing, character);
   drawVictoryInRoom(ctx, state, journey, time, character, theme);
 
   if (state.status === 'complete' && journey.phase === 'departed') {

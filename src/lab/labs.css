@@ -2,15 +2,17 @@
 .lab-tool-row { position: absolute; z-index: 3; top: 143px; left: 13px; right: 13px; display: flex; justify-content: space-between; pointer-events: none; }
 .lab-tool-row > * { pointer-events: auto; }
 .lab-tool-row.single-tool { justify-content: space-between; }
-.lab-message { bottom: 192px; min-height: 46px; background: #07191ee8; }
+.lab-message { bottom: 200px; min-height: 46px; background: #07191ee8; }
 .lab-message.failed { color: #fff; background: #8c3d35ed; border-color: #ffb7a8; }
-.lab-controls { height: 170px; display: block; grid-template-columns: none; gap: 0; align-items: normal; padding: 8px 10px; }
-.block-controls { display: grid; place-items: center; }
-.lab-utility { min-width: 82px; min-height: 44px; padding: 0 12px; border-color: #ffffff61; background: #0b2e35e8; box-shadow: 0 6px 15px #0004; }
+.lab-controls { height: 178px; display: grid; grid-template-columns: minmax(52px, 64px) 140px minmax(52px, 64px); grid-template-rows: 140px 18px; justify-content: center; gap: 4px 8px; align-items: center; padding: 7px 8px; }
+.block-controls { grid-template-columns: 1fr 140px 1fr; grid-template-rows: 140px 18px; place-items: center; }
+.block-controls .lab-dpad { grid-column: 2; grid-row: 1; }
+.lab-utility { min-width: 0; width: 100%; min-height: 44px; padding: 0 7px; border-color: #ffffff61; background: #0b2e35e8; box-shadow: 0 6px 15px #0004; }
 .lab-utility small { display: inline; margin: 0 0 0 5px; }
-.lab-dpad { width: 154px; height: 154px; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 48px); justify-self: center; margin-inline: auto; }
-.mine-controls { display: grid; grid-template-columns: 160px 1fr; gap: 10px; align-items: center; }
-.mine-action { justify-self: center; width: 104px; height: 104px; border-radius: 50%; border: 4px solid #fff4c8; background: #f6c85f; color: #172c32; box-shadow: inset 0 -7px 0 #bd8a2c, 0 8px 23px #0007; font-size: 11px; font-weight: 950; letter-spacing: .07em; }
+.lab-dpad { width: 140px; height: 140px; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px); gap: 4px; justify-self: center; margin-inline: auto; }
+.lab-dpad button { min-width: 44px; min-height: 44px; border-radius: 14px; font-size: 22px; }
+.mine-controls { grid-template-columns: 140px 82px; grid-template-rows: 140px 18px; justify-content: center; gap: 4px 12px; align-items: center; }
+.mine-action { justify-self: center; width: 82px; height: 82px; border-radius: 50%; border: 3px solid #fff4c8; background: #f6c85f; color: #172c32; box-shadow: inset 0 -6px 0 #bd8a2c, 0 8px 23px #0007; font-size: 9px; font-weight: 950; letter-spacing: .07em; }
 .mine-action span, .mine-action small { display: block; }
 .mine-action span { font-size: 26px; line-height: 1; margin-bottom: 3px; }
 .mine-action small { margin-top: 3px; font-size: 7px; opacity: .7; }
@@ -46,11 +48,11 @@
 .core-lab-hub-note strong { color: #9b5a21; font-size: 9px; letter-spacing: .08em; }
 
 /* Labs 03–16 extend the original two-room shell with game-specific control grids. */
-.classic-controls { display: grid; grid-template-columns: 82px minmax(154px, 1fr) 82px; gap: 7px; align-items: center; }
+.classic-controls { grid-template-columns: minmax(52px, 64px) 140px minmax(52px, 64px); gap: 4px 8px; justify-content: center; align-items: center; }
 .classic-controls .lab-utility small { display: block; margin: 3px 0 0; }
 
 @media (max-height: 720px) {
-  .lab-controls { height: 168px; }
-  .lab-message { bottom: 186px; }
+  .lab-controls { height: 178px; }
+  .lab-message { bottom: 198px; }
   .core-lab-card { min-height: 180px; }
 }

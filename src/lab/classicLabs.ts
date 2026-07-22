@@ -138,6 +138,7 @@ export interface CrateState extends BaseLabState { id: 11; player: Point; crates
 
 export interface EchoState extends BaseLabState {
   id: 12; sequence: number[]; round: number; revealIndex: number; revealClock: number; acceptingInput: boolean; inputIndex: number; strikes: number;
+  pressedPad: number | null; pressedMs: number;
 }
 
 export interface GearState extends BaseLabState { id: 13; rotations: number[]; target: number[]; moves: number; aligned: number }
@@ -313,6 +314,7 @@ function initialEchoState(): EchoState {
   return {
     id: 12, status: 'playing', elapsedMs: 0, score: 0, message: 'Watch the four pads. Input unlocks when the whole pattern has played.',
     sequence: ECHO_SEQUENCE, round: 0, revealIndex: 0, revealClock: 0, acceptingInput: false, inputIndex: 0, strikes: 0,
+    pressedPad: null, pressedMs: 0,
   };
 }
 
@@ -736,11 +738,14 @@ function moveCrate(state: CrateState, direction: ClassicDirection): CrateState {
 }
 
 function tickEcho(state: EchoState, ms: number): EchoState {
-  if (state.status !== 'playing' || state.acceptingInput) return state.status === 'playing' ? { ...state, elapsedMs: state.elapsedMs + ms } : state;
+  const pressedMs = Math.max(0, state.pressedMs - ms);
+  const pressedPad = pressedMs > 0 ? state.pressedPad : null;
+  if (state.status !== 'playing') return pressedMs !== state.pressedMs ? { ...state, pressedPad, pressedMs } : state;
+  if (state.acceptingInput) return { ...state, elapsedMs: state.elapsedMs + ms, pressedPad, pressedMs };
   let revealClock = state.revealClock + ms; let revealIndex = state.revealIndex; const length = echoRoundLength(state.round); let steps = 0;
   while (revealClock >= 520 && steps < 30) { revealClock -= 520; revealIndex += 1; steps += 1; }
-  if (revealIndex >= length) return { ...state, elapsedMs: state.elapsedMs + ms, revealClock: 0, revealIndex: length, acceptingInput: true, inputIndex: 0, message: `Your turn. Repeat all ${length} signals.` };
-  return { ...state, elapsedMs: state.elapsedMs + ms, revealClock, revealIndex };
+  if (revealIndex >= length) return { ...state, elapsedMs: state.elapsedMs + ms, revealClock: 0, revealIndex: length, acceptingInput: true, inputIndex: 0, pressedPad, pressedMs, message: `Your turn. Repeat all ${length} signals.` };
+  return { ...state, elapsedMs: state.elapsedMs + ms, revealClock, revealIndex, pressedPad, pressedMs };
 }
 
 function activateEcho(state: EchoState, index: number): EchoState {
@@ -749,12 +754,12 @@ function activateEcho(state: EchoState, index: number): EchoState {
   const length = echoRoundLength(state.round); const correct = state.sequence[state.inputIndex] === index;
   if (!correct) {
     const strikes = state.strikes + 1; const failed = strikes >= 2;
-    return { ...state, strikes, acceptingInput: false, inputIndex: 0, revealIndex: 0, revealClock: 0, status: failed ? 'failed' : 'playing', message: failed ? 'Two pattern errors overloaded the echo console. Reset to try again.' : 'Pattern mismatch. Watch this round once more.' };
+    return { ...state, strikes, acceptingInput: false, inputIndex: 0, revealIndex: 0, revealClock: 0, pressedPad: index, pressedMs: 180, status: failed ? 'failed' : 'playing', message: failed ? 'Two pattern errors overloaded the echo console. Reset to try again.' : 'Pattern mismatch. Watch this round once more.' };
   }
   const inputIndex = state.inputIndex + 1;
-  if (inputIndex < length) return { ...state, inputIndex, score: state.score + 1, message: `${length - inputIndex} signals remain in this echo.` };
-  if (state.round >= 2) return { ...state, inputIndex, score: state.score + 1, status: 'complete', message: 'All three echo sequences restored. Echo Sequence is clear!' };
-  return { ...state, round: state.round + 1, inputIndex: 0, score: state.score + 1, acceptingInput: false, revealIndex: 0, revealClock: 0, message: `Round ${state.round + 2} is longer. Watch closely.` };
+  if (inputIndex < length) return { ...state, inputIndex, score: state.score + 1, pressedPad: index, pressedMs: 180, message: `${length - inputIndex} signals remain in this echo.` };
+  if (state.round >= 2) return { ...state, inputIndex, score: state.score + 1, pressedPad: index, pressedMs: 180, status: 'complete', message: 'All three echo sequences restored. Echo Sequence is clear!' };
+  return { ...state, round: state.round + 1, inputIndex: 0, score: state.score + 1, acceptingInput: false, revealIndex: 0, revealClock: 0, pressedPad: index, pressedMs: 180, message: `Round ${state.round + 2} is longer. Watch closely.` };
 }
 
 function activateGear(state: GearState, index: number): GearState {
@@ -893,7 +898,7 @@ export function classicLabSnapshot(state: ClassicLabState) {
   if (state.id === 9) return { ...base, coordinateSystem: '5x5 light grid; index=y*5+x; origin top-left', objective: 'Turn all 25 lanterns on; activating a tile toggles itself and its direct neighbors', lights: state.lights, lit: state.lit, moves: state.moves, dark: 25 - state.lit };
   if (state.id === 10) return { ...base, coordinateSystem: '9x11 ice grid; origin top-left; x right; y down', objective: 'Collect four frost sigils and stop on the north gate', map: ICE_MAP, player: state.player, sigils: state.sigils, collected: state.collected, moves: state.moves, exit: state.exit };
   if (state.id === 11) return { ...base, coordinateSystem: '8x8 crate grid; origin top-left; x right; y down', objective: 'Push all three crates onto circuit goals', map: CRATE_MAP, player: state.player, crates: state.crates, goals: state.goals, pushes: state.pushes, moves: state.moves };
-  if (state.id === 12) return { ...base, coordinateSystem: 'four pads indexed 0 top, 1 right, 2 bottom, 3 left', objective: 'Repeat three sequences of lengths 4, 6, and 8', round: state.round + 1, sequenceLength: echoRoundLength(state.round), activePad: state.acceptingInput ? null : state.sequence[Math.min(state.revealIndex, echoRoundLength(state.round) - 1)], acceptingInput: state.acceptingInput, inputIndex: state.inputIndex, strikes: state.strikes };
+  if (state.id === 12) return { ...base, coordinateSystem: 'four pads indexed 0 top, 1 right, 2 bottom, 3 left', objective: 'Repeat three sequences of lengths 4, 6, and 8', round: state.round + 1, sequenceLength: echoRoundLength(state.round), activePad: state.pressedMs > 0 ? state.pressedPad : state.acceptingInput ? null : state.sequence[Math.min(state.revealIndex, echoRoundLength(state.round) - 1)], pressedPad: state.pressedMs > 0 ? state.pressedPad : null, acceptingInput: state.acceptingInput, inputIndex: state.inputIndex, strikes: state.strikes };
   if (state.id === 13) return { ...base, coordinateSystem: '4x4 gear grid; index=y*4+x; origin top-left', objective: 'Rotate all sixteen links to their target orientations', rotations: state.rotations, target: state.target, aligned: state.aligned, moves: state.moves };
   if (state.id === 14) return { ...base, coordinateSystem: 'circular orbit in radians; zero points right; angles increase clockwise', objective: 'Pulse inside six target windows before three misses', angle: Number(state.angle.toFixed(3)), targetAngle: state.targetAngle, targetWidth: state.targetWidth, gate: state.gate, misses: state.misses, speed: state.speed };
   if (state.id === 15) return { ...base, coordinateSystem: 'six rows of five letters', objective: 'Deduce the hidden five-letter word in six guesses', current: state.current, guesses: state.guesses, guessesRemaining: state.maxGuesses - state.guesses.length };
