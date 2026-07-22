@@ -5,8 +5,8 @@ export type BlockAxis = 'horizontal' | 'vertical' | 'free';
 export interface GridPoint { x: number; y: number }
 
 export interface ShiftBlock extends GridPoint {
-  id: 'keystone' | 'amber' | 'jade' | 'azure' | 'basalt' | 'crimson';
-  kind: 'keystone' | 'block';
+  id: 'relic' | 'cedar' | 'coral' | 'glacier' | 'lunar' | 'obsidian' | 'saffron' | 'service-beam';
+  kind: 'relic' | 'block';
   label: string;
   color: string;
   width: number;
@@ -29,9 +29,10 @@ export interface BlockShiftState extends StoredBlockShiftState {
   history: StoredBlockShiftState[];
 }
 
-export const BLOCK_SHIFT_WIDTH = 9;
-export const BLOCK_SHIFT_HEIGHT = 8;
-export const BLOCK_SHIFT_GOAL: GridPoint = { x: 7, y: 3 };
+export const BLOCK_SHIFT_WIDTH = 12;
+export const BLOCK_SHIFT_HEIGHT = 10;
+export const BLOCK_SHIFT_GOAL: GridPoint = { x: 10, y: 4 };
+export const BLOCK_SHIFT_BAY: GridPoint = { x: 7, y: 7 };
 
 const DIRECTIONS: Record<LabDirection, GridPoint> = {
   up: { x: 0, y: -1 },
@@ -54,19 +55,21 @@ function store(state: BlockShiftState): StoredBlockShiftState {
 
 export function initialBlockShiftState(): BlockShiftState {
   return {
-    player: { x: 0, y: 5 },
+    player: { x: 0, y: 8 },
     blocks: [
-      { id: 'keystone', kind: 'keystone', label: 'Keystone sled', color: '#f6c85f', x: 1, y: 3, width: 2, height: 1, axis: 'horizontal' },
-      { id: 'amber', kind: 'block', label: 'Amber pillar', color: '#df8350', x: 3, y: 3, width: 1, height: 2, axis: 'vertical' },
-      { id: 'jade', kind: 'block', label: 'Jade vault', color: '#55b7a5', x: 4, y: 2, width: 2, height: 2, axis: 'free' },
-      { id: 'azure', kind: 'block', label: 'Azure column', color: '#6e91cb', x: 6, y: 2, width: 1, height: 3, axis: 'vertical' },
-      { id: 'basalt', kind: 'block', label: 'Basalt beam', color: '#70777d', x: 3, y: 6, width: 3, height: 1, axis: 'horizontal' },
-      { id: 'crimson', kind: 'block', label: 'Crimson lock', color: '#bf5d58', x: 7, y: 2, width: 1, height: 2, axis: 'vertical' },
+      { id: 'relic', kind: 'relic', label: 'Sun relic cart', color: '#f5c85d', x: 1, y: 4, width: 2, height: 1, axis: 'horizontal' },
+      { id: 'cedar', kind: 'block', label: 'Cedar tower', color: '#a96845', x: 3, y: 3, width: 1, height: 3, axis: 'vertical' },
+      { id: 'coral', kind: 'block', label: 'Coral vault', color: '#d76f61', x: 4, y: 3, width: 2, height: 2, axis: 'free' },
+      { id: 'glacier', kind: 'block', label: 'Glacier pillar', color: '#72a8cf', x: 6, y: 4, width: 1, height: 2, axis: 'vertical' },
+      { id: 'lunar', kind: 'block', label: 'Lunar column', color: '#8b7bc4', x: 7, y: 2, width: 1, height: 3, axis: 'vertical' },
+      { id: 'obsidian', kind: 'block', label: 'Obsidian vault', color: '#525d66', x: 8, y: 3, width: 2, height: 2, axis: 'free' },
+      { id: 'saffron', kind: 'block', label: 'Saffron pillar', color: '#db934b', x: 10, y: 4, width: 1, height: 2, axis: 'vertical' },
+      { id: 'service-beam', kind: 'block', label: 'Service beam', color: '#4fa89f', x: 4, y: 7, width: 3, height: 1, axis: 'horizontal' },
     ],
     moves: 0,
     pushes: 0,
     status: 'playing',
-    message: 'Clear every shape from the gold lane, then push the keystone sled into the door.',
+    message: 'Dock the long service beam in its blue bay, clear the gold rail, and deliver the relic cart.',
     facing: 'right',
     lastAction: 'idle',
     history: [],
@@ -89,8 +92,11 @@ function blockAt(blocks: ShiftBlock[], point: GridPoint) {
   return blocks.find((block) => blockCells(block).some((cell) => cell.x === point.x && cell.y === point.y));
 }
 
-function isGoal(block: ShiftBlock) {
-  return block.id === 'keystone' && block.x === BLOCK_SHIFT_GOAL.x && block.y === BLOCK_SHIFT_GOAL.y;
+function boardSolved(blocks: ShiftBlock[]) {
+  const relic = blocks.find((block) => block.id === 'relic');
+  const serviceBeam = blocks.find((block) => block.id === 'service-beam');
+  return relic?.x === BLOCK_SHIFT_GOAL.x && relic.y === BLOCK_SHIFT_GOAL.y
+    && serviceBeam?.x === BLOCK_SHIFT_BAY.x && serviceBeam.y === BLOCK_SHIFT_BAY.y;
 }
 
 function axisAllows(block: ShiftBlock, direction: LabDirection) {
@@ -100,16 +106,16 @@ function axisAllows(block: ShiftBlock, direction: LabDirection) {
 }
 
 export function moveBlockShift(state: BlockShiftState, direction: LabDirection): BlockShiftState {
-  if (state.status === 'complete') return { ...state, facing: direction, lastAction: 'blocked', message: 'The door is open. Undo or reset to keep testing.' };
+  if (state.status === 'complete') return { ...state, facing: direction, lastAction: 'blocked', message: 'The relic gate is open. Undo or reset to keep testing.' };
   const delta = DIRECTIONS[direction];
   const destination = { x: state.player.x + delta.x, y: state.player.y + delta.y };
-  if (!isInside(destination)) return { ...state, facing: direction, lastAction: 'blocked', message: 'The explorer cannot step beyond the platform.' };
+  if (!isInside(destination)) return { ...state, facing: direction, lastAction: 'blocked', message: 'The explorer cannot step beyond the new platform.' };
 
   const pushed = blockAt(state.blocks, destination);
   if (!pushed) {
     return {
       ...state, player: destination, moves: state.moves + 1, facing: direction, lastAction: 'walk',
-      message: `Moved ${direction}.`, history: [...state.history, store(state)].slice(-150),
+      message: `Moved ${direction}.`, history: [...state.history, store(state)].slice(-240),
     };
   }
 
@@ -121,11 +127,16 @@ export function moveBlockShift(state: BlockShiftState, direction: LabDirection):
   const nextAnchor = { x: pushed.x + delta.x, y: pushed.y + delta.y };
   const occupiedByOther = state.blocks.filter((block) => block.id !== pushed.id);
   const blocked = blockCells(pushed, nextAnchor).some((cell) => !isInside(cell) || Boolean(blockAt(occupiedByOther, cell)));
-  if (blocked) return { ...state, facing: direction, lastAction: 'blocked', message: `${pushed.label} is blocked. Reach another side or move a different piece.` };
+  if (blocked) return { ...state, facing: direction, lastAction: 'blocked', message: `${pushed.label} is blocked. Find another side or shift a different piece.` };
 
   const blocks = state.blocks.map((block) => block.id === pushed.id ? { ...block, ...nextAnchor } : block);
-  const shifted = blocks.find((block) => block.id === pushed.id)!;
-  const complete = isGoal(shifted);
+  const complete = boardSolved(blocks);
+  const bayDocked = pushed.id === 'service-beam' && nextAnchor.x === BLOCK_SHIFT_BAY.x && nextAnchor.y === BLOCK_SHIFT_BAY.y;
+  const relicDocked = pushed.id === 'relic' && nextAnchor.x === BLOCK_SHIFT_GOAL.x && nextAnchor.y === BLOCK_SHIFT_GOAL.y;
+  const message = complete ? 'Both locks aligned. The relic gate opens into the next room.'
+    : bayDocked ? 'Service beam docked. Now clear the gold rail for the relic cart.'
+      : relicDocked ? 'Relic cart aligned. The service beam still belongs in the blue bay.'
+        : `Pushed ${pushed.label} ${direction}.`;
   return {
     ...state,
     player: destination,
@@ -135,8 +146,8 @@ export function moveBlockShift(state: BlockShiftState, direction: LabDirection):
     status: complete ? 'complete' : 'playing',
     facing: direction,
     lastAction: 'push',
-    message: complete ? 'Door unlocked. The route to the next room is open.' : `Pushed ${pushed.label} ${direction}.`,
-    history: [...state.history, store(state)].slice(-150),
+    message,
+    history: [...state.history, store(state)].slice(-240),
   };
 }
 
@@ -150,17 +161,19 @@ export function undoBlockShift(state: BlockShiftState): BlockShiftState {
 }
 
 export function blockShiftSnapshot(state: BlockShiftState) {
-  const keystone = state.blocks.find((block) => block.kind === 'keystone');
+  const relic = state.blocks.find((block) => block.kind === 'relic');
+  const serviceBeam = state.blocks.find((block) => block.id === 'service-beam');
   return {
     mode: 'puzzle-lab',
-    puzzle: 'block-shift-01',
-    coordinateSystem: '9x8 grid; origin top-left; x right; y down',
-    objective: 'Clear row 3 and push the 2x1 keystone sled to anchor (7,3).',
+    puzzle: 'block-shift-rebuilt-01',
+    coordinateSystem: '12x10 grid; origin top-left; x right; y down',
+    objective: 'Dock the 3x1 service beam at (7,7), clear row 4, and push the 2x1 relic cart to (10,4).',
     player: state.player,
     facing: state.facing,
     blocks: state.blocks.map(({ id, kind, x, y, width, height, axis }) => ({ id, kind, x, y, width, height, axis })),
-    goal: BLOCK_SHIFT_GOAL,
-    keystone,
+    goals: { relic: BLOCK_SHIFT_GOAL, serviceBay: BLOCK_SHIFT_BAY },
+    relic,
+    serviceBeam,
     moves: state.moves,
     pushes: state.pushes,
     canUndo: state.history.length > 0,
