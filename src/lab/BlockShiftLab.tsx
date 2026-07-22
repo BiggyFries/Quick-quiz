@@ -26,8 +26,8 @@ interface VisualTransition {
 }
 
 const TILE_W = 43;
-const TILE_H = 24;
-const ORIGIN = { x: 195, y: 260 };
+const TILE_H = 31;
+const ORIGIN = { x: 195, y: 210 };
 
 function iso(point: GridPoint) {
   return {
@@ -155,12 +155,16 @@ function drawCustomizedExplorer(ctx: CanvasRenderingContext2D, point: GridPoint,
   drawCharacterCanvas(ctx, character, { x: safeCenter.x, groundY: safeCenter.y + 9, scale: .54, time, pose: complete ? 'celebrate' : moving && transition?.pushed ? 'push' : moving ? 'walk' : 'idle', facing });
 }
 
-function drawVictoryStage(ctx: CanvasRenderingContext2D, journey: VictoryJourney, time: number, character: CharacterCustomization, theme: LabTheme) {
-  ctx.fillStyle = '#06171bed'; ctx.beginPath(); ctx.roundRect(38, 438, 314, 137, 24); ctx.fill();
-  ctx.strokeStyle = '#ffffff32'; ctx.beginPath(); ctx.moveTo(64, 548); ctx.lineTo(328, 548); ctx.stroke();
-  const pulse = 1 + Math.sin(time / 230) * .04; ctx.save(); ctx.shadowColor = theme.portal; ctx.shadowBlur = 18; ctx.strokeStyle = theme.portal; ctx.lineWidth = 7; ctx.beginPath(); ctx.ellipse(322, 518, 21 * pulse, 39 * pulse, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
-  drawCharacterCanvas(ctx, character, { x: 78 + journey.x * 57, groundY: 550 + journey.lane * 23, scale: .56, time, pose: journey.phase === 'celebrating' || journey.phase === 'departed' ? 'celebrate' : 'walk', facing: 'right' });
-  ctx.fillStyle = theme.accent; ctx.font = '900 9px Inter, system-ui'; ctx.textAlign = 'center'; ctx.fillText(journey.phase === 'celebrating' ? 'ONE SECOND VICTORY MOMENT' : journey.phase === 'portal-open' ? 'WALK TO THE OPEN DOOR' : 'DOOR CROSSED', 195, 461);
+function drawVictoryInRoom(ctx: CanvasRenderingContext2D, state: BlockShiftState, journey: VictoryJourney, time: number, character: CharacterCustomization, theme: LabTheme) {
+  if (journey.phase === 'idle') return;
+  const start = iso(state.player); const portal = iso({ x: BLOCK_SHIFT_WIDTH - .05, y: BLOCK_SHIFT_GOAL.y }); const progress = journey.x / 4;
+  const x = start.x + (portal.x - start.x) * progress + journey.lane * 7;
+  const y = start.y + (portal.y - start.y) * progress + journey.lane * 19;
+  if (journey.phase !== 'celebrating') {
+    const pulse = 1 + Math.sin(time / 230) * .04; ctx.save(); ctx.shadowColor = theme.portal; ctx.shadowBlur = 18; ctx.strokeStyle = theme.portal; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.ellipse(portal.x + 14, portal.y - 36, 19 * pulse, 35 * pulse, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  }
+  drawCharacterCanvas(ctx, character, { x, groundY: y + 8, scale: .54, time, pose: journey.phase === 'celebrating' || journey.phase === 'departed' ? 'celebrate' : 'walk', facing: 'right' });
 }
 
 function drawLab(ctx: CanvasRenderingContext2D, state: BlockShiftState, transition: VisualTransition | null, time: number, character: CharacterCustomization, journey: VictoryJourney, theme: LabTheme) {
@@ -195,7 +199,7 @@ function drawLab(ctx: CanvasRenderingContext2D, state: BlockShiftState, transiti
   const playerPoint = animatedPoint(transition, 'player', state.player, time);
   if (journey.phase === 'idle') entities.push({ depth: playerPoint.x + playerPoint.y + 1.4, draw: () => drawCustomizedExplorer(ctx, playerPoint, time, transition, false, state.facing, character) });
   entities.sort((a, b) => a.depth - b.depth).forEach((entity) => entity.draw());
-  drawVictoryStage(ctx, journey, time, character, theme);
+  drawVictoryInRoom(ctx, state, journey, time, character, theme);
 
   if (state.status === 'complete' && journey.phase === 'departed') {
     ctx.fillStyle = '#06171bc7'; ctx.beginPath(); ctx.roundRect(55, 505, 280, 63, 18); ctx.fill();
@@ -282,7 +286,10 @@ export function BlockShiftLab({ onExit, onComplete, character, theme = PROTOTYPE
     return () => { delete bridge.advanceTime; delete bridge.render_game_to_text; };
   }, [character, theme, updateJourney]);
 
-  const swipe = useSwipeDirection(move, journey.phase === 'celebrating' || journey.phase === 'departed');
+  const tapMove = useCallback(({ x, y }: { x: number; y: number }) => {
+    const dx = x - .5; const dy = y - .46; move(Math.abs(dx) > Math.abs(dy) ? dx > 0 ? 'right' : 'left' : dy > 0 ? 'down' : 'up');
+  }, [move]);
+  const swipe = useSwipeDirection(move, journey.phase === 'celebrating' || journey.phase === 'departed', tapMove);
 
   return <section className="lab-screen" aria-label="Block Shift tester game" style={themeCss(theme)}>
     <canvas ref={canvasRef} width="390" height="844" aria-label="Block Shift puzzle room" {...swipe} />
@@ -309,7 +316,7 @@ export function BlockShiftLab({ onExit, onComplete, character, theme = PROTOTYPE
         <button className="right" disabled={journey.phase === 'celebrating' || journey.phase === 'departed'} onClick={() => move('right')} aria-label="Move right">→</button>
         <button className="down" disabled={journey.phase === 'celebrating' || journey.phase === 'departed'} onClick={() => move('down')} aria-label="Move down">↓</button>
       </div>
-      <p>Swipe the world or use arrows · Walk into the portal after solving</p>
+      <p>Tap or swipe the world · Walk into the in-room door after solving</p>
     </div>
   </section>;
 }

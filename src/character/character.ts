@@ -3,11 +3,12 @@ export type BodyStyle = 'trail-jacket' | 'field-vest' | 'storm-coat' | 'heritage
 export type LegStyle = 'trail-boots' | 'scout-pants' | 'climbing-gear' | 'jean-shorts';
 export type FrameStyle = 'standard' | 'sturdy' | 'tall';
 export type EyeShape = 'round' | 'almond';
+export type FaceStyle = 'neutral' | 'smile' | 'sad' | 'angry' | 'silly' | 'surprised' | 'confident';
 export type HairStyle = 'short' | 'waves' | 'braids' | 'mohawk' | 'bun' | 'bald';
 export type AccessoryStyle = 'none' | 'round-glasses' | 'aviators' | 'goggles' | 'bandana' | 'flower' | 'trail-hat';
 
 export interface CharacterCustomization {
-  version: 2;
+  version: 3;
   name: string;
   head: HeadStyle;
   body: BodyStyle;
@@ -18,7 +19,9 @@ export interface CharacterCustomization {
   hairColor: string;
   eyeShape: EyeShape;
   eyeColor: string;
+  face: FaceStyle;
   accessory: AccessoryStyle;
+  scarf: boolean;
 }
 
 export interface CharacterDrawOptions {
@@ -34,7 +37,7 @@ export interface CharacterDrawOptions {
 export const CHARACTER_STORAGE_KEY = 'dailyVentureCharacter';
 
 export const DEFAULT_CHARACTER: CharacterCustomization = {
-  version: 2,
+  version: 3,
   name: 'Ari',
   head: 'oval',
   body: 'trail-jacket',
@@ -45,7 +48,9 @@ export const DEFAULT_CHARACTER: CharacterCustomization = {
   hairColor: '#3e302b',
   eyeShape: 'round',
   eyeColor: '#315b63',
+  face: 'neutral',
   accessory: 'trail-hat',
+  scarf: false,
 };
 
 export const HEAD_OPTIONS = [
@@ -62,6 +67,11 @@ export const FRAME_OPTIONS = [
 ] as const;
 export const EYE_SHAPE_OPTIONS = [
   { value: 'round', label: 'Round eyes' }, { value: 'almond', label: 'Almond eyes' },
+] as const;
+export const FACE_OPTIONS = [
+  { value: 'neutral', label: 'Neutral' }, { value: 'smile', label: 'Smiley' }, { value: 'sad', label: 'Sad' },
+  { value: 'angry', label: 'Angry' }, { value: 'silly', label: 'Silly' }, { value: 'surprised', label: 'Surprised' },
+  { value: 'confident', label: 'Confident' },
 ] as const;
 export const HAIR_OPTIONS = [
   { value: 'short', label: 'Short' }, { value: 'waves', label: 'Waves' }, { value: 'braids', label: 'Braids' },
@@ -91,7 +101,7 @@ export function normalizeCharacterCustomization(value: unknown): CharacterCustom
   const source = value && typeof value === 'object' ? value as Partial<CharacterCustomization> : {};
   const cleanedName = typeof source.name === 'string' ? source.name.trim().replace(/\s+/g, ' ').slice(0, 20) : '';
   return {
-    version: 2,
+    version: 3,
     name: cleanedName || DEFAULT_CHARACTER.name,
     head: allowed(HEAD_OPTIONS, source.head, DEFAULT_CHARACTER.head),
     body: allowed(BODY_OPTIONS, source.body, DEFAULT_CHARACTER.body),
@@ -102,7 +112,9 @@ export function normalizeCharacterCustomization(value: unknown): CharacterCustom
     hairColor: allowed(HAIR_COLORS, source.hairColor, DEFAULT_CHARACTER.hairColor),
     eyeShape: allowed(EYE_SHAPE_OPTIONS, source.eyeShape, DEFAULT_CHARACTER.eyeShape),
     eyeColor: allowed(EYE_COLORS, source.eyeColor, DEFAULT_CHARACTER.eyeColor),
+    face: allowed(FACE_OPTIONS, source.face, DEFAULT_CHARACTER.face),
     accessory: allowed(ACCESSORY_OPTIONS, source.accessory, DEFAULT_CHARACTER.accessory),
+    scarf: source.scarf === true,
   };
 }
 
@@ -110,14 +122,17 @@ export const CHARACTER_PRESETS = {
   Matt: normalizeCharacterCustomization({
     ...DEFAULT_CHARACTER, name: 'Matt', head: 'triangular', frame: 'standard', skinTone: '#f2c7a5',
     hairStyle: 'short', hairColor: '#d8b56b', eyeShape: 'round', eyeColor: '#3f6f9d', accessory: 'aviators',
+    face: 'confident', scarf: false,
   }),
   Myles: normalizeCharacterCustomization({
     ...DEFAULT_CHARACTER, name: 'Myles', head: 'oval', frame: 'tall', skinTone: '#e5ad83', body: 'field-vest',
     legs: 'scout-pants', hairStyle: 'short', hairColor: '#201b1a', eyeShape: 'almond', eyeColor: '#79583e', accessory: 'none',
+    face: 'smile', scarf: false,
   }),
   Ian: normalizeCharacterCustomization({
     ...DEFAULT_CHARACTER, name: 'Ian', head: 'round', frame: 'sturdy', skinTone: '#f2c7a5', body: 'heritage-tee',
     legs: 'jean-shorts', hairStyle: 'waves', hairColor: '#3e302b', eyeShape: 'round', eyeColor: '#3f6f9d', accessory: 'none',
+    face: 'neutral', scarf: false,
   }),
 } as const;
 
@@ -131,7 +146,7 @@ export function randomizeCharacterCustomization(character: CharacterCustomizatio
     head: randomOption(HEAD_OPTIONS, random), body: randomOption(BODY_OPTIONS, random), legs: randomOption(LEG_OPTIONS, random),
     frame: randomOption(FRAME_OPTIONS, random), skinTone: randomOption(SKIN_TONES, random), hairStyle: randomOption(HAIR_OPTIONS, random),
     hairColor: randomOption(HAIR_COLORS, random), eyeShape: randomOption(EYE_SHAPE_OPTIONS, random), eyeColor: randomOption(EYE_COLORS, random),
-    accessory: randomOption(ACCESSORY_OPTIONS, random),
+    face: randomOption(FACE_OPTIONS, random), accessory: randomOption(ACCESSORY_OPTIONS, random), scarf: random() > .72,
   });
 }
 
@@ -245,9 +260,21 @@ export function drawCharacterCanvas(ctx: CanvasRenderingContext2D, characterValu
   else { ctx.arc(-6, headY + 1, 2.4, 0, Math.PI * 2); ctx.arc(6, headY + 1, 2.4, 0, Math.PI * 2); }
   ctx.fill();
   ctx.fillStyle = '#10191c'; ctx.beginPath(); ctx.arc(-6, headY + 1, .9, 0, Math.PI * 2); ctx.arc(6, headY + 1, .9, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = '#8f5947'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-2, headY + 10); ctx.quadraticCurveTo(3, headY + 14, 7, headY + 9); ctx.stroke();
+  ctx.strokeStyle = '#47342f'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+  if (character.face === 'angry') { ctx.beginPath(); ctx.moveTo(-11, headY - 6); ctx.lineTo(-3, headY - 3); ctx.moveTo(3, headY - 3); ctx.lineTo(11, headY - 6); ctx.stroke(); }
+  else if (character.face === 'sad') { ctx.beginPath(); ctx.moveTo(-11, headY - 2); ctx.lineTo(-4, headY - 5); ctx.moveTo(4, headY - 5); ctx.lineTo(11, headY - 2); ctx.stroke(); }
+  else if (character.face === 'confident') { ctx.beginPath(); ctx.moveTo(-11, headY - 5); ctx.lineTo(-3, headY - 5); ctx.moveTo(3, headY - 3); ctx.lineTo(11, headY - 6); ctx.stroke(); }
+  ctx.strokeStyle = '#8f5947'; ctx.lineWidth = 1.8; ctx.beginPath();
+  if (character.face === 'smile' || character.face === 'confident') { ctx.moveTo(-7, headY + 9); ctx.quadraticCurveTo(0, headY + 16, 8, headY + 8); }
+  else if (character.face === 'sad') { ctx.moveTo(-7, headY + 14); ctx.quadraticCurveTo(0, headY + 7, 7, headY + 14); }
+  else if (character.face === 'angry') { ctx.moveTo(-6, headY + 12); ctx.lineTo(6, headY + 10); }
+  else if (character.face === 'silly') { ctx.moveTo(-7, headY + 9); ctx.quadraticCurveTo(0, headY + 17, 8, headY + 9); }
+  else if (character.face === 'surprised') { ctx.arc(1, headY + 11, 4, 0, Math.PI * 2); }
+  else { ctx.moveTo(-6, headY + 11); ctx.lineTo(6, headY + 11); }
+  ctx.stroke();
+  if (character.face === 'silly') { ctx.fillStyle = '#d96f80'; ctx.beginPath(); ctx.ellipse(2, headY + 15, 3, 4, 0, 0, Math.PI); ctx.fill(); }
   drawAccessory(ctx, character, headY, headRx, headRy);
-  ctx.strokeStyle = palette.scarf; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(-10, -86); ctx.lineTo(-28, -90 - gait * 3); ctx.lineTo(-37, -84 - gait * 5); ctx.stroke();
+  if (character.scarf) { ctx.strokeStyle = palette.scarf; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(-10, -86); ctx.lineTo(-28, -90 - gait * 3); ctx.lineTo(-37, -84 - gait * 5); ctx.stroke(); }
   if (pose === 'failed') { ctx.fillStyle = '#e76f5175'; ctx.beginPath(); ctx.roundRect(-42, -138, 84, 144, 24); ctx.fill(); }
   ctx.restore();
 }

@@ -132,7 +132,7 @@ export function App() {
       : requestedLab === 'adventure' ? 'lab-adventure'
       : requestedLab === 'block-shift' ? 'lab-block'
       : requestedLab === 'mine-trail' ? 'lab-mine'
-        : requestedLab && /^(?:0?[3-9]|1[0-4])$/.test(requestedLab) ? 'lab' : 'home';
+        : requestedLab && /^(?:0?[3-9]|1[0-6])$/.test(requestedLab) ? 'lab' : 'home';
   });
   const [modal, setModal] = useState<Modal>(null);
   const [calendar, setCalendar] = useState<CalendarDay[]>([]);
@@ -399,7 +399,7 @@ export function App() {
           <button className="primary-button" onClick={playToday} disabled={!todayAdventure}>VENTURE <small>{todayAdventure ? todayAdventure.title : 'Awaiting launch date'}</small></button>
           <button className="secondary-button" onClick={openArchive}>PAST VENTURES</button>
           <button className="formula-preview-button" onClick={() => setPage('formula')}>TEST DAILY FORMULA <span>Adventure → 2 puzzles → The Watcher</span></button>
-          <button className="lab-preview-button" onClick={() => setPage('lab')}>PREVIEW TESTER GAMES <span>Adventure + 14 prototype labs</span></button>
+          <button className="lab-preview-button" onClick={() => setPage('lab')}>PREVIEW TESTER GAMES <span>Adventure + 16 prototype labs</span></button>
           <button className="review-button" onClick={enterReview}>PREVIEW WEEK 1 <span>Reviewer build</span></button>
         </div>
       </section>}

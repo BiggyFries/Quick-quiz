@@ -116,7 +116,7 @@ test('mobile home remains usable across the supported phone range', async ({ pag
     await expect(page.getByRole('heading', { name: /DAILY VENTURE/i })).toBeVisible();
     await expect(page.getByRole('button', { name: 'About Daily Venture' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Achievements' })).toBeEnabled();
-    await expect(page.getByRole('button', { name: /PREVIEW TESTER GAMES/i })).toContainText('Adventure + 14 prototype labs');
+    await expect(page.getByRole('button', { name: /PREVIEW TESTER GAMES/i })).toContainText('Adventure + 16 prototype labs');
     const characterButton = await page.getByRole('button', { name: /^Customize character,/ }).boundingBox();
     expect(characterButton).not.toBeNull();
     expect(characterButton!.width).toBeGreaterThanOrEqual(44);
@@ -152,6 +152,11 @@ test('character creator saves appearance and name for the toolbar, profile, and 
   await page.getByRole('button', { name: 'Climbing gear', exact: true }).click();
   await page.getByRole('button', { name: 'Mohawk', exact: true }).click();
   await page.getByRole('button', { name: 'Goggles', exact: true }).click();
+  await page.getByRole('button', { name: 'Silly', exact: true }).click();
+  const scarfOptions = page.locator('.character-fieldset').filter({ has: page.locator('legend', { hasText: 'Scarf' }) });
+  await scarfOptions.getByRole('button', { name: 'On', exact: true }).click();
+  await expect(scarfOptions.getByRole('button', { name: 'On', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await scarfOptions.getByRole('button', { name: 'Off', exact: true }).click();
   await page.getByRole('button', { name: 'Skin tone: Deep brown' }).click();
   await page.getByRole('button', { name: 'Hair color: Violet' }).click();
   await page.getByRole('button', { name: 'Eye color: Green' }).click();
@@ -159,7 +164,7 @@ test('character creator saves appearance and name for the toolbar, profile, and 
   await page.getByRole('button', { name: 'SAVE CHARACTER' }).click();
   await expect(page.getByText(/Nova Vale is ready/i)).toBeVisible();
   const storedGuest = await page.evaluate(() => JSON.parse(localStorage.getItem('dailyVentureCharacter') ?? '{}'));
-  expect(storedGuest).toMatchObject({ name: 'Nova Vale', head: 'angular', body: 'storm-coat', legs: 'climbing-gear', hairStyle: 'mohawk', accessory: 'goggles' });
+  expect(storedGuest).toMatchObject({ name: 'Nova Vale', head: 'angular', body: 'storm-coat', legs: 'climbing-gear', hairStyle: 'mohawk', face: 'silly', accessory: 'goggles', scarf: false });
   await page.getByRole('button', { name: 'Close' }).click();
   await page.reload();
   await expect(page.getByRole('button', { name: 'Customize character, Nova Vale' })).toBeVisible();

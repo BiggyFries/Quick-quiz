@@ -5,7 +5,7 @@ import { countLogicSolutions, dailyAdventureSchema, satisfiesLogicClues } from '
 import type { AttemptRecord } from '../src/game/types';
 import { blockShiftSnapshot, initialBlockShiftState, moveBlockShift, undoBlockShift } from '../src/lab/blockShift';
 import { adventureSnapshot, initialAdventureState, moveAdventure, tickAdventure } from '../src/lab/adventure';
-import { CLASSIC_LABS, classicLabSnapshot, initialClassicLabState, updateClassicLab, type ClassicLabState } from '../src/lab/classicLabs';
+import { CLASSIC_LABS, classicLabSnapshot, initialClassicLabState, markWordGuess, updateClassicLab, type ClassicLabState } from '../src/lab/classicLabs';
 import { adjacentMineCount, initialMineTrailState, isMine, mineTrailSnapshot, moveMineTrail, revealMineTrail } from '../src/lab/mineTrail';
 import { calculateAchievements } from '../src/services/achievements';
 import { addDays, localDateKey } from '../src/services/date';
@@ -25,10 +25,15 @@ Object.defineProperty(globalThis, 'localStorage', { value: new MemoryStorage(), 
 const customExplorer = normalizeCharacterCustomization({
   ...DEFAULT_CHARACTER, name: '  Nova   Vale  ', head: 'angular', body: 'storm-coat', legs: 'climbing-gear',
   skinTone: '#8c573f', hairStyle: 'mohawk', hairColor: '#6d4b88', eyeColor: '#4f7a4f', accessory: 'goggles',
+  face: 'silly', scarf: true,
 });
 assert.equal(customExplorer.name, 'Nova Vale');
 assert.equal(customExplorer.head, 'angular');
+assert.equal(customExplorer.face, 'silly');
+assert.equal(customExplorer.scarf, true);
 assert.equal(normalizeCharacterCustomization({ head: 'not-an-option' }).head, DEFAULT_CHARACTER.head);
+assert.equal(normalizeCharacterCustomization({ version: 2, scarf: true }).scarf, true);
+assert.equal(normalizeCharacterCustomization({ version: 2 }).scarf, false);
 saveCharacterCustomization(customExplorer);
 assert.deepEqual(loadCharacterCustomization(), customExplorer);
 assert.deepEqual(
@@ -39,6 +44,7 @@ assert.deepEqual({ name: CHARACTER_PRESETS.Myles.name, frame: CHARACTER_PRESETS.
 assert.deepEqual({ name: CHARACTER_PRESETS.Ian.name, frame: CHARACTER_PRESETS.Ian.frame, body: CHARACTER_PRESETS.Ian.body, legs: CHARACTER_PRESETS.Ian.legs }, { name: 'Ian', frame: 'sturdy', body: 'heritage-tee', legs: 'jean-shorts' });
 const randomizedExplorer = randomizeCharacterCustomization(customExplorer, () => 0);
 assert.equal(randomizedExplorer.name, 'Nova Vale'); assert.equal(randomizedExplorer.head, 'round'); assert.equal(randomizedExplorer.accessory, 'none');
+assert.equal(randomizedExplorer.face, 'neutral'); assert.equal(randomizedExplorer.scarf, false);
 
 assert.equal(WEEK_ONE.length, 7);
 for (const [index, adventure] of WEEK_ONE.entries()) {
@@ -153,7 +159,7 @@ for (let y = 0; y < 5; y += 1) {
 assert.equal(completedMineTrail.status, 'complete');
 assert.equal(mineTrailSnapshot(completedMineTrail).safeTilesRemaining, 0);
 
-assert.deepEqual(CLASSIC_LABS.map((lab) => lab.id), [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+assert.deepEqual(CLASSIC_LABS.map((lab) => lab.id), [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
 for (const lab of CLASSIC_LABS) {
   const initial = initialClassicLabState(lab.id);
   assert.equal(initial.status, 'playing');
@@ -174,6 +180,8 @@ const stackDropped = updateClassicLab(stackShift, { type: 'hard-drop' });
 assert.equal(stackDropped.pieces, 1);
 const stackClear = updateClassicLab(stackInitial, { type: 'tick', ms: 75000 });
 assert.equal(stackClear.status, 'complete'); assert.equal(stackClear.remainingMs, 0);
+const stackLineClear = updateClassicLab({ ...stackInitial, lines: 50 } as ClassicLabState, { type: 'tick', ms: 1 });
+assert.equal(stackLineClear.status, 'complete'); assert.equal(classicLabSnapshot(stackLineClear).lineTarget, 50);
 
 const riverInitial = initialClassicLabState(5);
 const riverHop = updateClassicLab(riverInitial, { type: 'move', direction: 'up' });
@@ -232,6 +240,25 @@ let orbitComplete = initialClassicLabState(14);
 for (let gate = 0; gate < 6; gate += 1) orbitComplete = updateClassicLab({ ...orbitComplete, angle: orbitComplete.targetAngle } as ClassicLabState, { type: 'activate', index: 0 });
 assert.equal(orbitComplete.status, 'complete'); assert.equal(orbitComplete.score, 6);
 
+assert.deepEqual(markWordGuess('ALLEY', 'APPLE'), ['correct', 'present', 'absent', 'present', 'absent']);
+let wordComplete = initialClassicLabState(15);
+for (const letter of 'STONE') wordComplete = updateClassicLab(wordComplete, { type: 'letter', letter });
+wordComplete = updateClassicLab(wordComplete, { type: 'submit-word' });
+assert.equal(wordComplete.status, 'playing'); assert.equal(wordComplete.guesses.length, 1);
+for (const letter of 'TRAIL') wordComplete = updateClassicLab(wordComplete, { type: 'letter', letter });
+wordComplete = updateClassicLab(wordComplete, { type: 'submit-word' });
+assert.equal(wordComplete.status, 'complete'); assert.equal(wordComplete.guesses[1].word, 'TRAIL');
+
+let connectionsComplete = initialClassicLabState(16);
+for (const word of ['COMPASS', 'PINE', 'TORCH', 'SNOW']) connectionsComplete = updateClassicLab(connectionsComplete, { type: 'toggle-connection', word });
+connectionsComplete = updateClassicLab(connectionsComplete, { type: 'submit-connection' });
+assert.equal(connectionsComplete.mistakes, 1); assert.equal(connectionsComplete.selected.length, 0);
+for (const group of connectionsComplete.groups) {
+  for (const word of group.words) connectionsComplete = updateClassicLab(connectionsComplete, { type: 'toggle-connection', word });
+  connectionsComplete = updateClassicLab(connectionsComplete, { type: 'submit-connection' });
+}
+assert.equal(connectionsComplete.status, 'complete'); assert.equal(connectionsComplete.solved.length, 4);
+
 const { createVentureService, DEFAULT_SETTINGS } = await import('../src/services/ventureService');
 assert.equal(DEFAULT_SETTINGS.highContrast, true);
 const guestService = createVentureService();
@@ -267,4 +294,4 @@ await migratedService.updateCharacter(customExplorer);
 assert.deepEqual((await migratedService.getProfile())?.character, customExplorer);
 assert.deepEqual(JSON.parse(localStorage.getItem('dailyVentureLocalReviewerProfile') ?? '{}').character, customExplorer);
 
-console.log('unit: character persistence, 7 schemas, Adventure plus fourteen Puzzle Labs, timezone gating, attempts, archive rules, idempotency, and achievement thresholds passed');
+console.log('unit: character persistence, 7 schemas, Adventure plus sixteen Puzzle Labs, timezone gating, attempts, archive rules, idempotency, and achievement thresholds passed');

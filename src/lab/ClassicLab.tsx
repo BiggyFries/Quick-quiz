@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { drawCharacterCanvas, type CharacterCustomization } from '../character/character';
 import {
   CLASSIC_LABS,
@@ -26,6 +26,8 @@ import {
   type RelicState,
   type RiverState,
   type StackState,
+  type WordState,
+  type ConnectionsState,
 } from './classicLabs';
 import { PROTOTYPE_THEME, themeCss, type LabTheme } from './theme';
 import { useSwipeDirection } from './useSwipeDirection';
@@ -33,6 +35,7 @@ import { beginVictoryJourney, idleVictoryJourney, moveVictoryJourney, tickVictor
 
 const CANVAS_WIDTH = 390;
 const CANVAS_HEIGHT = 844;
+const WORD_KEY_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
 
 function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number, fill: string, stroke?: string) {
   ctx.beginPath(); ctx.roundRect(x, y, width, height, radius); ctx.fillStyle = fill; ctx.fill();
@@ -143,7 +146,7 @@ function drawStack(ctx: CanvasRenderingContext2D, state: StackState, time: numbe
     ctx.strokeStyle = '#fff9'; ctx.strokeRect(left + x * cellW + 2, top + y * cellH + 2, cellW - 4, cellH - 4);
   });
   ctx.fillStyle = '#b6e5db'; ctx.font = '800 9px Inter, system-ui'; ctx.textAlign = 'center';
-  ctx.fillText(`AIRLOCK · ${Math.ceil(state.remainingMs / 1000)}s`, 195, 548);
+  ctx.fillText(`SCORE ${state.score}  ·  LINES ${state.lines}/50  ·  ${Math.ceil(state.remainingMs / 1000)}s`, 195, 548);
   drawCustomizedExplorer(ctx, 195, 572, .76, time, character, true);
 }
 
@@ -323,16 +326,36 @@ function drawOrbit(ctx: CanvasRenderingContext2D, state: OrbitState, time: numbe
   drawCustomizedExplorer(ctx, 195, 561, .74, time, character, true);
 }
 
+const WORD_MARK_COLORS = { correct: '#418b67', present: '#b89139', absent: '#405a5d' } as const;
+function drawWord(ctx: CanvasRenderingContext2D, state: WordState, time: number, character: CharacterCustomization) {
+  roundedRect(ctx, 28, 150, 334, 454, 26, '#07171ddd', '#a5efd06b');
+  ctx.fillStyle = '#bfe5d6'; ctx.font = '900 9px Inter, system-ui'; ctx.textAlign = 'center'; ctx.fillText('FIVE-LETTER RUNE LOCK', 195, 174);
+  const cell = 43; const gap = 7; const left = 76; const top = 190;
+  for (let row = 0; row < state.maxGuesses; row += 1) {
+    const guess = state.guesses[row]; const letters = guess?.word ?? (row === state.guesses.length ? state.current : '');
+    for (let col = 0; col < 5; col += 1) {
+      const x = left + col * (cell + gap); const y = top + row * 47; const fill = guess ? WORD_MARK_COLORS[guess.marks[col]] : row === state.guesses.length ? '#31575b' : '#17383d';
+      roundedRect(ctx, x, y, cell, 40, 9, fill, row === state.guesses.length ? '#dffff29c' : '#ffffff30');
+      ctx.fillStyle = '#fff'; ctx.font = '900 19px Inter, system-ui'; ctx.textBaseline = 'middle'; ctx.fillText(letters[col] ?? '', x + cell / 2, y + 21);
+    }
+  }
+  ctx.textBaseline = 'alphabetic'; drawCustomizedExplorer(ctx, 340, 425, .58, time, character, true);
+}
+
+function drawConnections(ctx: CanvasRenderingContext2D, state: ConnectionsState, time: number, character: CharacterCustomization) {
+  roundedRect(ctx, 24, 150, 342, 454, 26, '#07171ddd', '#efb6df69');
+  ctx.fillStyle = '#e8cfe3'; ctx.font = '900 9px Inter, system-ui'; ctx.textAlign = 'center'; ctx.fillText('RELIC ASSOCIATION ARCHIVE', 195, 174);
+  ctx.fillStyle = '#ffffff18'; ctx.beginPath(); ctx.moveTo(48, 188); ctx.lineTo(342, 188); ctx.lineTo(322, 512); ctx.lineTo(68, 512); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#ffffff22'; ctx.stroke();
+  drawCustomizedExplorer(ctx, 195, 596, .48, time, character, true);
+}
+
 function drawExitJourney(ctx: CanvasRenderingContext2D, journey: VictoryJourney, time: number, character: CharacterCustomization, theme: LabTheme) {
   if (journey.phase === 'idle') return;
-  roundedRect(ctx, 34, 458, 322, 126, 24, '#06171bed', `${theme.portal}88`);
-  ctx.strokeStyle = '#ffffff25'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(62, 550); ctx.lineTo(331, 550); ctx.stroke();
-  const portalX = 323; const portalY = 542; const pulse = 1 + Math.sin(time / 230) * .04;
-  ctx.save(); ctx.shadowColor = theme.portal; ctx.shadowBlur = 18; ctx.strokeStyle = theme.portal; ctx.lineWidth = 7; ctx.beginPath(); ctx.ellipse(portalX, portalY - 28, 22 * pulse, 40 * pulse, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
-  const x = 77 + journey.x * 57; const y = 552 + journey.lane * 24;
+  const portalX = 338; const portalY = 548; const pulse = 1 + Math.sin(time / 230) * .04;
+  if (journey.phase !== 'celebrating') { ctx.save(); ctx.shadowColor = theme.portal; ctx.shadowBlur = 18; ctx.strokeStyle = theme.portal; ctx.lineWidth = 7; ctx.beginPath(); ctx.ellipse(portalX, portalY - 28, 22 * pulse, 40 * pulse, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
+  const x = 195 + journey.x / 4 * (portalX - 195); const y = 560 + journey.lane * 24;
   drawCharacterCanvas(ctx, character, { x, groundY: y, scale: .56, time, pose: journey.phase === 'celebrating' || journey.phase === 'departed' ? 'celebrate' : 'walk', facing: 'right' });
-  ctx.fillStyle = theme.accent; ctx.font = '900 9px Inter, system-ui'; ctx.textAlign = 'center';
-  ctx.fillText(journey.phase === 'celebrating' ? 'ONE SECOND VICTORY MOMENT' : journey.phase === 'portal-open' ? `STEER INTO THE ${theme.portalName.toUpperCase()}` : 'PORTAL CROSSED', 195, 478);
 }
 
 function drawStatusOverlay(ctx: CanvasRenderingContext2D, state: ClassicLabState, definition: LabDefinition, journey: VictoryJourney) {
@@ -358,7 +381,9 @@ function drawClassicLab(ctx: CanvasRenderingContext2D, state: ClassicLabState, d
   else if (state.id === 11) drawCrate(ctx, state, time, character);
   else if (state.id === 12) drawEcho(ctx, state, time, character);
   else if (state.id === 13) drawGear(ctx, state, time, character);
-  else drawOrbit(ctx, state, time, character);
+  else if (state.id === 14) drawOrbit(ctx, state, time, character);
+  else if (state.id === 15) drawWord(ctx, state, time, character);
+  else drawConnections(ctx, state, time, character);
   suppressGameCharacter = false;
   drawExitJourney(ctx, journey, time, character, theme);
   drawStatusOverlay(ctx, state, definition, journey);
@@ -366,7 +391,7 @@ function drawClassicLab(ctx: CanvasRenderingContext2D, state: ClassicLabState, d
 
 function labStats(state: ClassicLabState) {
   if (state.id === 3) return [{ value: `${Math.min(state.score, state.target)}/${state.target}`, label: 'sparks' }, { value: state.lives, label: 'lives' }];
-  if (state.id === 4) return [{ value: Math.ceil(state.remainingMs / 1000), label: 'seconds' }, { value: state.lines, label: 'lines' }];
+  if (state.id === 4) return [{ value: state.score, label: 'score' }, { value: `${state.lines}/50`, label: 'lines' }];
   if (state.id === 5) return [{ value: state.lives, label: 'lives' }, { value: 10 - state.bestRow, label: 'lanes' }];
   if (state.id === 6) return [{ value: `${state.score}/${state.target}`, label: 'signals' }, { value: state.trail.length, label: 'trail' }];
   if (state.id === 7) return [{ value: state.seals.length, label: 'seals' }, { value: state.lives, label: 'lives' }];
@@ -376,7 +401,9 @@ function labStats(state: ClassicLabState) {
   if (state.id === 11) return [{ value: `${state.score}/3`, label: 'powered' }, { value: state.pushes, label: 'pushes' }];
   if (state.id === 12) return [{ value: `${state.round + 1}/3`, label: 'round' }, { value: `${state.strikes}/2`, label: 'errors' }];
   if (state.id === 13) return [{ value: `${state.aligned}/16`, label: 'aligned' }, { value: state.moves, label: 'turns' }];
-  return [{ value: `${state.gate}/6`, label: 'gates' }, { value: `${state.misses}/3`, label: 'misses' }];
+  if (state.id === 14) return [{ value: `${state.gate}/6`, label: 'gates' }, { value: `${state.misses}/3`, label: 'misses' }];
+  if (state.id === 15) return [{ value: `${state.guesses.length}/6`, label: 'guesses' }, { value: state.current.length, label: 'letters' }];
+  return [{ value: `${state.solved.length}/4`, label: 'groups' }, { value: `${state.mistakes}/4`, label: 'mistakes' }];
 }
 
 function DirectionPad({ move, center, disabled }: { move: (direction: ClassicDirection) => void; center?: ReactNode; disabled?: boolean }) {
@@ -447,6 +474,12 @@ export function ClassicLab({ id, onExit, onComplete, character, theme = PROTOTYP
     const onKey = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
       const key = event.key.toLowerCase();
+      if (id === 15 && journeyRef.current.phase === 'idle') {
+        if (/^[a-z]$/.test(key)) { event.preventDefault(); commit({ type: 'letter', letter: key }); }
+        else if (key === 'backspace') { event.preventDefault(); commit({ type: 'backspace' }); }
+        else if (key === 'enter') { event.preventDefault(); commit({ type: 'submit-word' }); }
+        return;
+      }
       const direction = key === 'arrowup' || key === 'w' ? 'up'
         : key === 'arrowdown' || key === 's' ? 'down'
           : key === 'arrowleft' || key === 'a' ? 'left'
@@ -479,6 +512,17 @@ export function ClassicLab({ id, onExit, onComplete, character, theme = PROTOTYP
 
   const stats = labStats(state);
   const controlsDisabled = state.status !== 'playing';
+  const tapAction = useCallback(({ x, y }: { x: number; y: number }) => {
+    if (journeyRef.current.phase !== 'idle') {
+      const dx = x - .5; const dy = y - .48; move(Math.abs(dx) > Math.abs(dy) ? dx > 0 ? 'right' : 'left' : dy > 0 ? 'down' : 'up'); return;
+    }
+    if (id === 4) { commit({ type: 'hard-drop' }); return; }
+    if (id === 14) { commit({ type: 'activate', index: 0 }); return; }
+    const dx = x - .5; const dy = y - .45;
+    const direction: ClassicDirection = Math.abs(dx) > Math.abs(dy) ? dx > 0 ? 'right' : 'left' : dy > 0 ? 'down' : 'up';
+    if (id === 12) commit({ type: 'activate', index: direction === 'up' ? 0 : direction === 'right' ? 1 : direction === 'down' ? 2 : 3 });
+    else if (id !== 9 && id !== 13) move(direction);
+  }, [commit, id, move]);
   const swipe = useSwipeDirection((direction) => {
     if (journeyRef.current.phase !== 'idle') move(direction);
     else if (id === 12) commit({ type: 'activate', index: direction === 'up' ? 0 : direction === 'right' ? 1 : direction === 'down' ? 2 : 3 });
@@ -487,7 +531,7 @@ export function ClassicLab({ id, onExit, onComplete, character, theme = PROTOTYP
       return direction === 'left' ? y * 4 + Math.max(0, x - 1) : direction === 'right' ? y * 4 + Math.min(3, x + 1) : direction === 'up' ? Math.max(0, y - 1) * 4 + x : Math.min(3, y + 1) * 4 + x;
     });
     else move(direction);
-  }, state.status === 'failed' || journey.phase === 'celebrating' || journey.phase === 'departed');
+  }, state.status === 'failed' || journey.phase === 'celebrating' || journey.phase === 'departed', tapAction);
 
   return <section className="lab-screen classic-lab-screen" aria-label={`${definition.title} puzzle lab`} style={themeCss(theme)}>
     <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} aria-label={`${definition.title} game world`} {...swipe} />
@@ -509,6 +553,15 @@ export function ClassicLab({ id, onExit, onComplete, character, theme = PROTOTYP
     </div>}
     {state.id === 13 && <div className="gear-hit-grid" aria-label="Gear link grid">
       {state.rotations.map((rotation, index) => <button className={gridCursor === index ? 'keyboard-current' : ''} key={index} disabled={state.status !== 'playing'} onClick={() => { setGridCursor(index); commit({ type: 'activate', index }); }} aria-label={`Gear link ${Math.floor(index / 4) + 1}, ${index % 4 + 1}, orientation ${rotation + 1}`} />)}
+    </div>}
+    {state.id === 15 && journey.phase === 'idle' && <div className="word-keyboard" aria-label="Rune Word keyboard">
+      {WORD_KEY_ROWS.map((row) => <div key={row}>{[...row].map((letter) => <button key={letter} disabled={state.status !== 'playing'} onClick={() => commit({ type: 'letter', letter })} aria-label={`Letter ${letter}`}>{letter}</button>)}</div>)}
+      <div className="word-keyboard-actions"><button disabled={state.status !== 'playing'} onClick={() => commit({ type: 'backspace' })} aria-label="Delete letter">⌫ DELETE</button><button disabled={state.status !== 'playing'} onClick={() => commit({ type: 'submit-word' })}>ENTER ↵</button></div>
+    </div>}
+    {state.id === 16 && journey.phase === 'idle' && <div className="connection-panel" aria-label="Relic connection tiles">
+      {state.solved.map((name) => { const group = state.groups.find((item) => item.name === name)!; return <div className="connection-solved" key={name} style={{ '--group-color': group.color } as CSSProperties}><strong>{group.name}</strong><small>{group.words.join(' · ')}</small></div>; })}
+      <div className="connection-grid">{state.words.map((word) => <button key={word} className={state.selected.includes(word) ? 'selected' : ''} disabled={state.status !== 'playing'} aria-pressed={state.selected.includes(word)} onClick={() => commit({ type: 'toggle-connection', word })}>{word}</button>)}</div>
+      <div className="connection-actions"><button disabled={state.status !== 'playing'} onClick={() => commit({ type: 'shuffle-connection' })}>SHUFFLE</button><button disabled={state.status !== 'playing' || state.selected.length !== 4} onClick={() => commit({ type: 'submit-connection' })}>SUBMIT GROUP</button></div>
     </div>}
     <div className={`lab-message classic-message ${state.status}`} aria-live="polite">{journey.phase === 'idle' ? state.message : victoryJourneyMessage(journey, theme.portalName)}</div>
     <div className={`lab-controls classic-controls lab-controls-${state.id}`} aria-label={`${definition.title} controls`}>
@@ -540,12 +593,20 @@ export function ClassicLab({ id, onExit, onComplete, character, theme = PROTOTYP
         <button className="lab-mode-key active" disabled>GATES <small>{state.gate} / 6</small></button>
         <button className="orbit-pulse-button" disabled={controlsDisabled} onClick={() => commit({ type: 'activate', index: 0 })}>PULSE<small>SPACE</small></button>
         <button className="lab-mode-key" onClick={reset}>RESET <small>Restart orbit</small></button>
+      </> : state.id === 15 ? <>
+        <button className="lab-mode-key active" disabled>GUESSES <small>{state.guesses.length} / {state.maxGuesses}</small></button>
+        <div className="remote-center"><span>ABC</span><small>TYPE OR TAP LETTERS</small></div>
+        <button className="lab-mode-key" onClick={reset}>RESET <small>Clear guesses</small></button>
+      </> : state.id === 16 ? <>
+        <button className="lab-mode-key active" disabled>GROUPS <small>{state.solved.length} / 4</small></button>
+        <div className="remote-center"><span>4×4</span><small>TAP FOUR RELICS</small></div>
+        <button className="lab-mode-key" onClick={reset}>RESET <small>Restore archive</small></button>
       </> : <>
         <button className="lab-utility side-note" disabled>{state.id === 11 ? 'PUSH' : state.id === 10 ? 'SLIDE' : state.id === 8 ? 'MERGE' : state.id === 6 ? 'TRAIL' : state.id === 5 ? 'HOP' : 'RUN'}<small>{stats[0].value}</small></button>
         <DirectionPad move={move} center={definition.icon} disabled={controlsDisabled} />
         <button className="lab-utility" onClick={reset}>RESET <small>R</small></button>
       </>}
-      <p>{definition.controlHint} · Arrow keys or WASD · R resets</p>
+      <p>{definition.controlHint} · Tap or swipe · Arrow keys or WASD · R resets</p>
     </div>
   </section>;
 }

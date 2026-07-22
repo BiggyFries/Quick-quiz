@@ -107,15 +107,26 @@ class DailyVentureScene extends Phaser.Scene implements VentureScene {
     g.fillStyle(colorNumber(character.eyeColor));
     if (character.eyeShape === 'almond') { g.fillEllipse(headX - 6, y - 55 - tallLift, 7, 3); g.fillEllipse(headX + 6, y - 54 - tallLift, 7, 3); }
     else { g.fillCircle(headX - 6, y - 55 - tallLift, 2.6); g.fillCircle(headX + 6, y - 54 - tallLift, 2.6); }
-    g.lineStyle(2, 0x8f5947); g.lineBetween(x + 1, y - 49 - tallLift, x + 7, y - 48 - tallLift);
+    const faceY = y - 48 - tallLift;
+    if (character.face === 'angry') { g.lineStyle(2, 0x47342f); g.lineBetween(headX - 12, faceY - 12, headX - 3, faceY - 9); g.lineBetween(headX + 3, faceY - 9, headX + 12, faceY - 12); }
+    else if (character.face === 'sad') { g.lineStyle(2, 0x47342f); g.lineBetween(headX - 12, faceY - 9, headX - 3, faceY - 12); g.lineBetween(headX + 3, faceY - 12, headX + 12, faceY - 9); }
+    else if (character.face === 'confident') { g.lineStyle(2, 0x47342f); g.lineBetween(headX - 12, faceY - 11, headX - 3, faceY - 11); g.lineBetween(headX + 3, faceY - 9, headX + 12, faceY - 12); }
+    g.lineStyle(2, 0x8f5947);
+    if (character.face === 'smile' || character.face === 'confident' || character.face === 'silly') { g.beginPath(); g.moveTo(headX - 7, faceY); g.lineTo(headX, faceY + 5); g.lineTo(headX + 8, faceY - 1); g.strokePath(); }
+    else if (character.face === 'sad') { g.beginPath(); g.moveTo(headX - 7, faceY + 4); g.lineTo(headX, faceY - 1); g.lineTo(headX + 7, faceY + 4); g.strokePath(); }
+    else if (character.face === 'surprised') g.strokeCircle(headX, faceY + 2, 4);
+    else g.lineBetween(headX - 6, faceY + 2, headX + 6, faceY + 2);
+    if (character.face === 'silly') { g.fillStyle(0xd96f80); g.fillEllipse(headX + 2, faceY + 6, 6, 8); }
     if (character.accessory === 'trail-hat') { g.fillStyle(0x7b4e36); g.fillRoundedRect(headX - 24, y - 80 - tallLift, 49, 9, 4); g.fillRoundedRect(headX - 14, y - 90 - tallLift, 29, 14, 5); }
     else if (character.accessory === 'aviators') { g.fillStyle(0x27383a, .75); g.fillRoundedRect(headX - 15, y - 59 - tallLift, 13, 10, 3); g.fillRoundedRect(headX + 2, y - 59 - tallLift, 13, 10, 3); g.lineStyle(2, 0xd6b66c); g.strokeRoundedRect(headX - 15, y - 59 - tallLift, 13, 10, 3); g.strokeRoundedRect(headX + 2, y - 59 - tallLift, 13, 10, 3); g.lineBetween(headX - 2, y - 56 - tallLift, headX + 2, y - 56 - tallLift); }
     else if (character.accessory === 'round-glasses' || character.accessory === 'goggles') { g.lineStyle(character.accessory === 'goggles' ? 3 : 2, character.accessory === 'goggles' ? 0xd8c477 : 0x26363a); g.strokeCircle(headX - 7, y - 54 - tallLift, character.accessory === 'goggles' ? 7 : 5); g.strokeCircle(headX + 7, y - 54 - tallLift, character.accessory === 'goggles' ? 7 : 5); g.lineBetween(headX - 2, y - 54 - tallLift, headX + 2, y - 54 - tallLift); }
     else if (character.accessory === 'bandana') { g.fillStyle(0xd45f51); g.fillRoundedRect(headX - 18, y - 69 - tallLift, 36, 7, 2); g.fillTriangle(headX + 16, y - 66 - tallLift, headX + 31, y - 61 - tallLift, headX + 20, y - 53 - tallLift); }
     else if (character.accessory === 'flower') { g.fillStyle(0xf6c85f); g.fillCircle(headX - 16, y - 70 - tallLift, 7); g.fillStyle(0xd96f68); g.fillCircle(headX - 16, y - 70 - tallLift, 3); }
 
-    const scarfLift = pose === 'walk' ? gait * 4 : pose === 'brace' ? 5 : breath;
-    g.lineStyle(5, colorNumber(palette.scarf)); g.lineBetween(x - 12, y - 40, x - 29, y - 43 - scarfLift); g.lineBetween(x - 29, y - 43 - scarfLift, x - 38, y - 36 - scarfLift * 1.5);
+    if (character.scarf) {
+      const scarfLift = pose === 'walk' ? gait * 4 : pose === 'brace' ? 5 : breath;
+      g.lineStyle(5, colorNumber(palette.scarf)); g.lineBetween(x - 12, y - 40, x - 29, y - 43 - scarfLift); g.lineBetween(x - 29, y - 43 - scarfLift, x - 38, y - 36 - scarfLift * 1.5);
+    }
     if (failed) {
       const hazardColors = [0xe76f51, 0x7c8cff, 0x56cfe1, 0xb88bd4, 0xf1b45a];
       g.fillStyle(hazardColors[defeatVariant % hazardColors.length], 0.7);

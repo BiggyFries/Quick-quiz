@@ -41,7 +41,7 @@ test('Adventure combines chips, equipment, locks, a pressure crate, celebration,
   const canvas = await page.getByLabel('Adventure game world').boundingBox();
   expect(canvas).not.toBeNull();
   await page.mouse.move(canvas!.x + 115, canvas!.y + 350); await page.mouse.down(); await page.mouse.move(canvas!.x + 235, canvas!.y + 350, { steps: 4 }); await page.mouse.up();
-  let state = await snapshot(page); expect(state.player).toEqual({ x: 2, y: 1 });
+  let state = await snapshot(page); expect(state.player).toEqual({ x: 3, y: 2 });
   await page.getByRole('button', { name: 'RESET', exact: true }).click();
   await walkRoute(page, 'RRLLDDDRRRUUURLDDDLLLLLDDRRLLD');
   state = await snapshot(page); expect(state.phase).toBe('celebrating'); expect(state.inventory.chips).toBe(3); expect(state.plateActive).toBe(true);
@@ -80,7 +80,7 @@ test('daily formula preview runs Adventure, two themed prototypes, and the named
   await page.screenshot({ path: path.join(captures, 'daily-formula-complete.png') });
 });
 
-test('Prototype Corridor exposes Adventure and Labs 03 through 14 with matching deterministic state', async ({ page }) => {
+test('Prototype Corridor exposes Adventure and Labs 03 through 16 with matching deterministic state', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(String(error)));
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
@@ -89,14 +89,14 @@ test('Prototype Corridor exposes Adventure and Labs 03 through 14 with matching 
   await page.getByRole('button', { name: /PREVIEW TESTER GAME/i }).click();
   await expect(page.getByRole('heading', { name: 'Prototype Corridor' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Adventure.*Primary room/i })).toBeVisible();
-  for (const title of ['Relic Run', 'Sky Stack', 'River Relay', 'Trail Coil', 'Prism Break', 'Rune Merge', 'Lantern Grid', 'Icebound Route', 'Crate Circuit', 'Echo Sequence', 'Gear Links', 'Orbit Pulse']) {
+  for (const title of ['Relic Run', 'Sky Stack', 'River Relay', 'Trail Coil', 'Prism Break', 'Rune Merge', 'Lantern Grid', 'Icebound Route', 'Crate Circuit', 'Echo Sequence', 'Gear Links', 'Orbit Pulse', 'Rune Word', 'Relic Groups']) {
     await expect(page.getByRole('button', { name: new RegExp(title) })).toBeVisible();
   }
-  await page.screenshot({ path: path.join(captures, 'prototype-corridor-fifteen-games.png') });
+  await page.screenshot({ path: path.join(captures, 'prototype-corridor-seventeen-games.png') });
 
   const labs = [
     { id: 3, title: 'Relic Run', act: async () => page.keyboard.press('ArrowRight') },
-    { id: 4, title: 'Sky Stack', act: async () => { await page.keyboard.press('ArrowLeft'); await page.keyboard.press('q'); await page.keyboard.press('Space'); } },
+    { id: 4, title: 'Sky Stack', act: async () => { await page.keyboard.press('ArrowLeft'); await page.keyboard.press('q'); await page.getByLabel('Sky Stack game world').click({ position: { x: 195, y: 330 } }); } },
     { id: 5, title: 'River Relay', act: async () => page.keyboard.press('ArrowUp') },
     { id: 6, title: 'Trail Coil', act: async () => advance(page, 260) },
     { id: 7, title: 'Prism Break', act: async () => page.getByRole('button', { name: 'Move light bar right' }).click() },
@@ -107,6 +107,8 @@ test('Prototype Corridor exposes Adventure and Labs 03 through 14 with matching 
     { id: 12, title: 'Echo Sequence', act: async () => { await advance(page, 2080); await page.getByRole('button', { name: /Echo pad 1/ }).click(); } },
     { id: 13, title: 'Gear Links', act: async () => page.getByRole('button', { name: /Gear link 1, 1/ }).click() },
     { id: 14, title: 'Orbit Pulse', act: async () => { await advance(page, 290); await page.getByRole('button', { name: 'PULSE' }).click(); } },
+    { id: 15, title: 'Rune Word', act: async () => { await page.keyboard.type('STONE'); await page.keyboard.press('Enter'); } },
+    { id: 16, title: 'Relic Groups', act: async () => { for (const word of ['COMPASS', 'MAP', 'BEACON', 'SEXTANT']) await page.getByRole('button', { name: word, exact: true }).click(); await page.getByRole('button', { name: 'SUBMIT GROUP' }).click(); } },
   ];
 
   for (const lab of labs) {
@@ -131,6 +133,8 @@ test('Prototype Corridor exposes Adventure and Labs 03 through 14 with matching 
     if (lab.id === 12) expect(state.inputIndex).toBe(1);
     if (lab.id === 13) expect(state.moves).toBe(1);
     if (lab.id === 14) expect(state.gate).toBe(1);
+    if (lab.id === 15) { expect(state.guesses).toHaveLength(1); expect(state.guessesRemaining).toBe(5); }
+    if (lab.id === 16) { expect(state.solved).toEqual(['NAVIGATION']); expect(state.mistakes).toBe(0); }
     await page.screenshot({ path: path.join(captures, `lab-${String(lab.id).padStart(2, '0')}-${slug(lab.title)}.png`) });
 
     if (lab.id === 4) {
@@ -194,6 +198,20 @@ test('Prototype Corridor exposes Adventure and Labs 03 through 14 with matching 
       state = await snapshot(page); expect(state.status).toBe('complete'); expect(state.gate).toBe(6);
       await page.screenshot({ path: path.join(captures, 'lab-14-orbit-pulse-clear.png') });
     }
+    if (lab.id === 15) {
+      await page.getByRole('button', { name: 'RESET', exact: true }).click();
+      await page.keyboard.type('TRAIL'); await page.keyboard.press('Enter');
+      state = await snapshot(page); expect(state.status).toBe('complete'); expect(state.guesses[0].word).toBe('TRAIL');
+      await page.screenshot({ path: path.join(captures, 'lab-15-rune-word-clear.png') });
+    }
+    if (lab.id === 16) {
+      for (const group of [['PINE', 'OAK', 'ELM', 'BIRCH'], ['TORCH', 'LANTERN', 'CANDLE', 'STAR'], ['RAIN', 'HAIL', 'SLEET', 'SNOW']]) {
+        for (const word of group) await page.getByRole('button', { name: word, exact: true }).click();
+        await page.getByRole('button', { name: 'SUBMIT GROUP' }).click();
+      }
+      state = await snapshot(page); expect(state.status).toBe('complete'); expect(state.solved).toHaveLength(4);
+      await page.screenshot({ path: path.join(captures, 'lab-16-relic-groups-clear.png') });
+    }
     await page.getByRole('button', { name: 'Back to Lab corridor' }).click();
     await expect(page.getByRole('heading', { name: 'Prototype Corridor' })).toBeVisible();
   }
@@ -202,7 +220,7 @@ test('Prototype Corridor exposes Adventure and Labs 03 through 14 with matching 
 
 test('classic Lab controls remain reachable on the compact phone layout', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 640 });
-  for (const id of [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]) {
+  for (const id of [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]) {
     await page.goto(`/?lab=${String(id).padStart(2, '0')}`);
     await expect(page.locator('.classic-lab-screen')).toBeVisible();
     const controls = await page.locator('.classic-controls').boundingBox();
