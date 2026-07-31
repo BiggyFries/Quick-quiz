@@ -1,5 +1,16 @@
 Original prompt: Create a very simple low effort 5 round browser-based trivia game, test it, and publish it on GitHub Pages.
 
+- July 31 request: rebuild Adventure as an original, difficult Chip's Challenge-inspired main mode that should take a new player at least five minutes, with reusable in-world computers that open traditional puzzle screens and unlock world doors.
+- Current implementation direction: a camera-followed 21x21 Venture Circuit maze with ten chips, two color keys, water/fire equipment, two computer-controlled gates, crate/plate logic, and the existing one-second celebration plus player-controlled portal exit.
+- Implemented both computer overlays: Computer 1 is a six-guess Wordle-style five-letter cipher; Computer 2 is a six-miss Hangman-style archive decoder. Each persists partial progress, supports retry, and powers a different physical maze gate when solved.
+- Added a deterministic full solution fixture. The solved route is 248 counted world moves plus both computer interactions, and unit tests verify wrong-answer feedback, both door links, every inventory dependency, the celebration delay, and manual portal entry.
+- Unit tests and the production build pass after the engine/UI integration. Browser and target-phone visual verification remain in progress.
+- Required web-game-client validation reached the first circuit chip with matching 21x21 text state and no browser errors; the camera-followed maze and minimap were visually inspected.
+- Focused Chromium playthrough completes the entire 248-move route, both computer solves, all gates, the one-second celebration, and manual portal step. Word-grid feedback, Hangman miss/solve states, start, and completion screenshots were visually reviewed.
+- Focused home, Daily Formula integration, and Adventure layout checks pass at 360x640, 390x844, and 430x932. Full regression E2E remains to run.
+- Final verification: `npm test`, `npm run test:smoke`, and `npm run build` pass. A clean dedicated-server E2E run passes all 14 Playwright scenarios in 3.8 minutes, including the full Adventure/Formula routes, all 35 legacy room UIs, Labs 01–16, guest rules, and all three phone sizes.
+- The home screen now exposes `PLAY NEW DAILY MODE` directly to Venture Circuit while the current Week 1 Ventures remain unchanged. Suggested next step: promote this engine into authored daily level data and add more terminal puzzle adapters (connections, mini-Sudoku, code-breaking) without changing the world/terminal contract.
+
 - Added a single-file Quick Quiz prototype with five rounds, click/keyboard controls, score tracking, restart flow, fullscreen toggle, and deterministic test hooks.
 - Browser verification passed: start screen, five answer clicks, score updates, and completion screen were exercised with no console errors. Final test state was 3/5.
 - Replaced the quiz-only prototype with a static daily five-room game: date-seeded level queue, themed start screen, five distinct room types, failure/retry flow, local streak/history, result/share card, accessibility-aware timing, and deterministic test hooks.

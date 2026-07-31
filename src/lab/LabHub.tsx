@@ -83,7 +83,7 @@ export function LabHub({ onExit, openAdventure, openBlockShift, openMineTrail, c
     </div>
     <div className="lab-card-list">
       <button className="lab-card lab-card-adventure" onClick={openAdventure}>
-        <span className="lab-card-number">A</span><span className="lab-card-copy"><strong>Adventure</strong><small>Primary room · chips, gear, gates and crate logic</small></span><b>PLAY ›</b>
+        <span className="lab-card-number">A</span><span className="lab-card-copy"><strong>Venture Circuit</strong><small>Main mode · 21×21 maze, computers, gear and gates</small></span><b>PLAY ›</b>
       </button>
       <button className="lab-card lab-card-featured" onClick={openBlockShift}>
         <span className="lab-card-number">01</span><span className="lab-card-copy"><strong>Block Shift</strong><small>Original sliding-block room · 2.5D explorer</small></span><b>PLAY ›</b>
