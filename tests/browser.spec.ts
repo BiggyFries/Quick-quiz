@@ -122,7 +122,7 @@ test('mobile home remains usable across the supported phone range', async ({ pag
     expect(characterButton!.width).toBeGreaterThanOrEqual(44);
     expect(characterButton!.height).toBeGreaterThanOrEqual(44);
     expect(characterButton!.x + characterButton!.width).toBeLessThanOrEqual(viewport.width);
-    for (const label of ['VENTURE', 'PAST VENTURES', 'TEST DAILY FORMULA', 'PREVIEW TESTER GAMES?', 'PREVIEW WEEK 1']) {
+    for (const label of ['VENTURE', 'PAST VENTURES', 'PLAY NEW DAILY MODE', 'PREVIEW TESTER GAMES?', 'PREVIEW WEEK 1']) {
       const box = await page.getByRole('button', { name: new RegExp(`^${label}(?:\\s|$)`, 'i') }).boundingBox();
       expect(box).not.toBeNull();
       expect(box!.height).toBeGreaterThanOrEqual(44);
@@ -130,6 +130,10 @@ test('mobile home remains usable across the supported phone range', async ({ pag
     }
     await page.screenshot({ path: path.join(captures, `home-${viewport.width}x${viewport.height}.png`) });
   }
+  await page.getByRole('button', { name: /PLAY NEW DAILY MODE/i }).click();
+  await expect(page.getByLabel('Adventure game world')).toBeVisible();
+  await page.getByRole('button', { name: 'Back to Lab corridor' }).click();
+  await expect(page.getByRole('heading', { name: /DAILY VENTURE/i })).toBeVisible();
 });
 
 test('character creator saves appearance and name for the toolbar, profile, and playable labs', async ({ page }) => {

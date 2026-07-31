@@ -4,11 +4,12 @@ import { WEEK_ONE } from '../src/content/week1';
 import { countLogicSolutions, dailyAdventureSchema, satisfiesLogicClues } from '../src/game/schema';
 import type { AttemptRecord } from '../src/game/types';
 import { blockShiftSnapshot, initialBlockShiftState, moveBlockShift, undoBlockShift } from '../src/lab/blockShift';
-import { adventureSnapshot, initialAdventureState, moveAdventure, tickAdventure } from '../src/lab/adventure';
+import { adventureSnapshot, closeAdventureTerminal, initialAdventureState, inputAdventureTerminalLetter, interactAdventure, moveAdventure, resetAdventureTerminal, scoreAdventureWordGuess, submitAdventureTerminal, tickAdventure } from '../src/lab/adventure';
 import { CLASSIC_LABS, classicLabSnapshot, initialClassicLabState, markWordGuess, updateClassicLab, type ClassicLabState } from '../src/lab/classicLabs';
 import { adjacentMineCount, initialMineTrailState, isMine, mineTrailSnapshot, moveMineTrail, revealMineTrail } from '../src/lab/mineTrail';
 import { calculateAchievements } from '../src/services/achievements';
 import { addDays, localDateKey } from '../src/services/date';
+import { ADVENTURE_SOLUTION } from './adventure-solution';
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -205,12 +206,37 @@ assert.equal(classicLabSnapshot(mergeClear).highestStack, 6);
 
 let adventure = initialAdventureState();
 const adventureMove = (route: string) => { for (const key of route) adventure = moveAdventure(adventure, ({ U: 'up', D: 'down', L: 'left', R: 'right' } as const)[key as 'U' | 'D' | 'L' | 'R']); };
-adventureMove('URRDDURRRRURRLLDDDDRRLDDDDLLLLLLLLURR');
-assert.equal(adventure.phase, 'celebrating'); assert.equal(adventure.chips.length, 5); assert.equal(adventure.chipGateOpen, true); assert.equal(adventure.plateActive, true);
+adventureMove(ADVENTURE_SOLUTION.toSignalComputer);
+adventureMove('L'); assert.match(adventure.message, /press use/i); adventure = interactAdventure(adventure); assert.equal(adventure.phase, 'terminal'); assert.equal(adventure.activeTerminal, 'signal');
+for (const letter of 'STONE') adventure = inputAdventureTerminalLetter(adventure, letter);
+adventure = submitAdventureTerminal(adventure); assert.deepEqual(scoreAdventureWordGuess('STONE'), ['absent', 'present', 'present', 'absent', 'absent']);
+for (const letter of ADVENTURE_SOLUTION.signalAnswer) adventure = inputAdventureTerminalLetter(adventure, letter);
+adventure = submitAdventureTerminal(adventure); assert.equal(adventure.terminals.signal.solved, true); adventure = closeAdventureTerminal(adventure);
+adventureMove(ADVENTURE_SOLUTION.signalToArchiveComputer);
+adventureMove('R'); adventure = interactAdventure(adventure); assert.equal(adventure.activeTerminal, 'archive');
+adventure = inputAdventureTerminalLetter(adventure, 'A'); assert.equal(adventure.terminals.archive.kind === 'hangman' && adventure.terminals.archive.misses, 1);
+for (const letter of ADVENTURE_SOLUTION.archiveAnswer) adventure = inputAdventureTerminalLetter(adventure, letter);
+assert.equal(adventure.terminals.archive.solved, true); adventure = closeAdventureTerminal(adventure);
+adventureMove(ADVENTURE_SOLUTION.archiveToFinalGate);
+assert.equal(adventure.phase, 'celebrating'); assert.equal(adventure.chips.length, 10); assert.equal(adventure.chipGateOpen, true); assert.equal(adventure.plateActive, true);
+assert.equal(adventure.redDoorOpen, true); assert.equal(adventure.blueDoorOpen, true); assert.equal(adventure.signalDoorOpen, true); assert.equal(adventure.archiveDoorOpen, true);
 adventure = tickAdventure(adventure, 999); assert.equal(adventure.phase, 'celebrating');
 adventure = tickAdventure(adventure, 1); assert.equal(adventure.phase, 'portal-open');
-adventureMove('DLLD');
-assert.equal(adventure.phase, 'complete'); assert.equal(adventureSnapshot(adventure).portalOpen, true);
+adventureMove(ADVENTURE_SOLUTION.finalPortalStep);
+assert.equal(adventure.phase, 'complete'); assert.equal(adventure.moves, ADVENTURE_SOLUTION.expectedMoves); assert.equal(adventureSnapshot(adventure).portalOpen, true);
+
+let signalLockout = { ...initialAdventureState(), phase: 'terminal' as const, activeTerminal: 'signal' as const };
+for (const guess of ['AAAAA', 'CCCCC', 'DDDDD', 'FFFFF', 'JJJJJ', 'XXXXX']) {
+  for (const letter of guess) signalLockout = inputAdventureTerminalLetter(signalLockout, letter);
+  signalLockout = submitAdventureTerminal(signalLockout);
+}
+assert.equal(signalLockout.terminals.signal.failed, true);
+signalLockout = resetAdventureTerminal(signalLockout); assert.equal(signalLockout.terminals.signal.failed, false); assert.deepEqual(signalLockout.terminals.signal.guesses, []);
+
+let archiveLockout = { ...initialAdventureState(), phase: 'terminal' as const, activeTerminal: 'archive' as const };
+for (const letter of 'ACDEFJ') archiveLockout = inputAdventureTerminalLetter(archiveLockout, letter);
+assert.equal(archiveLockout.terminals.archive.failed, true);
+archiveLockout = resetAdventureTerminal(archiveLockout); assert.equal(archiveLockout.terminals.archive.failed, false); assert.deepEqual(archiveLockout.terminals.archive.guessed, []);
 
 let lanternComplete = initialClassicLabState(9);
 for (const index of [0, 2, 6, 10, 12, 14, 18, 22, 24]) lanternComplete = updateClassicLab(lanternComplete, { type: 'activate', index });

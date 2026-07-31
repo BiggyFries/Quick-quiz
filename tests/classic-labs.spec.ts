@@ -1,6 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { ADVENTURE_SOLUTION } from './adventure-solution';
 
 declare global {
   interface Window {
@@ -33,7 +34,39 @@ async function crossLabPortal(page: Page) {
   await walkRoute(page, 'RRRR');
 }
 
-test('Adventure combines chips, equipment, locks, a pressure crate, celebration, and manual portal exit', async ({ page }) => {
+async function solveAdventureComputer(page: Page, answer: string) {
+  await page.getByRole('button', { name: 'USE' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.screenshot({ path: path.join(captures, `adventure-computer-${answer.toLowerCase()}-open.png`) });
+  if (answer === ADVENTURE_SOLUTION.signalAnswer) {
+    await page.keyboard.type('STONE'); await page.keyboard.press('Enter');
+    await expect(page.locator('.computer-word-grid [data-score="present"]')).toHaveCount(2);
+    await page.screenshot({ path: path.join(captures, 'adventure-word-grid-feedback.png') });
+  } else {
+    await page.keyboard.type('A');
+    await expect(page.getByLabel('1 of 6 misses')).toBeVisible();
+    await page.screenshot({ path: path.join(captures, 'adventure-hangman-miss.png') });
+  }
+  await page.keyboard.type(answer);
+  if (answer === ADVENTURE_SOLUTION.signalAnswer) await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: 'RETURN TO TRAIL' })).toBeVisible();
+  await page.screenshot({ path: path.join(captures, `adventure-computer-${answer.toLowerCase()}-solved.png`) });
+  await page.getByRole('button', { name: 'RETURN TO TRAIL' }).click();
+}
+
+async function completeAdventure(page: Page) {
+  await walkRoute(page, ADVENTURE_SOLUTION.toSignalComputer);
+  await page.keyboard.press('ArrowLeft');
+  await solveAdventureComputer(page, ADVENTURE_SOLUTION.signalAnswer);
+  await walkRoute(page, ADVENTURE_SOLUTION.signalToArchiveComputer);
+  await page.keyboard.press('ArrowRight');
+  await solveAdventureComputer(page, ADVENTURE_SOLUTION.archiveAnswer);
+  await walkRoute(page, ADVENTURE_SOLUTION.archiveToFinalGate);
+  await advance(page, 1000);
+  await walkRoute(page, ADVENTURE_SOLUTION.finalPortalStep);
+}
+
+test('Adventure combines a five-minute maze, two computers, gear, locks, a pressure crate, and a manual portal exit', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/?lab=adventure');
   await expect(page.getByLabel('Adventure game world')).toBeVisible();
@@ -42,14 +75,11 @@ test('Adventure combines chips, equipment, locks, a pressure crate, celebration,
   expect(canvas).not.toBeNull();
   await page.screenshot({ path: path.join(captures, 'adventure-primary-start.png') });
   await page.mouse.move(canvas!.x + 115, canvas!.y + 350); await page.mouse.down(); await page.mouse.move(canvas!.x + 235, canvas!.y + 350, { steps: 4 }); await page.mouse.up();
-  let state = await snapshot(page); expect(state.player).toEqual({ x: 3, y: 3 });
+  let state = await snapshot(page); expect(state.player).toEqual({ x: 2, y: 1 });
   await page.getByRole('button', { name: 'RESET', exact: true }).click();
-  await walkRoute(page, 'URRDDURRRRURRLLDDDDRRLDDDDLLLLLLLLURR');
-  state = await snapshot(page); expect(state.phase).toBe('celebrating'); expect(state.inventory.chips).toBe(5); expect(state.doors.chipGateOpen).toBe(true); expect(state.plateActive).toBe(true);
-  await advance(page, 999); expect((await snapshot(page)).phase).toBe('celebrating');
-  await advance(page, 1); expect((await snapshot(page)).phase).toBe('portal-open');
-  await walkRoute(page, 'DLLD');
-  state = await snapshot(page); expect(state.phase).toBe('complete'); expect(state.portalOpen).toBe(true);
+  await completeAdventure(page);
+  state = await snapshot(page); expect(state.phase).toBe('complete'); expect(state.inventory.chips).toBe(10); expect(state.doors.chipGateOpen).toBe(true); expect(state.plateActive).toBe(true);
+  expect(state.terminals.signal.solved).toBe(true); expect(state.terminals.archive.solved).toBe(true); expect(state.moves).toBe(ADVENTURE_SOLUTION.expectedMoves); expect(state.portalOpen).toBe(true);
   await page.screenshot({ path: path.join(captures, 'adventure-primary-complete.png') });
 });
 
@@ -60,7 +90,7 @@ test('daily formula preview runs Adventure, two themed prototypes, and the named
   await expect(page.getByRole('heading', { name: 'The Verdant Orrery' })).toBeVisible();
   await page.getByRole('button', { name: 'ENTER THE ADVENTURE' }).click();
   await advance(page, 0);
-  await walkRoute(page, 'URRDDURRRRURRLLDDDDRRLDDDDLLLLLLLLURR'); await advance(page, 1000); await walkRoute(page, 'DLLD');
+  await completeAdventure(page);
   await expect(page.getByRole('heading', { name: /Gear Links/i })).toBeVisible();
   let state = await snapshot(page);
   for (let index = 0; index < 16; index += 1) {
@@ -89,7 +119,7 @@ test('Prototype Corridor exposes Adventure and Labs 03 through 16 with matching 
   await page.goto('/');
   await page.getByRole('button', { name: /PREVIEW TESTER GAME/i }).click();
   await expect(page.getByRole('heading', { name: 'Prototype Corridor' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Adventure.*Primary room/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Venture Circuit.*Main mode/i })).toBeVisible();
   for (const title of ['Relic Run', 'Sky Stack', 'River Relay', 'Trail Coil', 'Prism Break', 'Rune Merge', 'Lantern Grid', 'Icebound Route', 'Crate Circuit', 'Echo Sequence', 'Gear Links', 'Orbit Pulse', 'Rune Word', 'Relic Groups']) {
     await expect(page.getByRole('button', { name: new RegExp(title) })).toBeVisible();
   }
@@ -253,9 +283,9 @@ test('expanded Adventure map and controls fit every supported phone size', async
     await page.goto('/?lab=adventure');
     await expect(page.getByLabel('Adventure game world')).toBeVisible();
     const state = await snapshot(page);
-    expect(state.coordinateSystem).toContain('13x13');
-    expect(state.map).toHaveLength(13);
-    expect(state.inventory.chipTotal).toBe(5);
+    expect(state.coordinateSystem).toContain('21x21');
+    expect(state.map).toHaveLength(21);
+    expect(state.inventory.chipTotal).toBe(10);
     const controls = await page.locator('.lab-controls').boundingBox();
     const stage = await page.locator('.phone-stage').boundingBox();
     expect(controls).not.toBeNull(); expect(stage).not.toBeNull();

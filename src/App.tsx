@@ -134,6 +134,7 @@ export function App() {
       : requestedLab === 'mine-trail' ? 'lab-mine'
         : requestedLab && /^(?:0?[3-9]|1[0-6])$/.test(requestedLab) ? 'lab' : 'home';
   });
+  const [adventureReturnPage, setAdventureReturnPage] = useState<'home' | 'lab'>('lab');
   const [modal, setModal] = useState<Modal>(null);
   const [calendar, setCalendar] = useState<CalendarDay[]>([]);
   const [reviewAdventures, setReviewAdventures] = useState<DailyAdventure[]>([]);
@@ -382,8 +383,8 @@ export function App() {
       {!(session.mode === 'home' && (page.startsWith('lab') || page === 'formula')) && <VentureCanvas view={session.mode === 'home' ? homeCanvasView : canvasView} />}
 
       {session.mode === 'home' && page === 'formula' && <FormulaPreview character={character} onExit={() => setPage('home')} />}
-      {session.mode === 'home' && page === 'lab' && <CoreLabHub character={character} onExit={() => setPage('home')} openAdventure={() => setPage('lab-adventure')} openBlockShift={() => setPage('lab-block')} openMineTrail={() => setPage('lab-mine')} />}
-      {session.mode === 'home' && page === 'lab-adventure' && <AdventureLab character={character} onExit={() => setPage('lab')} />}
+      {session.mode === 'home' && page === 'lab' && <CoreLabHub character={character} onExit={() => setPage('home')} openAdventure={() => { setAdventureReturnPage('lab'); setPage('lab-adventure'); }} openBlockShift={() => setPage('lab-block')} openMineTrail={() => setPage('lab-mine')} />}
+      {session.mode === 'home' && page === 'lab-adventure' && <AdventureLab character={character} onExit={() => setPage(adventureReturnPage)} />}
       {session.mode === 'home' && page === 'lab-block' && <BlockShiftLab character={character} onExit={() => setPage('lab')} />}
       {session.mode === 'home' && page === 'lab-mine' && <MineTrailLab character={character} onExit={() => setPage('lab')} />}
 
@@ -398,7 +399,7 @@ export function App() {
         <div className="home-actions">
           <button className="primary-button" onClick={playToday} disabled={!todayAdventure}>VENTURE <small>{todayAdventure ? todayAdventure.title : 'Awaiting launch date'}</small></button>
           <button className="secondary-button" onClick={openArchive}>PAST VENTURES</button>
-          <button className="formula-preview-button" onClick={() => setPage('formula')}>TEST DAILY FORMULA <span>Adventure → 2 puzzles → The Watcher</span></button>
+          <button className="formula-preview-button" onClick={() => { setAdventureReturnPage('home'); setPage('lab-adventure'); }}>PLAY NEW DAILY MODE <span>Venture Circuit · computers + world puzzle</span></button>
           <button className="lab-preview-button" onClick={() => setPage('lab')}>PREVIEW TESTER GAMES <span>Adventure + 16 prototype labs</span></button>
           <button className="review-button" onClick={enterReview}>PREVIEW WEEK 1 <span>Reviewer build</span></button>
         </div>
@@ -443,7 +444,7 @@ export function App() {
 
       {session.mode === 'results' && session.adventure && <section className="screen-overlay results-screen"><div className="results-card"><div className="eyebrow">{session.finalOutcome === 'survived' ? 'VENTURE SURVIVED' : 'EXPEDITION ENDED'}</div><h1>{session.finalOutcome === 'survived' ? 'The trail opens' : `Room ${session.results.length} stopped you`}</h1><h2>{session.adventure.title}</h2><div className="result-tiles">{Array.from({ length: 5 }, (_, index) => <span key={index} className={session.results[index]?.success ? 'success' : session.results[index] ? 'failed' : ''}>{session.results[index]?.success ? '✓' : session.results[index] ? '×' : '·'}</span>)}</div><div className="result-stats"><div><strong>{session.results.filter((item) => item.success).length}/5</strong><small>cleared</small></div><div><strong>{formatDuration(session.activeMs)}</strong><small>active time</small></div><div><strong>{session.attemptNumber}</strong><small>attempt</small></div></div>{session.newlyUnlocked.length > 0 && <p className="achievement-toast">Achievement unlocked · {session.newlyUnlocked.join(', ')}</p>}<button className="primary-button" onClick={retry}>RETRY FULL TRAIL</button><button className="secondary-button" disabled={!profile || !session.authenticated} onClick={share}>{profile && session.authenticated ? 'SHARE RESULT' : 'LOG IN BEFORE PLAYING TO SHARE'}</button>{!session.authenticated && <p className="guest-note">Guest results are never saved or made shareable. Logging in now only applies to your next run.</p>}{shareMessage && <p className="share-message">{shareMessage}</p>}<button className="text-button" onClick={goHome}>Return home</button></div></section>}
 
-      {modal === 'help' && <ModalFrame title="What is Daily Venture?" onClose={() => setModal(null)}><p>Every calendar day opens one themed trail of handcrafted, character-driven puzzle rooms.</p><p>Future ventures will let you guide the explorer through each environment, unlocking the next room only after solving the current obstacle.</p><p>Guests can play freely, but only signed-in explorers save stats, achievements, settings, and shareable results.</p><div className="modal-note">Puzzle Lab is where new game mechanics are built and refined before they receive a theme or enter a Daily Venture.</div></ModalFrame>}
+      {modal === 'help' && <ModalFrame title="What is Daily Venture?" onClose={() => setModal(null)}><p>Every calendar day will open one handcrafted adventure world where you guide your explorer through circuits, locks, hazards, objects, and hidden routes.</p><p>Computers inside the world open focused puzzles—such as word grids or decoders—and solving them changes the surrounding level.</p><p>Guests can play freely, but only signed-in explorers save stats, achievements, settings, and shareable results.</p><div className="modal-note">The Venture Circuit is the first test of this new main mode. Puzzle Lab remains the workshop for mechanics that can become future computers and world obstacles.</div></ModalFrame>}
 
       {modal === 'rooms' && session.adventure && <ModalFrame title="Test any room" onClose={() => setModal(null)}><p>Jump directly to a puzzle without completing the earlier rooms. Test-room outcomes are not saved.</p><div className="room-picker">{session.adventure.levelOrder.map((type, index) => <button key={`${type}-${index}`} onClick={() => { dispatch({ type: 'JUMP_TO_LEVEL', levelIndex: index }); setModal(null); }}><span>{index + 1}</span><strong>{session.adventure?.puzzles[type].title}</strong><small>{type}</small></button>)}</div></ModalFrame>}
 
