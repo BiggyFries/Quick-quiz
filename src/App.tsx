@@ -132,7 +132,7 @@ export function App() {
       : requestedLab === 'adventure' ? 'lab-adventure'
       : requestedLab === 'block-shift' ? 'lab-block'
       : requestedLab === 'mine-trail' ? 'lab-mine'
-        : requestedLab && /^(?:0?[3-9]|1[0-6])$/.test(requestedLab) ? 'lab' : 'home';
+        : requestedLab && /^(?:0?[3-9]|1[0-9]|2[0-6])$/.test(requestedLab) ? 'lab' : 'home';
   });
   const [adventureReturnPage, setAdventureReturnPage] = useState<'home' | 'lab'>('lab');
   const [modal, setModal] = useState<Modal>(null);

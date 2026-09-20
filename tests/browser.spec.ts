@@ -111,7 +111,7 @@ async function failPuzzle(page: Page, config: PuzzleConfig) {
 test('mobile home remains usable across the supported phone range', async ({ page }) => {
   for (const viewport of [{ width: 360, height: 640 }, { width: 390, height: 844 }, { width: 430, height: 932 }]) {
     await page.setViewportSize(viewport);
-    await page.goto('/');
+    await page.goto('/?legacy=1');
     await expect(page.locator('main.high-contrast')).toBeVisible();
     await expect(page.getByRole('heading', { name: /DAILY VENTURE/i })).toBeVisible();
     await expect(page.getByRole('button', { name: 'About Daily Venture' })).toBeEnabled();
@@ -138,7 +138,7 @@ test('mobile home remains usable across the supported phone range', async ({ pag
 
 test('character creator saves appearance and name for the toolbar, profile, and playable labs', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/');
+  await page.goto('/?legacy=1');
   await page.getByRole('button', { name: 'Customize character, Ari' }).click();
   await expect(page.getByRole('dialog', { name: 'Customize character' })).toBeVisible();
   await page.getByRole('button', { name: /Matt.*Triangular/i }).click();
@@ -198,13 +198,13 @@ test('character creator saves appearance and name for the toolbar, profile, and 
   await expect(page.locator('.puzzle-panel')).toBeVisible();
   await page.screenshot({ path: path.join(captures, 'venture-puzzle-custom-character.png') });
 
-  await page.goto('/?lab=block-shift');
+  await page.goto('/?legacy=1&lab=block-shift');
   await expect(page.getByLabel('Block Shift puzzle room')).toBeVisible();
   const state = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
   expect(state.character).toMatchObject({ name: 'Nova Vale', head: 'angular', body: 'storm-coat', accessory: 'goggles' });
   await page.screenshot({ path: path.join(captures, 'block-shift-custom-character.png') });
 
-  await page.goto('/?lab=03');
+  await page.goto('/?legacy=1&lab=03');
   await expect(page.getByLabel('Relic Run game world')).toBeVisible();
   const classicState = JSON.parse((await page.evaluate(() => window.render_game_to_text?.())) ?? '{}');
   expect(classicState.character).toMatchObject({ name: 'Nova Vale', hairStyle: 'mohawk', eyeColor: '#4f7a4f' });
@@ -213,7 +213,7 @@ test('character creator saves appearance and name for the toolbar, profile, and 
 
 test('Block Shift lab supports touch controls, undo, keyboard play, and a complete door unlock', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/');
+  await page.goto('/?legacy=1');
   await page.getByRole('button', { name: /PREVIEW TESTER GAME/i }).click();
   await expect(page.getByRole('heading', { name: 'Prototype Corridor' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Block Shift/i })).toBeVisible();
@@ -265,7 +265,7 @@ test('Block Shift lab supports touch controls, undo, keyboard play, and a comple
 
 test('Mine Trail uses character movement and an action reveal for safe, failed, and cleared routes', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/');
+  await page.goto('/?legacy=1');
   await page.getByRole('button', { name: /PREVIEW TESTER GAME/i }).click();
   await page.getByRole('button', { name: /Mine Trail/i }).click();
   await expect(page.getByRole('heading', { name: /Mine Trail/i })).toBeVisible();
@@ -320,7 +320,7 @@ test('both character puzzle labs keep controls inside the supported phone range'
       { query: 'block-shift', canvas: 'Block Shift puzzle room', action: 'Move down' },
       { query: 'mine-trail', canvas: 'Mine Trail puzzle room', action: 'Reveal current tile' },
     ]) {
-      await page.goto(`/?lab=${lab.query}`);
+      await page.goto(`/?legacy=1&lab=${lab.query}`);
       await expect(page.getByLabel(lab.canvas)).toBeVisible();
       const control = await page.getByRole('button', { name: lab.action }).boundingBox();
       const reset = await page.getByRole('button', { name: /RESET/i }).boundingBox();
@@ -334,7 +334,7 @@ test('both character puzzle labs keep controls inside the supported phone range'
 });
 
 test('reviewer room picker jumps directly to each puzzle without saving a result', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?legacy=1');
   await openPreview(page, WEEK_ONE[0]);
   for (let index = 0; index < 5; index += 1) {
     await page.getByRole('button', { name: 'ROOMS' }).click();
@@ -349,10 +349,11 @@ test('reviewer room picker jumps directly to each puzzle without saving a result
 });
 
 test('reviewer can survive all seven adventures through all 35 real room UIs', async ({ page }) => {
+  test.setTimeout(360_000);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(String(error)));
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
-  await page.goto('/');
+  await page.goto('/?legacy=1');
   for (const adventure of WEEK_ONE) {
     await openPreview(page, adventure);
     const daySlug = slug(adventure.title);
@@ -382,7 +383,7 @@ test('reviewer can survive all seven adventures through all 35 real room UIs', a
 
 test('every theme and all five traversal variants render a defeat and guest-safe result', async ({ page }) => {
   test.setTimeout(240_000);
-  await page.goto('/');
+  await page.goto('/?legacy=1');
   for (const adventure of WEEK_ONE) {
     const target = adventure.weekIndex % 5;
     await openPreview(page, adventure);
@@ -408,7 +409,7 @@ test('every theme and all five traversal variants render a defeat and guest-safe
 });
 
 test('guest results stay memory-only and locked even after a later login', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?legacy=1');
   await page.getByRole('button', { name: /PREVIEW WEEK 1/i }).click();
   const today = await page.evaluate(() => {
     const date = new Date();

@@ -2,8 +2,10 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { drawCharacterCanvas, type CharacterCustomization } from '../character/character';
 import { ClassicLab } from './ClassicLab';
 import { CLASSIC_LABS, type ClassicLabId } from './classicLabs';
+import { MotionLab } from './MotionLab';
+import { MOTION_LABS, type MotionLabId } from './motionLabs';
 
-type LabSelection = ClassicLabId | null;
+type LabSelection = ClassicLabId | MotionLabId | null;
 
 function drawHubExplorer(ctx: CanvasRenderingContext2D, time: number) {
   const bob = Math.sin(time / 380) * 2;
@@ -43,7 +45,7 @@ function drawHub(canvas: HTMLCanvasElement, time: number, character: CharacterCu
 export function LabHub({ onExit, openAdventure, openBlockShift, openMineTrail, character }: { onExit: () => void; openAdventure: () => void; openBlockShift: () => void; openMineTrail: () => void; character: CharacterCustomization }) {
   const [selected, setSelected] = useState<LabSelection>(() => {
     const requested = Number(new URLSearchParams(window.location.search).get('lab'));
-    return requested >= 3 && requested <= 16 ? requested as ClassicLabId : null;
+    return requested >= 3 && requested <= 26 ? requested as ClassicLabId | MotionLabId : null;
   });
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -61,21 +63,23 @@ export function LabHub({ onExit, openAdventure, openBlockShift, openMineTrail, c
     bridge.advanceTime = () => { if (canvasRef.current) drawHub(canvasRef.current, performance.now(), character); };
     bridge.render_game_to_text = () => JSON.stringify({
       mode: 'lab-corridor', coordinateSystem: 'portrait menu; cards ordered top-to-bottom',
-      playableLabs: ['adventure', 1, 2, ...CLASSIC_LABS.map((lab) => lab.id)],
+      playableLabs: ['adventure', 1, 2, ...CLASSIC_LABS.map((lab) => lab.id), ...MOTION_LABS.map((lab) => lab.id)],
       objective: 'Choose a prototype lab to play. Every playable lab uses the same explorer and portal system.',
       character,
     });
     return () => { delete bridge.advanceTime; delete bridge.render_game_to_text; };
   }, [character, selected]);
 
-  if (selected !== null) return <ClassicLab id={selected} character={character} onExit={() => setSelected(null)} />;
+  if (selected !== null) return selected <= 16
+    ? <ClassicLab id={selected as ClassicLabId} character={character} onExit={() => setSelected(null)} />
+    : <MotionLab id={selected as MotionLabId} character={character} onExit={() => setSelected(null)} />;
 
   return <section className="lab-hub-screen" aria-label="Prototype Lab corridor">
     <canvas ref={canvasRef} width="390" height="844" aria-label="Explorer standing in the prototype corridor" />
     <header className="lab-hub-header">
       <button className="icon-button glass" onClick={onExit} aria-label="Back to home">←</button>
       <div><span>DAILY VENTURE · TEST WING</span><h1>Prototype Corridor</h1></div>
-      <div className="lab-count"><strong>17</strong><small>PLAYABLE</small></div>
+      <div className="lab-count"><strong>27</strong><small>PLAYABLE</small></div>
     </header>
     <div className="lab-hub-intro">
       <strong>Choose the next field test</strong>
@@ -93,6 +97,12 @@ export function LabHub({ onExit, openAdventure, openBlockShift, openMineTrail, c
       </button>
       <div className="lab-list-divider"><span>MECHANIC STUDIES · TUNED CHALLENGE</span></div>
       {CLASSIC_LABS.map((lab) => <button key={lab.id} className="lab-card" style={{ '--lab-accent': lab.accent } as CSSProperties} onClick={() => setSelected(lab.id)}>
+        <span className="lab-card-number">{String(lab.id).padStart(2, '0')}</span>
+        <span className="lab-card-icon" aria-hidden="true">{lab.icon}</span>
+        <span className="lab-card-copy"><strong>{lab.title}</strong><small>{lab.shortTitle} · {lab.inspiration}</small></span><b>PLAY ›</b>
+      </button>)}
+      <div className="lab-list-divider"><span>MOTION LABS · SPRING PHYSICS + DEPTH-SORTED WORLDS</span></div>
+      {MOTION_LABS.map((lab) => <button key={lab.id} className="lab-card motion-lab-card" style={{ '--lab-accent': lab.accent } as CSSProperties} onClick={() => setSelected(lab.id)}>
         <span className="lab-card-number">{String(lab.id).padStart(2, '0')}</span>
         <span className="lab-card-icon" aria-hidden="true">{lab.icon}</span>
         <span className="lab-card-copy"><strong>{lab.title}</strong><small>{lab.shortTitle} · {lab.inspiration}</small></span><b>PLAY ›</b>

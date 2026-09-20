@@ -1,3 +1,5 @@
+import { drawScenery } from '../venture/scenery';
+import { isGamePaused, gameFeedback } from '../venture/runtime';
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { drawCharacterCanvas, type CharacterCustomization } from '../character/character';
 import {
@@ -50,27 +52,12 @@ function wordKeyMark(state: WordState, letter: string) {
 }
 
 function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number, fill: string, stroke?: string) {
-  ctx.beginPath(); ctx.roundRect(x, y, width, height, radius); ctx.fillStyle = fill; ctx.fill();
+  ctx.save(); if (width > 100) { ctx.shadowColor = "#18382930"; ctx.shadowBlur = 16; ctx.shadowOffsetY = 8; } ctx.beginPath(); ctx.roundRect(x, y, width, height, radius); ctx.fillStyle = fill; ctx.fill(); ctx.restore();
   if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
 }
 
 function drawLabBackdrop(ctx: CanvasRenderingContext2D, definition: LabDefinition, time: number, theme: LabTheme) {
-  const gradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
-  gradient.addColorStop(0, theme.skyTop); gradient.addColorStop(.55, theme.skyMid); gradient.addColorStop(1, theme.skyBottom);
-  ctx.fillStyle = gradient; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-  const glow = ctx.createRadialGradient(195, 315, 20, 195, 315, 260);
-  glow.addColorStop(0, `${theme.accent}42`); glow.addColorStop(1, '#0d2a3000');
-  ctx.fillStyle = glow; ctx.fillRect(0, 85, 390, 590);
-  ctx.fillStyle = '#061a214c';
-  ctx.beginPath(); ctx.moveTo(0, 680); ctx.lineTo(0, 150); ctx.quadraticCurveTo(55, 95, 104, 145); ctx.lineTo(86, 680); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(390, 680); ctx.lineTo(390, 150); ctx.quadraticCurveTo(335, 95, 286, 145); ctx.lineTo(304, 680); ctx.fill();
-  const pulse = (Math.sin(time / 600) + 1) / 2;
-  ctx.strokeStyle = `${theme.accent}${Math.round(80 + pulse * 80).toString(16).padStart(2, '0')}`;
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(195, 376, 182, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
-  for (let x = 18; x < 390; x += 44) {
-    ctx.fillStyle = '#bfe3d317'; ctx.fillRect(x, 138, 1, 510);
-  }
+  drawScenery(ctx, definition.id, time);
 }
 
 function drawExplorer(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, time: number, remote = false, facing: ClassicDirection = 'down') {
@@ -229,7 +216,7 @@ function drawPrism(ctx: CanvasRenderingContext2D, state: PrismState, time: numbe
   });
   ctx.save(); ctx.shadowColor = '#fff0a6'; ctx.shadowBlur = 15; ctx.fillStyle = '#fff0a6'; ctx.beginPath(); ctx.arc(state.ball.x, state.ball.y, 7, 0, Math.PI * 2); ctx.fill(); ctx.restore();
   ctx.save(); ctx.shadowColor = '#71e3d0'; ctx.shadowBlur = 12; ctx.fillStyle = '#71e3d0'; ctx.beginPath(); ctx.roundRect(state.paddleX - 46, 560, 92, 13, 7); ctx.fill(); ctx.restore();
-  drawCustomizedExplorer(ctx, 195, 530, .68, time, character, true);
+  drawCustomizedExplorer(ctx, 374, 529, .3, time, character, true);
 }
 
 const MERGE_COLORS: Record<number, string> = { 2: '#5d8e88', 4: '#55a99c', 8: '#d6a351', 16: '#d37b51', 32: '#a76fb9', 64: '#f6c85f', 128: '#ef8378' };
@@ -348,9 +335,9 @@ function drawWord(ctx: CanvasRenderingContext2D, state: WordState, time: number,
   for (let row = 0; row < state.maxGuesses; row += 1) {
     const guess = state.guesses[row]; const letters = guess?.word ?? (row === state.guesses.length ? state.current : '');
     for (let col = 0; col < 5; col += 1) {
-      const x = left + col * (cell + gap); const y = top + row * 47; const fill = guess ? WORD_MARK_COLORS[guess.marks[col]] : row === state.guesses.length ? '#31575b' : '#17383d';
-      roundedRect(ctx, x, y, cell, 40, 9, fill, row === state.guesses.length ? '#dffff29c' : '#ffffff30');
-      ctx.fillStyle = '#fff'; ctx.font = '900 19px Inter, system-ui'; ctx.textBaseline = 'middle'; ctx.fillText(letters[col] ?? '', x + cell / 2, y + 21);
+      const x = left + col * (cell + gap); const y = top + row * 38; const fill = guess ? WORD_MARK_COLORS[guess.marks[col]] : row === state.guesses.length ? '#31575b' : '#17383d';
+      roundedRect(ctx, x, y, cell, 33, 7, fill, row === state.guesses.length ? '#dffff29c' : '#ffffff30');
+      ctx.fillStyle = '#fff'; ctx.font = '900 19px Inter, system-ui'; ctx.textBaseline = 'middle'; ctx.fillText(letters[col] ?? '', x + cell / 2, y + 17);
     }
   }
   ctx.textBaseline = 'alphabetic'; drawCustomizedExplorer(ctx, 340, 425, .58, time, character, true);
@@ -430,10 +417,10 @@ function DirectionPad({ move, center, disabled }: { move: (direction: ClassicDir
   </div>;
 }
 
-export function ClassicLab({ id, onExit, onComplete, character, theme = PROTOTYPE_THEME, contextLabel = 'PROTOTYPE CORRIDOR' }: { id: ClassicLabId; onExit: () => void; onComplete?: () => void; character: CharacterCustomization; theme?: LabTheme; contextLabel?: string }) {
+export function ClassicLab({ id, onExit, onComplete, character, seed = 0, theme = PROTOTYPE_THEME, contextLabel = 'THE PUZZLE ARCADE' }: { id: ClassicLabId; onExit: () => void; onComplete?: () => void; character: CharacterCustomization; seed?: number; theme?: LabTheme; contextLabel?: string }) {
   const definition = CLASSIC_LABS.find((lab) => lab.id === id)!;
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [state, setState] = useState<ClassicLabState>(() => initialClassicLabState(id));
+  const [state, setState] = useState<ClassicLabState>(() => initialClassicLabState(id, seed));
   const stateRef = useRef<ClassicLabState>(state);
   const manualTime = useRef(false);
   const drawNowRef = useRef<(() => void) | null>(null);
@@ -441,12 +428,14 @@ export function ClassicLab({ id, onExit, onComplete, character, theme = PROTOTYP
   const [journey, setJourney] = useState<VictoryJourney>(idleVictoryJourney);
   const journeyRef = useRef(journey);
   const completionSent = useRef(false);
+  const history = useRef<ClassicLabState[]>([]);
 
   const updateJourney = useCallback((update: (current: VictoryJourney) => VictoryJourney) => {
     const next = update(journeyRef.current); journeyRef.current = next; setJourney(next); drawNowRef.current?.();
   }, []);
 
   const commit = useCallback((action: ClassicLabAction) => {
+    if (isGamePaused()) return;
     if (journeyRef.current.phase !== 'idle') {
       if (action.type === 'tick') {
         updateJourney((current) => tickVictoryJourney(current, action.ms));
@@ -459,19 +448,23 @@ export function ClassicLab({ id, onExit, onComplete, character, theme = PROTOTYP
       return;
     }
     const current = stateRef.current;
+    if (action.type !== 'tick' && current.status === 'playing' && [8,9,10,11,13].includes(id)) { history.current.push(structuredClone(current)); if(history.current.length>100) history.current.shift(); }
     const next = updateClassicLab(current, action);
+    if(action.type !== 'tick' && action.type !== 'aim') gameFeedback(next.status === 'complete');
     const statusChanged = next.status !== current.status;
     stateRef.current = next; setState(next);
     if (current.status !== 'complete' && next.status === 'complete') updateJourney(() => beginVictoryJourney());
     drawNowRef.current?.();
-    if (statusChanged || action.type !== 'tick') navigator.vibrate?.(next.status === 'complete' ? [30, 40, 60] : 10);
-  }, [updateJourney]);
+    if (action.type !== 'aim' && (statusChanged || action.type !== 'tick')) navigator.vibrate?.(next.status === 'complete' ? [30, 40, 60] : 10);
+  }, [id, updateJourney]);
+
+  useEffect(() => { const undo = () => { if(isGamePaused() || journeyRef.current.phase !== 'idle') return; const previous=history.current.pop(); if(previous){stateRef.current=previous;setState(previous);drawNowRef.current?.();gameFeedback();} }; window.addEventListener('venture-undo',undo); return ()=>window.removeEventListener('venture-undo',undo); }, []);
 
   const move = useCallback((direction: ClassicDirection) => commit({ type: 'move', direction }), [commit]);
   const reset = useCallback(() => {
-    const next = initialClassicLabState(id); stateRef.current = next; setState(next); completionSent.current = false;
+    history.current = []; const next = initialClassicLabState(id, seed); stateRef.current = next; setState(next); completionSent.current = false;
     const idle = idleVictoryJourney(); journeyRef.current = idle; setJourney(idle); drawNowRef.current?.();
-  }, [id]);
+  }, [id, seed]);
 
   useEffect(() => {
     if (journey.phase === 'departed' && onComplete && !completionSent.current) { completionSent.current = true; onComplete(); }
@@ -536,6 +529,7 @@ export function ClassicLab({ id, onExit, onComplete, character, theme = PROTOTYP
     if (journeyRef.current.phase !== 'idle') {
       const dx = x - .5; const dy = y - .48; move(Math.abs(dx) > Math.abs(dy) ? dx > 0 ? 'right' : 'left' : dy > 0 ? 'down' : 'up'); return;
     }
+    if (id === 7) { commit({ type: 'aim', x: x * 390 }); return; }
     if (id === 4) { commit({ type: 'hard-drop' }); return; }
     if (id === 14) { commit({ type: 'activate', index: 0 }); return; }
     const dx = x - .5; const dy = y - .45;
@@ -550,11 +544,11 @@ export function ClassicLab({ id, onExit, onComplete, character, theme = PROTOTYP
       const x = current % 4; const y = Math.floor(current / 4);
       return direction === 'left' ? y * 4 + Math.max(0, x - 1) : direction === 'right' ? y * 4 + Math.min(3, x + 1) : direction === 'up' ? Math.max(0, y - 1) * 4 + x : Math.min(3, y + 1) * 4 + x;
     });
-    else move(direction);
+    else if(id !== 7) move(direction);
   }, state.status === 'failed' || journey.phase === 'celebrating' || journey.phase === 'departed', tapAction);
 
   return <section className="lab-screen classic-lab-screen" aria-label={`${definition.title} puzzle lab`} style={themeCss(theme)}>
-    <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} aria-label={`${definition.title} game world`} {...swipe} />
+    <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} aria-label={`${definition.title} game world`} {...swipe} onPointerDown={(event)=>{swipe.onPointerDown(event);if(id===7 && journeyRef.current.phase==='idle'){const box=event.currentTarget.getBoundingClientRect();commit({type:'aim',x:(event.clientX-box.left)/box.width*390});}}} onPointerMove={(event)=>{if(id===7 && event.buttons && journeyRef.current.phase==='idle'){const box=event.currentTarget.getBoundingClientRect();commit({type:'aim',x:(event.clientX-box.left)/box.width*390});}}} />
     <header className="lab-header">
       <button className="icon-button glass" onClick={onExit} aria-label="Back to Lab corridor">←</button>
       <div><span>{contextLabel} · LAB {String(id).padStart(2, '0')}</span><h1>{definition.title} · {definition.shortTitle}</h1></div>

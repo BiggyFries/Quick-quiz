@@ -51,6 +51,26 @@
 .classic-controls { grid-template-columns: minmax(52px, 64px) 140px minmax(52px, 64px); gap: 4px 8px; justify-content: center; align-items: center; }
 .classic-controls .lab-utility small { display: block; margin: 3px 0 0; }
 
+/* Labs 17+ use a higher-fidelity motion shell with canvas-native hit testing. */
+.motion-lab-screen > canvas { cursor: crosshair; touch-action: none; }
+.motion-lab-card { border-color: color-mix(in srgb, var(--lab-accent) 62%, #fff 38%); background: linear-gradient(120deg, color-mix(in srgb, var(--lab-accent) 19%, #0b2c34 81%), #071b21e8); }
+.motion-lab-card .lab-card-number, .motion-lab-card .lab-card-icon { color: var(--lab-accent); }
+.motion-controls { grid-template-columns: minmax(62px, 76px) 140px minmax(62px, 76px); }
+.motion-submit { width: 94px; height: 78px; justify-self: center; border: 2px solid #eafff1; border-radius: 50%; background: var(--motion-accent); color: #102c32; box-shadow: inset 0 -7px 0 #17343a35, 0 9px 22px #0007, 0 0 22px color-mix(in srgb, var(--motion-accent) 55%, transparent); font-size: 11px; font-weight: 950; letter-spacing: .05em; }
+.motion-submit small { display: block; margin-top: 5px; font-size: 7px; }
+.motion-submit:active { transform: translateY(3px); box-shadow: inset 0 -4px 0 #17343a35, 0 5px 13px #0007; }
+.motion-submit:disabled { opacity: .42; filter: saturate(.55); }
+.flood-color-controls { width: 136px; display: grid; grid-template-columns: repeat(2, 58px); grid-template-rows: repeat(2, 58px); place-content: center; gap: 8px; }
+.flood-color-controls button { min-width: 58px; min-height: 58px; padding: 0; border: 2px solid #e8fff4; border-radius: 18px; box-shadow: inset 0 -6px 0 #102c3245, 0 6px 16px #0006; }
+.flood-color-controls button:disabled { opacity: .32; transform: scale(.88); }
+
+@media (max-height: 720px) {
+  .motion-controls { grid-template-columns: minmax(54px, 68px) 136px minmax(54px, 68px); }
+  .motion-submit { width: 82px; height: 72px; }
+  .flood-color-controls { width: 128px; grid-template-columns: repeat(2, 54px); grid-template-rows: repeat(2, 54px); }
+  .flood-color-controls button { min-width: 54px; min-height: 54px; }
+}
+
 .adventure-controls .use-computer { border-color: #71dce8a3; background: #164e58e8; color: #dfffff; }
 .adventure-controls .lab-utility small { display: block; margin: 3px 0 0; font-size: 7px; line-height: 1.1; }
 .adventure-computer-panel { position: absolute; z-index: 7; top: 140px; left: 12px; right: 12px; bottom: 190px; display: flex; flex-direction: column; align-items: center; padding: 15px 14px 12px; overflow: hidden; border: 1px solid #8beaf0a3; border-radius: 24px; background: linear-gradient(165deg, #0d3038f7, #06171bfc 72%); box-shadow: 0 22px 55px #000d, inset 0 0 40px #64d9ed0d; color: #f6fbf8; text-align: center; backdrop-filter: blur(18px); }

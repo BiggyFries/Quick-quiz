@@ -1,3 +1,5 @@
+import { drawScenery } from '../venture/scenery';
+import { isGamePaused, gameFeedback } from '../venture/runtime';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { drawCharacterCanvas, type CharacterCustomization } from '../character/character';
 import {
@@ -108,11 +110,7 @@ function drawMiniMap(ctx: CanvasRenderingContext2D, state: AdventureState, theme
 }
 
 function drawAdventure(ctx: CanvasRenderingContext2D, state: AdventureState, time: number, character: CharacterCustomization, theme: LabTheme) {
-  const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT); sky.addColorStop(0, theme.skyTop); sky.addColorStop(.58, theme.skyMid); sky.addColorStop(1, theme.skyBottom);
-  ctx.fillStyle = sky; ctx.fillRect(0, 0, WIDTH, HEIGHT);
-  const halo = ctx.createRadialGradient(195, 315, 20, 195, 315, 310); halo.addColorStop(0, `${theme.accent}4c`); halo.addColorStop(1, `${theme.accent}00`); ctx.fillStyle = halo; ctx.fillRect(0, 60, WIDTH, 570);
-  ctx.fillStyle = '#07191d75'; ctx.beginPath(); ctx.moveTo(0, 590); ctx.lineTo(0, 118); ctx.lineTo(48, 160); ctx.lineTo(88, 590); ctx.fill(); ctx.beginPath(); ctx.moveTo(390, 590); ctx.lineTo(390, 118); ctx.lineTo(342, 160); ctx.lineTo(302, 590); ctx.fill();
-
+  drawScenery(ctx, 0, time);
   const entities: Array<{ depth: number; draw: () => void }> = [];
   ADVENTURE_MAP.forEach((row, y) => [...row].forEach((tile, x) => {
     const point = { x, y }; const center = iso(point, state.player); const depth = x + y;
@@ -194,8 +192,9 @@ export function AdventureLab({ onExit, onComplete, character, theme = PROTOTYPE_
   const stateRef = useRef(state); const manualTime = useRef(false); const completionSent = useRef(false); const drawRef = useRef<(() => void) | null>(null);
 
   const commit = useCallback((update: (current: AdventureState) => AdventureState) => {
+    if(isGamePaused()) return;
     const previous = stateRef.current; const next = update(previous); stateRef.current = next; setState(next); drawRef.current?.();
-    if (next.moves !== previous.moves) navigator.vibrate?.(8);
+    if (next.moves !== previous.moves) { navigator.vibrate?.(8);gameFeedback(); }
   }, []);
   const move = useCallback((direction: AdventureDirection) => commit((current) => moveAdventure(current, direction)), [commit]);
   const useComputer = useCallback(() => commit(interactAdventure), [commit]);

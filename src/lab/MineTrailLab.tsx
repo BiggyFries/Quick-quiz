@@ -1,3 +1,5 @@
+import { drawScenery } from '../venture/scenery';
+import { isGamePaused, gameFeedback } from '../venture/runtime';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { drawCharacterCanvas, type CharacterCustomization } from '../character/character';
 import type { GridPoint, LabDirection } from './blockShift';
@@ -127,11 +129,7 @@ function drawMineVictory(ctx: CanvasRenderingContext2D, state: MineTrailState, j
 }
 
 function drawMineLab(ctx: CanvasRenderingContext2D, state: MineTrailState, transition: MoveTransition | null, actionStartedAt: number, time: number, character: CharacterCustomization, journey: VictoryJourney, theme: LabTheme) {
-  const sky = ctx.createLinearGradient(0, 0, 0, 844); sky.addColorStop(0, theme.skyTop); sky.addColorStop(.55, theme.skyMid); sky.addColorStop(1, theme.skyBottom);
-  ctx.fillStyle = sky; ctx.fillRect(0, 0, 390, 844);
-  const glow = ctx.createRadialGradient(195, 330, 20, 195, 330, 250); glow.addColorStop(0, '#def2d541'); glow.addColorStop(1, '#15293600'); ctx.fillStyle = glow; ctx.fillRect(0, 120, 390, 480);
-  ctx.fillStyle = '#1729367d'; ctx.beginPath(); ctx.moveTo(0, 520); ctx.lineTo(0, 195); ctx.lineTo(78, 140); ctx.lineTo(100, 520); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(390, 520); ctx.lineTo(390, 195); ctx.lineTo(312, 140); ctx.lineTo(290, 520); ctx.fill();
+  drawScenery(ctx, 2, time);
   const revealed = new Set(state.revealed);
   for (let sum = 0; sum <= MINE_TRAIL_WIDTH + MINE_TRAIL_HEIGHT - 2; sum += 1) {
     for (let y = 0; y < MINE_TRAIL_HEIGHT; y += 1) {
@@ -150,7 +148,7 @@ function drawMineLab(ctx: CanvasRenderingContext2D, state: MineTrailState, trans
   }
 }
 
-export function MineTrailLab({ onExit, onComplete, character, theme = PROTOTYPE_THEME, contextLabel = 'PREVIEW TESTER GAME' }: { onExit: () => void; onComplete?: () => void; character: CharacterCustomization; theme?: LabTheme; contextLabel?: string }) {
+export function MineTrailLab({ onExit, onComplete, character, theme = PROTOTYPE_THEME, contextLabel = 'THE PUZZLE ARCADE' }: { onExit: () => void; onComplete?: () => void; character: CharacterCustomization; theme?: LabTheme; contextLabel?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [state, setState] = useState(initialMineTrailState);
   const stateRef = useRef(state); const transitionRef = useRef<MoveTransition | null>(null);
@@ -163,6 +161,7 @@ export function MineTrailLab({ onExit, onComplete, character, theme = PROTOTYPE_
   }, []);
 
   const move = useCallback((direction: LabDirection) => {
+    if(isGamePaused())return;gameFeedback();
     if (journeyRef.current.phase !== 'idle') { updateJourney((current) => moveVictoryJourney(current, direction)); return; }
     setState((current) => {
       const next = moveMineTrail(current, direction);
@@ -171,6 +170,7 @@ export function MineTrailLab({ onExit, onComplete, character, theme = PROTOTYPE_
     });
   }, [updateJourney]);
   const reveal = useCallback(() => {
+    if(isGamePaused())return;gameFeedback();
     setState((current) => {
       const next = revealMineTrail(current); actionStartedRef.current = performance.now() + manualTimeOffset.current;
       if (current.status !== 'complete' && next.status === 'complete') updateJourney(() => beginVictoryJourney());
@@ -188,7 +188,7 @@ export function MineTrailLab({ onExit, onComplete, character, theme = PROTOTYPE_
     render(); return () => { cancelAnimationFrame(frame); drawNowRef.current = null; };
   }, [character, theme]);
 
-  useEffect(() => { const interval = window.setInterval(() => { if (!manualTime.current && journeyRef.current.phase === 'celebrating') updateJourney((current) => tickVictoryJourney(current, 50)); }, 50); return () => window.clearInterval(interval); }, [updateJourney]);
+  useEffect(() => { const interval = window.setInterval(() => { if (!isGamePaused() && !manualTime.current && journeyRef.current.phase === 'celebrating') updateJourney((current) => tickVictoryJourney(current, 50)); }, 50); return () => window.clearInterval(interval); }, [updateJourney]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -204,7 +204,7 @@ export function MineTrailLab({ onExit, onComplete, character, theme = PROTOTYPE_
 
   useEffect(() => {
     const bridge = window as typeof window & { advanceTime?: (ms: number) => void; render_game_to_text?: () => string };
-    bridge.advanceTime = (ms: number) => { manualTime.current = true; manualTimeOffset.current += ms; updateJourney((current) => tickVictoryJourney(current, ms)); drawNowRef.current?.(); };
+    bridge.advanceTime = (ms: number) => { manualTime.current = true; if(isGamePaused())return; manualTimeOffset.current += ms; updateJourney((current) => tickVictoryJourney(current, ms)); drawNowRef.current?.(); };
     bridge.render_game_to_text = () => JSON.stringify({ ...mineTrailSnapshot(stateRef.current), victory: journeyRef.current, character, theme: { id: theme.id, worldName: theme.worldName } });
     return () => { delete bridge.advanceTime; delete bridge.render_game_to_text; };
   }, [character, theme, updateJourney]);

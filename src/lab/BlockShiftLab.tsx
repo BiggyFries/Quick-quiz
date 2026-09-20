@@ -1,3 +1,5 @@
+import { drawScenery } from '../venture/scenery';
+import { isGamePaused, gameFeedback } from '../venture/runtime';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { drawCharacterCanvas, type CharacterCustomization } from '../character/character';
 import {
@@ -169,14 +171,7 @@ function drawVictoryInRoom(ctx: CanvasRenderingContext2D, state: BlockShiftState
 }
 
 function drawLab(ctx: CanvasRenderingContext2D, state: BlockShiftState, transition: VisualTransition | null, time: number, character: CharacterCustomization, journey: VictoryJourney, theme: LabTheme) {
-  const sky = ctx.createLinearGradient(0, 0, 0, 844);
-  sky.addColorStop(0, theme.skyTop); sky.addColorStop(.55, theme.skyMid); sky.addColorStop(1, theme.skyBottom);
-  ctx.fillStyle = sky; ctx.fillRect(0, 0, 390, 844);
-  const halo = ctx.createRadialGradient(195, 340, 20, 195, 340, 260);
-  halo.addColorStop(0, '#dff7cf4d'); halo.addColorStop(1, '#18383d00'); ctx.fillStyle = halo; ctx.fillRect(0, 115, 390, 500);
-  ctx.fillStyle = '#0b252b4a'; ctx.beginPath(); ctx.moveTo(0, 510); ctx.lineTo(0, 175); ctx.lineTo(68, 135); ctx.lineTo(96, 510); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(390, 510); ctx.lineTo(390, 175); ctx.lineTo(322, 135); ctx.lineTo(294, 510); ctx.fill();
-
+  drawScenery(ctx, 1, time);
   for (let y = 0; y < BLOCK_SHIFT_HEIGHT; y += 1) {
     for (let x = 0; x < BLOCK_SHIFT_WIDTH; x += 1) {
       const rail = y === BLOCK_SHIFT_GOAL.y;
@@ -215,7 +210,7 @@ function drawLab(ctx: CanvasRenderingContext2D, state: BlockShiftState, transiti
   }
 }
 
-export function BlockShiftLab({ onExit, onComplete, character, theme = PROTOTYPE_THEME, contextLabel = 'PREVIEW TESTER GAME' }: { onExit: () => void; onComplete?: () => void; character: CharacterCustomization; theme?: LabTheme; contextLabel?: string }) {
+export function BlockShiftLab({ onExit, onComplete, character, theme = PROTOTYPE_THEME, contextLabel = 'THE PUZZLE ARCADE' }: { onExit: () => void; onComplete?: () => void; character: CharacterCustomization; theme?: LabTheme; contextLabel?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [state, setState] = useState(initialBlockShiftState);
   const stateRef = useRef(state);
@@ -247,6 +242,7 @@ export function BlockShiftLab({ onExit, onComplete, character, theme = PROTOTYPE
   }, [updateJourney]);
 
   const move = useCallback((direction: LabDirection) => {
+    if(isGamePaused())return;gameFeedback();
     if (journeyRef.current.phase !== 'idle') updateJourney((current) => moveVictoryJourney(current, direction));
     else commit((current) => moveBlockShift(current, direction));
   }, [commit, updateJourney]);
@@ -270,7 +266,7 @@ export function BlockShiftLab({ onExit, onComplete, character, theme = PROTOTYPE
   }, [character, theme]);
 
   useEffect(() => {
-    const interval = window.setInterval(() => { if (!manualTime.current && journeyRef.current.phase === 'celebrating') updateJourney((current) => tickVictoryJourney(current, 50)); }, 50);
+    const interval = window.setInterval(() => { if (!isGamePaused() && !manualTime.current && journeyRef.current.phase === 'celebrating') updateJourney((current) => tickVictoryJourney(current, 50)); }, 50);
     return () => window.clearInterval(interval);
   }, [updateJourney]);
 
@@ -288,7 +284,7 @@ export function BlockShiftLab({ onExit, onComplete, character, theme = PROTOTYPE
 
   useEffect(() => {
     const bridge = window as typeof window & { advanceTime?: (ms: number) => void; render_game_to_text?: () => string };
-    bridge.advanceTime = (ms: number) => { manualTime.current = true; manualTimeOffset.current += ms; updateJourney((current) => tickVictoryJourney(current, ms)); drawNowRef.current?.(); };
+    bridge.advanceTime = (ms: number) => { manualTime.current = true; if(isGamePaused())return; manualTimeOffset.current += ms; updateJourney((current) => tickVictoryJourney(current, ms)); drawNowRef.current?.(); };
     bridge.render_game_to_text = () => JSON.stringify({ ...blockShiftSnapshot(stateRef.current), victory: journeyRef.current, character, theme: { id: theme.id, worldName: theme.worldName } });
     return () => { delete bridge.advanceTime; delete bridge.render_game_to_text; };
   }, [character, theme, updateJourney]);
