@@ -7,6 +7,7 @@ import { blockShiftSnapshot, initialBlockShiftState, moveBlockShift, undoBlockSh
 import { adventureSnapshot, closeAdventureTerminal, initialAdventureState, inputAdventureTerminalLetter, interactAdventure, moveAdventure, resetAdventureTerminal, scoreAdventureWordGuess, submitAdventureTerminal, tickAdventure } from '../src/lab/adventure';
 import { CLASSIC_LABS, classicLabSnapshot, initialClassicLabState, markWordGuess, updateClassicLab, type ClassicLabState } from '../src/lab/classicLabs';
 import { adjacentMineCount, initialMineTrailState, isMine, mineTrailSnapshot, moveMineTrail, revealMineTrail } from '../src/lab/mineTrail';
+import { BEAM_TARGET, BRIDGE_TARGET, DOMINO_SOLUTION, FLOOD_SOLUTION, INEQUALITY_TARGET, MAGNET_TARGET, MOTION_LABS, PEG_SOLUTION, SIGNAL_PATH, STAR_TARGET, UNTANGLE_SOLUTION, initialMotionLabState, motionLabSnapshot, updateMotionLab, type MotionLabState } from '../src/lab/motionLabs';
 import { calculateAchievements } from '../src/services/achievements';
 import { addDays, localDateKey } from '../src/services/date';
 import { ADVENTURE_SOLUTION } from './adventure-solution';
@@ -166,6 +167,63 @@ for (const lab of CLASSIC_LABS) {
   assert.equal(classicLabSnapshot(initial).puzzle, `classic-lab-${String(lab.id).padStart(2, '0')}`);
 }
 
+assert.deepEqual(MOTION_LABS.map((lab) => lab.id), [17, 18, 19, 20, 21, 22, 23, 24, 25, 26]);
+for (const lab of MOTION_LABS) {
+  const initial = initialMotionLabState(lab.id);
+  assert.equal(initial.status, 'playing');
+  assert.equal(motionLabSnapshot(initial).puzzle, `motion-lab-${lab.id}`);
+}
+
+let beamComplete = initialMotionLabState(17);
+for (const index of BEAM_TARGET) beamComplete = updateMotionLab(beamComplete, { type: 'activate', index });
+beamComplete = updateMotionLab(beamComplete, { type: 'submit' });
+assert.equal(beamComplete.status, 'complete'); assert.equal(beamComplete.selected.length, 3);
+
+let bridgeComplete = initialMotionLabState(18);
+for (let index = 0; index < BRIDGE_TARGET.length; index += 1) for (let count = 0; count < BRIDGE_TARGET[index]; count += 1) bridgeComplete = updateMotionLab(bridgeComplete, { type: 'activate', index });
+assert.equal(bridgeComplete.status, 'complete'); assert.deepEqual(bridgeComplete.links, BRIDGE_TARGET);
+bridgeComplete = updateMotionLab(bridgeComplete, { type: 'tick', ms: 200 });
+assert.ok(bridgeComplete.spring.slice(0, 4).every((value) => value > 0));
+
+let floodComplete = initialMotionLabState(19);
+for (const color of FLOOD_SOLUTION) floodComplete = updateMotionLab(floodComplete, { type: 'activate', index: color });
+assert.equal(floodComplete.status, 'complete'); assert.equal(new Set(floodComplete.board.flat()).size, 1); assert.equal(floodComplete.moves, 4);
+
+let starComplete = initialMotionLabState(20);
+for (let index = 0; index < STAR_TARGET.length; index += 1) while (starComplete.assignments[index] !== STAR_TARGET[index]) starComplete = updateMotionLab(starComplete, { type: 'activate', index });
+assert.equal(starComplete.status, 'complete'); assert.deepEqual(starComplete.assignments, STAR_TARGET);
+
+let pegComplete: MotionLabState = initialMotionLabState(21);
+for (const [from, to] of PEG_SOLUTION) {
+  pegComplete = updateMotionLab(pegComplete, { type: 'activate', index: from });
+  pegComplete = updateMotionLab(pegComplete, { type: 'activate', index: to });
+  pegComplete = updateMotionLab(pegComplete, { type: 'tick', ms: 520 });
+}
+assert.equal(pegComplete.status, 'complete');
+assert.equal(pegComplete.id === 21 && pegComplete.pegs.filter(Boolean).length, 1);
+
+let dominoComplete = initialMotionLabState(22);
+for (const [first, second] of DOMINO_SOLUTION) { dominoComplete = updateMotionLab(dominoComplete, { type: 'activate', index: first }); dominoComplete = updateMotionLab(dominoComplete, { type: 'activate', index: second }); dominoComplete = updateMotionLab(dominoComplete, { type: 'tick', ms: 520 }); }
+assert.equal(dominoComplete.status, 'complete'); assert.equal(dominoComplete.pairs.length, 6);
+
+let inequalityComplete = initialMotionLabState(23);
+for (let index = 0; index < INEQUALITY_TARGET.length; index += 1) while (inequalityComplete.values[index] !== INEQUALITY_TARGET[index]) inequalityComplete = updateMotionLab(inequalityComplete, { type: 'activate', index });
+assert.equal(inequalityComplete.status, 'complete'); assert.deepEqual(inequalityComplete.values, INEQUALITY_TARGET);
+
+let signalComplete = initialMotionLabState(24);
+for (const index of SIGNAL_PATH) signalComplete = updateMotionLab(signalComplete, { type: 'activate', index });
+assert.equal(signalComplete.status, 'complete'); assert.equal(signalComplete.progress, SIGNAL_PATH.length);
+
+let magnetComplete = initialMotionLabState(25);
+for (let index = 0; index < MAGNET_TARGET.length; index += 1) magnetComplete = updateMotionLab(magnetComplete, { type: 'activate', index });
+assert.equal(magnetComplete.status, 'complete'); assert.deepEqual(magnetComplete.orientations, MAGNET_TARGET);
+magnetComplete = updateMotionLab(magnetComplete, { type: 'tick', ms: 800 });
+assert.ok(magnetComplete.angles.every((angle, index) => Math.abs(angle - MAGNET_TARGET[index] * Math.PI) < .1));
+
+let untangleComplete = initialMotionLabState(26);
+for (const [first, second] of UNTANGLE_SOLUTION) { untangleComplete = updateMotionLab(untangleComplete, { type: 'activate', index: first }); untangleComplete = updateMotionLab(untangleComplete, { type: 'activate', index: second }); untangleComplete = updateMotionLab(untangleComplete, { type: 'tick', ms: 600 }); }
+assert.equal(untangleComplete.status, 'complete'); assert.equal(untangleComplete.crossings, 0);
+
 const relicInitial = initialClassicLabState(3);
 const relicWalk = updateClassicLab(relicInitial, { type: 'move', direction: 'right' });
 assert.deepEqual(relicWalk.player, { x: 2, y: 13 });
@@ -319,4 +377,4 @@ await migratedService.updateCharacter(customExplorer);
 assert.deepEqual((await migratedService.getProfile())?.character, customExplorer);
 assert.deepEqual(JSON.parse(localStorage.getItem('dailyVentureLocalReviewerProfile') ?? '{}').character, customExplorer);
 
-console.log('unit: character persistence, 7 schemas, Adventure plus sixteen Puzzle Labs, timezone gating, attempts, archive rules, idempotency, and achievement thresholds passed');
+console.log('unit: character persistence, 7 schemas, Adventure plus twenty-six numbered Puzzle Labs, timezone gating, attempts, archive rules, idempotency, and achievement thresholds passed');

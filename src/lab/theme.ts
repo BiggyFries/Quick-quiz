@@ -16,11 +16,11 @@ export interface LabTheme {
 
 export const PROTOTYPE_THEME: LabTheme = {
   id: 'prototype-corridor',
-  worldName: 'Prototype Corridor',
+  worldName: 'The Verdant Isles',
   lore: 'A shifting test wing where the Wayfinder Guild studies new puzzle mechanisms.',
-  skyTop: '#163c42', skyMid: '#2e6768', skyBottom: '#071c24',
-  surface: '#31585a', surfaceAlt: '#486b67', accent: '#f6c85f', accent2: '#71d8c7',
-  portal: '#9ff4e4', portalName: 'field portal', collectibleName: 'signal',
+  skyTop: '#dce8cc', skyMid: '#a5be98', skyBottom: '#42664e',
+  surface: '#5c7f65', surfaceAlt: '#99b08a', accent: '#f6c85f', accent2: '#71d8c7',
+  portal: '#9ff4e4', portalName: 'garden portal', collectibleName: 'signal',
 };
 
 export const WATCHER_TEST_THEME: LabTheme = {

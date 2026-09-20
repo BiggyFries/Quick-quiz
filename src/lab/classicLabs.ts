@@ -155,6 +155,7 @@ export interface ConnectionsState extends BaseLabState { id: 16; groups: Connect
 export type ClassicLabState = RelicState | StackState | RiverState | CoilState | PrismState | MergeState | LanternState | IceState | CrateState | EchoState | GearState | OrbitState | WordState | ConnectionsState;
 
 export type ClassicLabAction =
+  | { type: 'aim'; x: number }
   | { type: 'move'; direction: ClassicDirection }
   | { type: 'tick'; ms: number }
   | { type: 'rotate' }
@@ -344,7 +345,7 @@ function initialConnectionsState(): ConnectionsState {
   return { id: 16, status: 'playing', elapsedMs: 0, score: 0, message: 'Select four words that share one precise connection.', groups: CONNECTION_GROUPS.map((group) => ({ ...group, words: [...group.words] })), words: [...CONNECTION_ORDER], selected: [], solved: [], mistakes: 0, maxMistakes: 4 };
 }
 
-export function initialClassicLabState(id: ClassicLabId): ClassicLabState {
+function baseClassicLabState(id: ClassicLabId): ClassicLabState {
   if (id === 3) return initialRelicState();
   if (id === 4) return initialStackState();
   if (id === 5) return initialRiverState();
@@ -359,6 +360,26 @@ export function initialClassicLabState(id: ClassicLabId): ClassicLabState {
   if (id === 14) return initialOrbitState();
   if (id === 15) return initialWordState();
   return initialConnectionsState();
+}
+
+/** Seeded remixes preserve each mechanic's rules and use constructive scrambles. */
+export function initialClassicLabState(id: ClassicLabId, seed = 0): ClassicLabState {
+  const state=baseClassicLabState(id); if(!seed)return state;
+  let value=seed>>>0;const random=()=>{value=(Math.imul(value,1664525)+1013904223)>>>0;return value/4294967296;};
+  if(state.id===5)state.movers=state.movers.map(m=>({...m,x:m.x+random()*2}));
+  if(state.id===7)state.ball={...state.ball,vx:(random()>.5?1:-1)*Math.abs(state.ball.vx)};
+  if(state.id===8){state.board=Array.from({length:4},()=>Array(4).fill(0));const a=Math.floor(random()*16);let b=Math.floor(random()*15);if(b>=a)b++;state.board[Math.floor(a/4)][a%4]=2;state.board[Math.floor(b/4)][b%4]=2;}
+  if(state.id===9){state.lights=Array(25).fill(true);for(let i=0;i<9;i++){const n=Math.floor(random()*25);const x=n%5,y=Math.floor(n/5);for(const [dx,dy] of [[0,0],[1,0],[-1,0],[0,1],[0,-1]])if(x+dx>=0&&x+dx<5&&y+dy>=0&&y+dy<5){const k=(y+dy)*5+x+dx;state.lights[k]=!state.lights[k];}}state.lit=state.lights.filter(Boolean).length;}
+  if(state.id===12)state.sequence=Array.from({length:8},()=>Math.floor(random()*4));
+  if(state.id===13){state.target=state.target.map(()=>Math.floor(random()*4));state.rotations=state.target.map(t=>(t+1+Math.floor(random()*3))%4);}
+  if(state.id===15)state.target=['TRAIL','GROVE','BLOOM','STONE','FLAME','CORAL','LIGHT','RIVER','CLOUD','FROST','SPARK','EARTH','OCEAN','MAPLE'][Math.floor(random()*14)];
+  if(state.id===16){
+    const packs:ConnectionGroup[][]=[
+      [{name:'IN THE SKY',words:['CLOUD','SUN','MOON','STAR'],color:'#e8bd62'},{name:'GARDEN TOOLS',words:['RAKE','SPADE','HOE','TROWEL'],color:'#86bd75'},{name:'MUSICAL INSTRUMENTS',words:['HARP','FLUTE','DRUM','VIOLIN'],color:'#b59bd0'},{name:'UNITS OF TIME',words:['SECOND','MINUTE','HOUR','WEEK'],color:'#8ab8d9'}],
+      [{name:'PRECIOUS STONES',words:['RUBY','OPAL','JADE','PEARL'],color:'#d295b4'},{name:'WAYS TO MOVE',words:['HOP','SKIP','WALK','RUN'],color:'#e8bd62'},{name:'PARTS OF A BOOK',words:['SPINE','COVER','PAGE','INDEX'],color:'#86bd75'},{name:'ON A CHESSBOARD',words:['PAWN','ROOK','KING','QUEEN'],color:'#8ab8d9'}]
+    ];state.groups=packs[Math.floor(random()*packs.length)];state.words=state.groups.flatMap(g=>g.words);for(let i=state.words.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[state.words[i],state.words[j]]=[state.words[j],state.words[i]];}
+  }
+  return state;
 }
 
 function relicWalkable(point: Point) {
@@ -848,6 +869,7 @@ function shuffleConnections(state: ConnectionsState): ConnectionsState {
 }
 
 export function updateClassicLab(state: ClassicLabState, action: ClassicLabAction): ClassicLabState {
+  if(action.type==='aim' && state.id===7 && state.status==='playing')return {...state,paddleX:Math.max(70,Math.min(320,action.x)),message:'Follow the prism with your light bar. Drag anywhere on the playfield.'};
   if (action.type === 'tick') {
     if (state.id === 3) return tickRelic(state, action.ms);
     if (state.id === 4) return tickStack(state, action.ms);

@@ -8,3 +8,4 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+interface Window { advanceTime?: (ms: number) => void; render_game_to_text?: () => string }

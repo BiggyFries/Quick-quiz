@@ -1,63 +1,57 @@
 # Daily Venture
 
-A mobile-first daily puzzle anthology built with Vite, React, TypeScript, Phaser, Matter physics, Zod, and Supabase. Week 1 contains seven complete draft adventures, each with trivia, varied logic, rhythm, memory, and multi-stage finale rooms.
+**Little escapes. Big discoveries.** A responsive puzzle arcade with 27 playable games, a five-room daily expedition, an explorer creator, saved favorites, and a local stamp passport. Built with React, TypeScript, Vite, and Canvas. The original seven story adventures remain available from the footer.
 
-## Run locally
+## Play and test
 
-```bash
+```sh
 npm install
 npm run dev
 ```
 
-With no Supabase environment variables, the app runs in local reviewer mode. `Preview Week 1` creates a local reviewer profile, exposes all seven drafts, and lets a reviewer assign a simulated launch date. Guest play, attempts, achievements, archive availability, and settings can all be reviewed locally.
+Open the printed local address. The app works without an account or backend. Each room includes a ready screen, instructions, a pause menu, touch controls, and a manually entered completion portal. Daily expeditions save at room boundaries; individual unfinished rooms restart after a reload. Arcade layouts are handcrafted; the daily mix uses the date to select rooms and remix memory, word, gear, lantern, and connection puzzles.
+
+- **Explore:** Venture Circuit, Relic Run, and Icebound Route.
+- **Think:** Block Shift, Mine Trail, Rune Merge, Lantern Grid, Crate Circuit, Gear Links, Rune Word, Relic Groups, and ten motion puzzles.
+- **React:** Sky Stack, River Relay, Trail Coil, Prism Break, and Orbit Pulse.
+- **Remember:** Echo Sequence.
+
+Use the on-screen controls or arrow keys/WASD for movement. Space activates many mechanics. Escape pauses. Select How to play for each room's instructions. Logic games expose an Undo move action; Block Shift retains its built-in undo. Games pause when the document becomes hidden. Sound and reduced menu motion can be adjusted in Settings.
+
+## Install on iPhone
+
+1. Open the deployed HTTPS address in Safari.
+2. Tap **Share → Add to Home Screen**.
+3. Leave **Open as Web App** enabled, then tap **Add**.
+
+Wait for the first online visit to finish downloading before going offline. The production build precaches the complete game, including lazily loaded rooms and original story art. A manifest, Apple touch icon, standalone metadata, safe-area layout, and versioned service worker are included. Progress is stored on the current device; it does not sync between browsers or installations.
 
 ## Verification
 
-```bash
+```sh
 npm test
 npm run test:smoke
 npm run test:e2e
 npm run build
+npm run preview -- --port 4174
 ```
 
-- Unit coverage validates the seven content schemas, unique logic solutions, timezone boundaries, attempt rules, idempotent completion, archive behavior, and achievement thresholds.
-- Deterministic reducer smoke coverage completes seven victories and all 35 room failure routes.
-- Playwright drives the real React/Phaser UI through all 35 rooms and seven Matter finales, checks themed defeat/results states, validates guest non-persistence, and captures the 360×640, 390×844, and 430×932 layouts.
-- `window.advanceTime(ms)` and `window.render_game_to_text()` remain available for deterministic game clients.
+The production preview is served at `/Quick-quiz/` to match the existing GitHub Pages site. Service-worker registration runs only in production. `scripts/build-offline.mjs` generates a versioned asset list after the Vite build. Existing open installs adopt a new version after their old tabs are closed.
 
-## Supabase production setup
+The browser suites cover the rebuilt home, search/categories/favorites, all 27 game layouts at three phone sizes, ready/pause/undo, portal awards, a full seeded daily expedition, the complete maze with both terminals, all classic and motion engines, and the original 35 story rooms. `window.render_game_to_text()` and `window.advanceTime(ms)` provide deterministic inspection.
 
-1. Create a Supabase project and apply [the migration](./supabase/migrations/202607140001_daily_venture.sql).
-2. Run `npm run content:seed`, then apply [the generated Week 1 seed](./supabase/seed.sql).
-3. Deploy every function in `supabase/functions`. Public content functions perform server-time gating; protected functions validate the bearer token internally and use the service role only after authentication.
-4. Promote the reviewer account after its first magic-link sign-in:
+## Source map
 
-   ```sql
-   update public.profiles
-   set role = 'reviewer'
-   where id = (select id from auth.users where email = 'reviewer@example.com');
-   ```
+- `src/venture/VentureApp.tsx` — discovery, arcade, passport, player shell, and daily expedition.
+- `src/venture/Art.tsx` — original vector island, compass, and puzzle illustrations.
+- `src/venture/scenery.ts` — canvas landscape scenes shared by all arcade rooms.
+- `src/venture/catalog.ts` — the full game inventory, instructions, tips, and daily selection.
+- `src/venture/storage.ts` — device-local passport, favorites, personal bests, and room checkpoints.
+- `src/lab/` — game engines and renderers, with reusable portal completion.
+- `src/character/` — the shared customizable explorer.
+- `src/App.tsx`, `src/content/week1.ts`, `src/game/` — the preserved story-adventure collection (`?legacy=1`).
+- `supabase/` — optional account backend for the original stories; the new arcade does not require it.
 
-5. Add these deployment secrets without committing them:
+## Publishing
 
-   ```text
-   VITE_SUPABASE_URL
-   VITE_SUPABASE_PUBLISHABLE_KEY
-   ```
-
-The reviewer gallery starts unscheduled. After content approval, `Set Date` updates the seven database rows to consecutive release dates. No frontend rebuild is needed.
-
-## GitHub Pages
-
-[The Pages workflow](./.github/workflows/deploy.yml) tests and builds on `main`, then publishes `dist`. The current production base path is `/Quick-quiz/`, matching this repository; update `vite.config.ts` if the repository name changes.
-
-## Project map
-
-- `src/content/week1.ts` — all seven validated adventures.
-- `src/game/session.ts` — deterministic puzzle/run state machine and active-time accounting.
-- `src/game/VentureCanvas.tsx` — Phaser scene, layered code-native room art, explorer vignettes, and Matter finale mechanisms.
-- `src/services/ventureService.ts` — Supabase production adapter and local reviewer adapter.
-- `supabase/` — Postgres schema, RLS policies, generated seed, and eight Edge Functions.
-- `public/assets/backplates/` — home and seven generated paper-diorama establishing scenes.
-
-The web output stays framework-neutral at the native boundary, so a later Capacitor iOS wrapper can package the same `dist` build without changing gameplay architecture.
+The existing GitHub Pages workflow tests and builds `main`, then deploys `dist`. Production uses `/Quick-quiz/` as its base. Update `vite.config.ts` when hosting at a different path. No production credentials are required for the rebuilt arcade.
